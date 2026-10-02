@@ -1,8 +1,10 @@
 // QA visual interativo: login, desktop, busca com resultados e chat IA respondendo
+require('dotenv').config();
 const { chromium } = require('playwright');
 
-const LOGIN_USER = process.env.LOGIN_USER || 'admin';
-const LOGIN_PASS = process.env.LOGIN_PASS || 'virgo123';
+const QA_USER = process.env.QA_USER;
+const QA_PASS = process.env.QA_PASS;
+if (!QA_USER || !QA_PASS) { console.error('QA_USER/QA_PASS não definidos no .env'); process.exit(1); }
 
 (async () => {
   const base = process.env.BASE || 'http://localhost:8901';
@@ -13,8 +15,8 @@ const LOGIN_PASS = process.env.LOGIN_PASS || 'virgo123';
   await page.goto(base + '/login', { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForTimeout(1800);
   await page.screenshot({ path: 'docs/qa/login-desktop.png' });
-  await page.fill('#loginUser', LOGIN_USER);
-  await page.fill('#loginPass', LOGIN_PASS);
+  await page.fill('#loginUser', QA_USER);
+  await page.fill('#loginPass', QA_PASS);
   await page.click('#loginSubmit');
   await page.waitForURL(base + '/', { timeout: 10000 });
   await page.waitForTimeout(2600);
