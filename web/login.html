@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Virgo Scout — Entrar</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="login.css">
+</head>
+<body class="login-page">
+
+<div class="sky" aria-hidden="true">
+  <i class="glow g1"></i><i class="glow g2"></i><i class="glow g3"></i>
+  <svg class="constellation" viewBox="0 0 720 400" preserveAspectRatio="xMidYMid slice">
+    <g class="c-lines" fill="none" stroke="rgba(56,189,248,.14)" stroke-width="1">
+      <path d="M80 330 L170 250 L250 275 L330 190 L420 210 L505 130 L590 165"/>
+      <path d="M330 190 L355 95 L430 60"/>
+      <path d="M250 275 L215 165"/>
+    </g>
+    <g class="c-stars" fill="#7dd3fc">
+      <circle cx="80" cy="330" r="2.5" class="tw t1"/><circle cx="170" cy="250" r="2" class="tw t2"/>
+      <circle cx="250" cy="275" r="3" class="tw t3"/><circle cx="330" cy="190" r="3.5" class="tw t4"/>
+      <circle cx="420" cy="210" r="2" class="tw t2"/><circle cx="505" cy="130" r="3" class="tw t5"/>
+      <circle cx="590" cy="165" r="2.5" class="tw t1"/><circle cx="355" cy="95" r="2.5" class="tw t3"/>
+      <circle cx="430" cy="60" r="2" class="tw t4"/><circle cx="215" cy="165" r="2" class="tw t5"/>
+    </g>
+    <circle cx="330" cy="190" r="9" fill="none" stroke="rgba(56,189,248,.35)" stroke-width="1" class="pulse-ring"/>
+    <text x="344" y="176" fill="rgba(125,211,252,.5)" font-size="11" font-family="Inter, system-ui">Spica</text>
+  </svg>
+</div>
+
+<main class="login-wrap">
+  <section class="login-card" aria-labelledby="loginTitle">
+    <div class="login-brand">
+      <img src="assets/LOGO.png" alt="" class="login-logo">
+      <div>
+        <h1 id="loginTitle">Virgo Scout</h1>
+        <p>Constele seus melhores leads</p>
+      </div>
+    </div>
+
+    <form id="loginForm" novalidate>
+      <label class="field" for="loginUser">
+        <span>Usuário</span>
+        <div class="input-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <input id="loginUser" name="user" type="text" autocomplete="username" placeholder="seu usuário" required>
+        </div>
+      </label>
+
+      <label class="field" for="loginPass">
+        <span>Senha</span>
+        <div class="input-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <input id="loginPass" name="pass" type="password" autocomplete="current-password" placeholder="••••••••" required>
+          <button class="eye" id="togglePass" type="button" aria-label="Mostrar senha">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </label>
+
+      <div class="login-row">
+        <label class="check"><input type="checkbox" id="keep"><i></i> Manter conectado</label>
+        <button type="button" class="linkish" id="forgot">Esqueci a senha</button>
+      </div>
+
+      <p class="login-err" id="loginErr" role="alert" hidden>Usuário ou senha inválidos — tente novamente.</p>
+
+      <button class="login-btn" id="loginSubmit" type="submit">
+        <span>Entrar</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+      </button>
+    </form>
+
+    <footer class="login-foot">Virgo Tech <span>v1.0.0</span> · acesso local · <em>admin / virgo123</em></footer>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script src="vendor/gsap.min.js"></script>
+<script src="login.js"></script>
+</body>
+</html>

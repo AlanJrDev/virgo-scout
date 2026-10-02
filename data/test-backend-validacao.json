@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Teste",
+    "rating": 5,
+    "reviews": 10,
+    "address": "DF",
+    "phone": "",
+    "website": "",
+    "source": "test",
+    "captured_at": "2026-10-02T20:31:15.877Z"
+  }
+]

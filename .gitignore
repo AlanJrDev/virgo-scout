@@ -1,8 +1,6 @@
 node_modules/
+*.log
 .env
-.env.*
-data/
-test-results/
 playwright-report/
-.DS_Store
-Thumbs.db
+test-results/
+docs/qa/

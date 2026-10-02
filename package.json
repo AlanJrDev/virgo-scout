@@ -4,9 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test src/tests/backend.test.js",
+    "test": "node --test src/tests/backend.test.js src/tests/classify.test.js src/tests/wa.test.js src/tests/login.test.js",
     "capture": "node scripts/capture-advogados-df.js",
-    "capture:quick": "QUERIES=advogados Distrito Federal MAX_DETAILS=40 MAX_SCROLLS=25 node scripts/capture-advogados-df.js"
+    "capture:quick": "cross-env QUERIES=\"advogados Distrito Federal\" MAX_DETAILS=40 MAX_SCROLLS=25 node scripts/capture-advogados-df.js",
+    "classify": "node scripts/classify-leads.js",
+    "build:web": "node scripts/build-web-data.js",
+    "serve": "node scripts/serve-web.js"
   },
   "keywords": [],
   "type": "commonjs",
