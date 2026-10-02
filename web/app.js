@@ -612,11 +612,34 @@
     aiInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } });
   }
 
+  /* ---------- identidade da sessão (topbar) ---------- */
+  function emailInitials(email) {
+    var parts = String(email || '').split('@')[0].split(/[._-]+/).filter(Boolean);
+    var a = parts[0] ? parts[0][0] : '';
+    var b = parts[1] ? parts[1][0] : (parts[0] && parts[0][1] ? parts[0][1] : '');
+    return (a + b).toUpperCase() || 'VS';
+  }
+  function loadMe() {
+    fetch('/api/me', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (me) {
+        if (!me) return;
+        var name = document.getElementById('uName');
+        var role = document.getElementById('uRole');
+        var av = document.getElementById('uAvatar');
+        if (name) name.textContent = me.user;
+        if (role) role.textContent = me.role === 'founder' ? 'Fundador' : 'Cofounder';
+        if (av) av.textContent = emailInitials(me.user);
+      })
+      .catch(function () {});
+  }
+
   /* ---------- boot: API ao vivo com fallback estático ---------- */
   var FALLBACK = window.VIRGO_DATA || { stats: {}, top: [], pool: [], regions: [], ratingBuckets: [], dots: [], series: { days: [], values: [0] }, donut: [], recent: [], areas: [] };
   function boot(payload) {
     currentPayload = payload && payload.stats && payload.stats.total ? payload : FALLBACK;
     render(currentPayload);
+    loadMe();
     pollCapture();
   }
   if (window.fetch && location.protocol !== 'file:') {

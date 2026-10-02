@@ -43,7 +43,7 @@
   });
 
   $('#forgot').addEventListener('click', function () {
-    toast('Credenciais locais: definidas em LOGIN_USER / LOGIN_PASS no .env', 'ok');
+    toast('Contate o administrador do painel para redefinir sua senha', 'ok');
   });
 
   function showError(msg) {
@@ -64,7 +64,7 @@
     e.preventDefault();
     err.hidden = true;
     var u = user.value.trim(), p = pass.value;
-    if (!u || !p) { showError('Preencha usuário e senha para continuar.'); return; }
+    if (!u || !p) { showError('Preencha e-mail e senha para continuar.'); return; }
     setBusy(true);
     fetch('/api/login', {
       method: 'POST',
@@ -75,7 +75,12 @@
     }).then(function (res) {
       if (!res.ok) {
         setBusy(false);
-        showError(res.b && res.b.error === 'locked' ? 'Muitas tentativas — aguarde 30s.' : 'Usuário ou senha inválidos — tente novamente.');
+        var e = res.b && res.b.error;
+        showError(
+          e === 'locked' ? 'Muitas tentativas — aguarde 30s.' :
+          e === 'setup_required' ? 'Painel não configurado — rode scripts/init-users.js' :
+          'E-mail ou senha inválidos — tente novamente.'
+        );
         pass.value = '';
         pass.focus();
         return;
