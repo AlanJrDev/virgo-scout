@@ -5,6 +5,7 @@ const { spawn } = require('node:child_process');
 require('dotenv').config();
 const { buildPayload } = require('../src/utils/metrics');
 const { authenticate, newSessionToken, loginAllowed, registerFail, clearFails } = require('./serve-web-auth');
+const { askGroq, formatContext } = require('./groq');
 
 const ROOT = path.join(__dirname, '..', 'web');
 const DATA = path.join(__dirname, '..', 'data');
@@ -193,6 +194,27 @@ const server = http.createServer((req, res) => {
   if (url.startsWith('/api')) {
     if (!authed) { json(res, 401, { error: 'unauthorized' }); return; }
     if (url === '/api/me') { json(res, 200, { user: sess.email, role: sess.role }); return; }
+    if (url === '/api/insight' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 8192) req.destroy(); });
+      req.on('end', async () => {
+        let q = '';
+        let history = [];
+        try {
+          const j = JSON.parse(body || '{}');
+          q = String(j.q || '').slice(0, 1000);
+          history = Array.isArray(j.history) ? j.history.slice(-6) : [];
+        } catch {}
+        if (!q) { json(res, 400, { error: 'empty_q' }); return; }
+        try {
+          const r = await askGroq({ question: q, context: formatContext(livePayload()), history });
+          json(res, 200, { answer: r.answer, source: 'groq' });
+        } catch (e) {
+          json(res, 503, { error: e.code || 'groq_error' });
+        }
+      });
+      return;
+    }
     if (url === '/api/leads') {
       try { json(res, 200, livePayload()); } catch (e) { json(res, 500, { error: e.message }); }
       return;

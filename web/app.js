@@ -590,21 +590,39 @@
     $('#chatLog').appendChild(el);
     return el;
   }
+  var chatHistory = [];
+  function chatCaption(src) {
+    return src ? ' <em class="ai-src">' + (src === 'groq' ? 'Groq' : 'local') + '</em>' : '';
+  }
   function sendChat() {
     var input = $('#aiInput');
     var q = (input.value || '').trim();
     if (!q) return;
     input.value = '';
     appendUserMsg(q);
+    chatHistory.push({ role: 'user', text: q });
     var typing = document.createElement('div');
     typing.className = 'msg assistant';
     typing.innerHTML = '<span class="ai-typing" aria-label="Pensando"><i></i><i></i><i></i></span>';
     $('#chatLog').appendChild(typing);
     typing.scrollIntoView({ block: 'nearest' });
-    setTimeout(function () {
-      typing.innerHTML = '<p>' + aiAnswer(q) + '</p>';
+
+    function finish(html, src) {
+      chatHistory.push({ role: 'assistant', text: String(html).replace(/<[^>]+>/g, '') });
+      typing.innerHTML = '<p>' + html + chatCaption(src) + '</p>';
       typing.scrollIntoView({ block: 'nearest' });
-    }, 480);
+    }
+    fetch('/api/insight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: q, history: chatHistory.slice(0, -1).slice(-6) })
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (d && d.answer) finish(escapeHtml(d.answer), d.source || 'groq');
+        else finish(aiAnswer(q), 'local');
+      })
+      .catch(function () { finish(aiAnswer(q), 'local'); });
   }
   var aiInput = $('#aiInput'), aiSend = $('#aiSend');
   if (aiInput && aiSend) {

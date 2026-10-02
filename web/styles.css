@@ -1,4 +1,4 @@
-/* Virgo Tech — Visão Geral | tokens extraídos de TEMPLATE.png */
+﻿/* Virgo Tech â€” VisÃ£o Geral | tokens extraÃ­dos de TEMPLATE.png */
 :root{
   --bg:#04070f; --bg2:#060b16; --surface:#0a1322; --surface2:#0d1729;
   --border:rgba(120,160,255,.10); --border-strong:rgba(120,160,255,.20);
@@ -167,7 +167,7 @@ button.chip:active{transform:scale(.97)}
 .ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:11px;font-variant-numeric:tabular-nums}
 .badge{font-size:11px;font-weight:700;border-radius:99px;padding:4px 11px;flex:none}
 .badge.Alta{background:rgba(52,211,153,.14);color:var(--green);border:1px solid rgba(52,211,153,.3)}
-.badge.Média{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.3)}
+.badge.MÃ©dia{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.3)}
 .badge.Baixa{background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.3)}
 .wa-btn{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.32);color:#25D366;transition:transform 160ms var(--ease-out),background 160ms var(--ease-out);cursor:pointer}
 .wa-btn svg{width:15px;height:15px;fill:currentColor}
@@ -282,7 +282,7 @@ button.chip:active{transform:scale(.97)}
   *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
 }
 
-/* ---------- integra��o API (captura ao vivo + filtro por �rea) ---------- */
+/* ---------- integraï¿½ï¿½o API (captura ao vivo + filtro por ï¿½rea) ---------- */
 .cap-run{margin-top:9px;background:var(--blue);color:#fff;border:0;border-radius:9px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:filter 160ms var(--ease-out),transform 120ms var(--ease-out)}
 .cap-run:active{transform:scale(.97)}
 .cap-run:disabled{opacity:.55;cursor:default}
@@ -321,6 +321,7 @@ button.chip:active{transform:scale(.97)}
 .msg.assistant .ai-typing i{width:5px;height:5px;border-radius:50%;background:var(--faint);animation:aiDot 1s ease-in-out infinite}
 .msg.assistant .ai-typing i:nth-child(2){animation-delay:.15s}
 .msg.assistant .ai-typing i:nth-child(3){animation-delay:.3s}
+.ai-src{font-size:10px;font-style:normal;color:var(--faint);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
 @keyframes aiDot{0%,100%{opacity:.35}50%{opacity:1}}
 #chatLog{display:flex;flex-direction:column;gap:10px}
 #chatLog:not(:empty){margin-top:2px}
