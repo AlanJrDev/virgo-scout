@@ -1,26 +1,59 @@
-// Testes da tela de login (utilitários de sessão do servidor)
-const { test } = require('node:test');
+// Testes do login (autenticação por user-store + sessões)
+const { test, before, after } = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
-const { checkCredentials, newSessionToken } = require('../../scripts/serve-web-auth');
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-auth-'));
+process.env.USERS_FILE = path.join(TMP, 'users.json');
 
-test('credenciais padrão admin/virgo123 funcionam', () => {
-  assert.strictEqual(checkCredentials('admin', 'virgo123'), true);
+const { addUser } = require('../../src/utils/user-store');
+const { authenticate, newSessionToken, loginAllowed, registerFail, clearFails } = require('../../scripts/serve-web-auth');
+
+before(() => {
+  addUser('landevbrasil.ia@gmail.com', 'founder', 'iloveTI@26');
+  addUser('contatodylanjunio@gmail.com', 'cofounder', 'cofounder@26');
+});
+after(() => fs.rmSync(TMP, { recursive: true, force: true }));
+
+test('credenciais válidas autenticam com o papel correto', () => {
+  const r = authenticate('landevbrasil.ia@gmail.com', 'iloveTI@26');
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.user, { email: 'landevbrasil.ia@gmail.com', role: 'founder' });
+  const r2 = authenticate('CONTATODYLANJUNIO@gmail.com', 'cofounder@26');
+  assert.strictEqual(r2.status, 200);
+  assert.strictEqual(r2.user.role, 'cofounder');
 });
 
-test('senha errada é rejeitada', () => {
-  assert.strictEqual(checkCredentials('admin', 'errada'), false);
-  assert.strictEqual(checkCredentials('outro', 'virgo123'), false);
-  assert.strictEqual(checkCredentials('', ''), false);
+test('senha errada ou e-mail desconhecido → 401 (sem revelar qual)', () => {
+  assert.strictEqual(authenticate('landevbrasil.ia@gmail.com', 'errada').status, 401);
+  assert.strictEqual(authenticate('ninguem@x.com', 'iloveTI@26').status, 401);
+  assert.strictEqual(authenticate('', '').status, 401);
+  assert.strictEqual(authenticate('landevbrasil.ia@gmail.com', '').status, 401);
 });
 
-test('credenciais customizadas via env', () => {
-  process.env.LOGIN_USER = 'alan';
-  process.env.LOGIN_PASS = 'df2026';
-  assert.strictEqual(checkCredentials('alan', 'df2026'), true);
-  assert.strictEqual(checkCredentials('admin', 'virgo123'), false);
-  delete process.env.LOGIN_USER;
-  delete process.env.LOGIN_PASS;
+test('fail-closed: sem users.json → 503 setup_required', () => {
+  const f = process.env.USERS_FILE;
+  fs.renameSync(f, f + '.bak');
+  assert.strictEqual(authenticate('landevbrasil.ia@gmail.com', 'iloveTI@26').status, 503);
+  fs.renameSync(f + '.bak', f);
+});
+
+test('papel desconhecido no arquivo → 401 no login', () => {
+  const parsed = JSON.parse(fs.readFileSync(process.env.USERS_FILE, 'utf8'));
+  parsed.users.push({ email: 'ghost@x.com', role: 'root', algo: 'scrypt', salt: 'aGk=', hash: 'aGk=' });
+  fs.writeFileSync(process.env.USERS_FILE, JSON.stringify(parsed));
+  assert.strictEqual(authenticate('ghost@x.com', 'qualquer123').status, 401);
+});
+
+test('rate-limit: 5 falhas bloqueiam e clearFails libera', () => {
+  clearFails('1.2.3.4');
+  assert.strictEqual(loginAllowed('1.2.3.4'), true);
+  for (let i = 0; i < 5; i++) registerFail('1.2.3.4');
+  assert.strictEqual(loginAllowed('1.2.3.4'), false);
+  clearFails('1.2.3.4');
+  assert.strictEqual(loginAllowed('1.2.3.4'), true);
 });
 
 test('tokens de sessão são únicos e não vazios', () => {

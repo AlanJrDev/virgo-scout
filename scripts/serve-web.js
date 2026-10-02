@@ -4,7 +4,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 require('dotenv').config();
 const { buildPayload } = require('../src/utils/metrics');
-const { checkCredentials, newSessionToken, loginAllowed, registerFail, clearFails } = require('./serve-web-auth');
+const { authenticate, newSessionToken, loginAllowed, registerFail, clearFails } = require('./serve-web-auth');
 
 const ROOT = path.join(__dirname, '..', 'web');
 const DATA = path.join(__dirname, '..', 'data');
@@ -14,14 +14,14 @@ const JOB_ERR = path.join(DATA, 'capture-live.err.log');
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 
 /* ---------- sessões locais (em memória; reinício do servidor desloga) ---------- */
-const sessions = new Map(); // token -> expiresAt (ms)
+const sessions = new Map(); // token -> { exp, email, role }
 const DAY = 24 * 60 * 60 * 1000;
 function sessionValid(token) {
-  if (!token) return false;
-  const exp = sessions.get(token);
-  if (!exp) return false;
-  if (Date.now() > exp) { sessions.delete(token); return false; }
-  return true;
+  if (!token) return null;
+  const s = sessions.get(token);
+  if (!s) return null;
+  if (Date.now() > s.exp) { sessions.delete(token); return null; }
+  return s;
 }
 function parseCookies(header) {
   const out = {};
@@ -146,7 +146,8 @@ function livePayload() {
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
   const cookies = parseCookies(req.headers.cookie);
-  const authed = sessionValid(cookies.vs_auth);
+  const sess = sessionValid(cookies.vs_auth);
+  const authed = !!sess;
   const ip = req.socket.remoteAddress || '?';
 
   function serveFile(file, code) {
@@ -165,17 +166,19 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       let u = '', p = '', keep = false;
       try { const j = JSON.parse(body || '{}'); u = j.user; p = j.pass; keep = !!j.keep; } catch {}
-      if (!checkCredentials(u, p)) {
+      const r = authenticate(u, p);
+      if (r.status === 503) { json(res, 503, { error: 'setup_required' }); return; }
+      if (r.status !== 200) {
         const locked = registerFail(ip);
         json(res, locked ? 429 : 401, { error: locked ? 'locked' : 'invalid' });
         return;
       }
       clearFails(ip);
       const token = newSessionToken();
-      sessions.set(token, Date.now() + (keep ? 7 * DAY : DAY));
+      sessions.set(token, { exp: Date.now() + (keep ? 7 * DAY : DAY), email: r.user.email, role: r.user.role });
       const cookie = `vs_auth=${token}; Path=/; HttpOnly; SameSite=Lax${keep ? `; Max-Age=${7 * 86400}` : ''}`;
       res.setHeader('Set-Cookie', cookie);
-      json(res, 200, { ok: true, user: u });
+      json(res, 200, { ok: true, user: r.user.email, role: r.user.role });
     });
     return;
   }
@@ -189,6 +192,7 @@ const server = http.createServer((req, res) => {
   /* API exige sessão */
   if (url.startsWith('/api')) {
     if (!authed) { json(res, 401, { error: 'unauthorized' }); return; }
+    if (url === '/api/me') { json(res, 200, { user: sess.email, role: sess.role }); return; }
     if (url === '/api/leads') {
       try { json(res, 200, livePayload()); } catch (e) { json(res, 500, { error: e.message }); }
       return;

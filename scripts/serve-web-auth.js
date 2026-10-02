@@ -1,16 +1,12 @@
 const crypto = require('node:crypto');
+const store = require('../src/utils/user-store');
 
-// credenciais locais: LOGIN_USER / LOGIN_PASS no .env (padrão admin / virgo123)
-function checkCredentials(user, pass) {
-  const u = process.env.LOGIN_USER || 'admin';
-  const p = process.env.LOGIN_PASS || 'virgo123';
-  const a = Buffer.from(String(user || ''));
-  const b = Buffer.from(String(u));
-  const c = Buffer.from(String(pass || ''));
-  const d = Buffer.from(String(p));
-  const okUser = a.length === b.length && crypto.timingSafeEqual(a, b);
-  const okPass = c.length === d.length && crypto.timingSafeEqual(c, d);
-  return okUser && okPass;
+// autentica no user-store local; 503 = sem users.json (fail-closed), 401 = inválido
+function authenticate(email, pass) {
+  if (!store.readStore()) return { status: 503 };
+  const user = store.findUser(email);
+  if (!user || !store.verifyPassword(user, pass)) return { status: 401 };
+  return { status: 200, user: { email: user.email, role: user.role } };
 }
 
 function newSessionToken() {
@@ -35,4 +31,4 @@ function registerFail(ip) {
 }
 function clearFails(ip) { attempts.delete(ip); }
 
-module.exports = { checkCredentials, newSessionToken, loginAllowed, registerFail, clearFails };
+module.exports = { authenticate, newSessionToken, loginAllowed, registerFail, clearFails };
