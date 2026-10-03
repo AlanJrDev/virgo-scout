@@ -71,3 +71,20 @@ test('HTTP >= 500 vira 503; 4xx preserva status; 204 e corpo vazio viram null', 
   global.fetch = async () => ({ ok: true, status: 201, text: async () => '' });
   assert.strictEqual(await sbFetch('users', { method: 'POST', body: [] }), null);
 });
+
+test('sbFetchAll pagina com limit/offset até buscar todos (teto de 1000 do PostgREST)', async () => {
+  const { sbFetchAll } = require('../../src/utils/sb');
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    const m = String(url).match(/offset=(\d+)/);
+    const off = m ? parseInt(m[1], 10) : 0;
+    const n = off === 0 ? 1000 : 40;
+    return { ok: true, status: 200, text: async () => JSON.stringify(Array.from({ length: n }, (_, i) => ({ id: off + i }))) };
+  };
+  const all = await sbFetchAll('leads?select=*&order=id');
+  assert.strictEqual(all.length, 1040);
+  assert.strictEqual(calls.length, 2);
+  assert.ok(calls[0].includes('limit=1000') && calls[0].includes('offset=0'), calls[0]);
+  assert.ok(calls[1].includes('offset=1000'), calls[1]);
+});

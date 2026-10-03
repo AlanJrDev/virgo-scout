@@ -1,6 +1,6 @@
 const { sessionUser } = require('../scripts/serve-web-auth');
 const { parseCookies } = require('../src/utils/cookies');
-const { sbFetch, SbError } = require('../src/utils/sb');
+const { sbFetchAll, SbError } = require('../src/utils/sb');
 const { buildPayload } = require('../src/utils/metrics');
 const { json } = require('../src/utils/http-json');
 
@@ -14,7 +14,7 @@ module.exports = async (req, res) => {
   if (!sess) { json(res, 401, { error: 'unauthorized' }); return; }
   const category = categoryOf(req);
   try {
-    const rows = await sbFetch(`leads?select=*&source=${category === 'arquitetura' ? 'eq.arquitetura' : 'neq.arquitetura'}`);
+    const rows = await sbFetchAll(`leads?select=*&source=${category === 'arquitetura' ? 'eq.arquitetura' : 'neq.arquitetura'}&order=id`);
     const payload = buildPayload(rows || [], { dataDir: '/tmp', category });
     payload.source = 'supabase';
     json(res, 200, payload);

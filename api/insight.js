@@ -1,6 +1,6 @@
 const { sessionUser } = require('../scripts/serve-web-auth');
 const { parseCookies } = require('../src/utils/cookies');
-const { sbFetch, SbError } = require('../src/utils/sb');
+const { sbFetchAll, SbError } = require('../src/utils/sb');
 const { buildPayload } = require('../src/utils/metrics');
 const { askGroq, formatContext } = require('../scripts/groq');
 const { json } = require('../src/utils/http-json');
@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
   const category = b.category === 'arquitetura' ? 'arquitetura' : 'advogados';
   if (!q) { json(res, 400, { error: 'empty_q' }); return; }
   try {
-    const rows = await sbFetch(`leads?select=*&source=${category === 'arquitetura' ? 'eq.arquitetura' : 'neq.arquitetura'}`);
+    const rows = await sbFetchAll(`leads?select=*&source=${category === 'arquitetura' ? 'eq.arquitetura' : 'neq.arquitetura'}&order=id`);
     const payload = buildPayload(rows || [], { dataDir: '/tmp', category });
     const r = await askGroq({ question: q, context: formatContext(payload), history });
     json(res, 200, { answer: r.answer, source: 'groq' });

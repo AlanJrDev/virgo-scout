@@ -39,4 +39,20 @@ async function sbFetch(path, { method = 'GET', body, headers = {} } = {}) {
   try { return JSON.parse(text); } catch { throw new SbError('sb_bad_json', 502); }
 }
 
-module.exports = { sbEnabled, sbFetch, SbError };
+/* GET paginado — o PostgREST do Supabase trava em 1000 linhas por requisição;
+   o chamador deve passar `order=` estável p/ offset não pular registros. */
+async function sbFetchAll(path) {
+  const sep = path.includes('?') ? '&' : '?';
+  const size = 1000;
+  let all = [];
+  let offset = 0;
+  for (;;) {
+    const batch = (await sbFetch(`${path}${sep}limit=${size}&offset=${offset}`)) || [];
+    all = all.concat(batch);
+    if (batch.length < size) break;
+    offset += size;
+  }
+  return all;
+}
+
+module.exports = { sbEnabled, sbFetch, sbFetchAll, SbError };
