@@ -7,3 +7,5 @@ test-results/
 docs/qa/
 .vercel/
 data/job.json
+.vercel
+.env*
