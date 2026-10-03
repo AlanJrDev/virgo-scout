@@ -117,7 +117,7 @@
       .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
       .then(function (res) {
         if (res.ok) setCaptureUI(res.b.job || { status: 'running', done: 0, total: res.b.job && res.b.job.queries });
-        else { btn.disabled = false; btn.textContent = 'Tentar de novo'; $('#capSub').textContent = res.b.error === 'already_running' ? 'Já existe uma captura em andamento' : 'Erro ao iniciar'; }
+        else { btn.disabled = false; btn.textContent = 'Tentar de novo'; $('#capSub').textContent = res.b.error === 'already_running' ? 'Já existe uma captura em andamento' : res.b.error === 'local-only' ? 'Capture na máquina local' : 'Erro ao iniciar'; }
       })
       .catch(function () { btn.disabled = false; btn.textContent = 'Tentar de novo'; });
   }
