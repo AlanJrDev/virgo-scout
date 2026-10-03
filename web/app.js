@@ -63,6 +63,21 @@
   /* ---------- estado da captura (API) ---------- */
   var currentPayload = null;
   var pollTimer = null;
+  var category = 'advogados';
+  try { if (sessionStorage.getItem('vs_category') === 'arquitetura') category = 'arquitetura'; } catch (e) {}
+  function syncCatUI() {
+    var box = document.querySelector('.cat-switch');
+    if (box) {
+      var btns = box.querySelectorAll('.cat-btn');
+      for (var i = 0; i < btns.length; i++) {
+        var on = btns[i].getAttribute('data-cat') === category;
+        btns[i].classList.toggle('active', on);
+        btns[i].setAttribute('aria-selected', on ? 'true' : 'false');
+      }
+    }
+    var t = document.getElementById('capTitle');
+    if (t) t.textContent = 'Captura ativa - ' + (category === 'arquitetura' ? 'Arquitetura' : 'Advocacia');
+  }
   function setCaptureUI(st) {
     var bar = $('#capBar'), pct = $('#capPct'), sub = $('#capSub'), btn = $('#capRun');
     var prog = document.querySelector('.capture-card .progress');
@@ -113,7 +128,7 @@
   function startCapture() {
     var btn = $('#capRun');
     btn.disabled = true; btn.textContent = 'Iniciando…';
-    fetch('/api/capture', { method: 'POST' })
+    fetch('/api/capture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: category }) })
       .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
       .then(function (res) {
         if (res.ok) setCaptureUI(res.b.job || { status: 'running', done: 0, total: res.b.job && res.b.job.queries });
@@ -615,7 +630,7 @@
     fetch('/api/insight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: q, history: chatHistory.slice(0, -1).slice(-6) })
+      body: JSON.stringify({ q: q, history: chatHistory.slice(0, -1).slice(-6), category: category })
     })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
@@ -655,21 +670,37 @@
   /* ---------- boot: API ao vivo com fallback estático ---------- */
   var FALLBACK = window.VIRGO_DATA || { stats: {}, top: [], pool: [], regions: [], ratingBuckets: [], dots: [], series: { days: [], values: [0] }, donut: [], recent: [], areas: [] };
   function boot(payload) {
-    currentPayload = payload && payload.stats && payload.stats.total ? payload : FALLBACK;
+    currentPayload = payload && payload.stats ? payload : FALLBACK;
     render(currentPayload);
     loadMe();
     pollCapture();
   }
-  if (window.fetch && location.protocol !== 'file:') {
-    fetch('/api/leads', { cache: 'no-store' })
+  function loadLeads() {
+    fetch('/api/leads?category=' + category, { cache: 'no-store' })
       .then(function (r) {
         if (r.status === 401) { location.href = '/login'; return false; }
         return r.ok ? r.json() : null;
       })
       .then(function (d) { if (d !== false) boot(d); })
       .catch(function () { boot(null); });
-  } else {
-    boot(null);
+  }
+  if (window.fetch && location.protocol !== 'file:') loadLeads();
+  else boot(null);
+
+  syncCatUI();
+  var catBox = document.querySelector('.cat-switch');
+  if (catBox) {
+    catBox.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('.cat-btn') : null;
+      if (!b) return;
+      var cat = b.getAttribute('data-cat');
+      if (cat !== 'advogados' && cat !== 'arquitetura') return;
+      if (cat === category) return;
+      category = cat;
+      try { sessionStorage.setItem('vs_category', cat); } catch (err) {}
+      syncCatUI();
+      loadLeads();
+    });
   }
 
   document.addEventListener('click', function (e) {

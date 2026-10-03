@@ -39,6 +39,10 @@
       <kbd>Ctrl + K</kbd>
       <div class="search-results" id="searchResults" role="listbox" hidden></div>
     </label>
+    <div class="cat-switch" role="tablist" aria-label="Categoria de leads">
+      <button type="button" class="cat-btn active" data-cat="advogados" role="tab" aria-selected="true">Advogados</button>
+      <button type="button" class="cat-btn" data-cat="arquitetura" role="tab" aria-selected="false">Arquitetura</button>
+    </div>
     <div class="top-user">
       <button class="icon-btn bell" aria-label="Notificações"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="dot"></i></button>
       <div class="avatar" id="uAvatar" aria-hidden="true">VS</div>
@@ -64,7 +68,7 @@
       <div class="card capture-card">
         <span class="cap-ico"><svg viewBox="0 0 24 24"><path d="M12 3v10"/><path d="m8 9 4-4 4 4"/><path d="M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></span>
         <div class="cap-body">
-          <strong>Captura ativa - Advocacia</strong>
+          <strong id="capTitle">Captura ativa - Advocacia</strong>
           <span id="capSub">Brasília/DF · — empresas</span>
           <div class="progress"><i id="capBar" style="width:0%"></i></div>
           <button class="cap-run" id="capRun" type="button">Nova captura</button>
