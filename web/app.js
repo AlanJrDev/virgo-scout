@@ -73,6 +73,7 @@
   /* ---------- estado da captura (API) ---------- */
   var currentPayload = null;
   var pollTimer = null;
+  var sawRunning = false;
   var category = 'advogados';
   try { if (sessionStorage.getItem('vs_category') === 'arquitetura') category = 'arquitetura'; } catch (e) {}
   function syncCatUI() {
@@ -101,6 +102,7 @@
       return;
     }
     if (st.status === 'running') {
+      sawRunning = true;
       var p = st.total ? Math.round((100 * st.done) / st.total) : 0;
       bar.style.width = p + '%'; pct.textContent = p + '%';
       sub.textContent = (st.current || 'iniciando…') + ' · ' + st.done + '/' + st.total;
@@ -115,8 +117,9 @@
       btn.textContent = 'Nova captura'; btn.disabled = false; btn.classList.remove('busy');
       if (prog) prog.classList.remove('busy');
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      toast('Captura concluída — atualizando dados…', 'ok');
-      setTimeout(function () { location.reload(); }, 1400);
+      var dec = window.CaptureState.decide('done', { sawRunning: sawRunning, startedAt: st.started_at, storage: window.sessionStorage });
+      if (dec.toast) toast('Captura concluída — atualizando dados…', 'ok');
+      if (dec.reload) setTimeout(function () { location.reload(); }, 1400);
       return;
     }
     bar.style.width = '0%'; pct.textContent = 'erro';

@@ -123,6 +123,38 @@ test('capture GET com fetch stubado devolve idle (nunca done, p/ não gerar relo
   }
 });
 
+test('capture GET: running fresco → running; running travado >30min → idle (não prende o polling)', async () => {
+  const r0 = fakeRes();
+  await loginH(fakeReq({ method: 'POST', body: { user: 'landevbrasil.ia@gmail.com', pass: 'iloveTI@26' }, ip: 'api-g' }), r0);
+  const ck = cookieDe(r0);
+  const nativeFetch = global.fetch;
+  process.env.SUPABASE_URL = 'https://x.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_t';
+  const stub = (started) => {
+    global.fetch = async (url) => {
+      if (url.includes('/sessions?')) {
+        return { ok: true, status: 200, text: async () => JSON.stringify([{ token_hash: 'h', email: 'landevbrasil.ia@gmail.com', role: 'founder', exp: new Date(Date.now() + 60000).toISOString() }]) };
+      }
+      return { ok: true, status: 200, text: async () => JSON.stringify([{ status: 'running', started_at: started, queries: 39, finished_at: null }]) };
+    };
+  };
+  try {
+    stub(new Date(Date.now() - 5 * 60 * 1000).toISOString());
+    const rFresh = fakeRes();
+    await captureH(fakeReq({ cookie: ck }), rFresh);
+    assert.strictEqual(rFresh.body.status, 'running');
+
+    stub(new Date(Date.now() - 31 * 60 * 1000).toISOString());
+    const rStale = fakeRes();
+    await captureH(fakeReq({ cookie: ck }), rStale);
+    assert.strictEqual(rStale.body.status, 'idle');
+  } finally {
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+    global.fetch = nativeFetch;
+  }
+});
+
 test('insight: 400 em q vazia; queries devolve a lista de 26', async () => {
   const r0 = fakeRes();
   await loginH(fakeReq({ method: 'POST', body: { user: 'landevbrasil.ia@gmail.com', pass: 'iloveTI@26' }, ip: 'api-f' }), r0);
