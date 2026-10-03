@@ -8,6 +8,7 @@ const { attemptLogin, sessionUser } = require('./serve-web-auth');
 const { destroySession } = require('../src/utils/session-store');
 const { parseCookies, authCookie, clearAuthCookie } = require('../src/utils/cookies');
 const { json } = require('../src/utils/http-json');
+const { newestLeadsFile } = require('../src/utils/leads-io');
 const { askGroq, formatContext } = require('./groq');
 
 const ROOT = path.join(__dirname, '..', 'web');
@@ -20,22 +21,8 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript
 // arquivos que a tela de login precisa sem sessão
 const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor/gsap.min.js', '/assets/LOGO.png']);
 
-function newestLeadsFile() {
-  const preferred = [process.env.BASENAME ? `${process.env.BASENAME}.v2.json` : null, 'advogados-df-max.v2.json', 'advogados-df-max.json'].filter(Boolean);
-  for (const f of preferred) {
-    const p = path.join(DATA, f);
-    if (fs.existsSync(p)) return p;
-  }
-  const any = fs
-    .readdirSync(DATA)
-    .filter((f) => f.endsWith('.json') && !f.includes('validacao') && !f.includes('job'))
-    .map((f) => ({ f, m: fs.statSync(path.join(DATA, f)).mtimeMs }))
-    .sort((a, b) => b.m - a.m);
-  return any.length ? path.join(DATA, any[0].f) : null;
-}
-
 function readLeads() {
-  const file = newestLeadsFile();
+  const file = newestLeadsFile(DATA);
   if (!file) return { leads: [], file: null, mtime: 0, fallbackTs: Date.now() };
   // data da captura real = mtime do JSON bruto (o .v2 é gerado depois)
   const raw = file.replace(/\.v2\.json$/, '.json');
