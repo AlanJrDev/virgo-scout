@@ -2,7 +2,7 @@
    Uso: npm run capture:arq */
 process.env.BASENAME = 'arquitetura-df-max';
 process.env.CAPTURE_CATEGORY = 'arquitetura';
-process.env.QUERIES = process.env.QUERIES || require('./queries-arquitetura').QUERIES.join('|');
+process.env.QUERIES = process.env.QUERIES || require('./queries-arquitetura').QUERIES_ARQ.join('|');
 
 const { main } = require('./capture-advogados-df');
 
