@@ -9,6 +9,10 @@
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
   function hhmm() { var d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  function fmtInt(n) { return (typeof n === 'number' && isFinite(n) ? Math.round(n) : 0).toLocaleString('pt-BR'); }
+
+  var WA_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>';
+  var SITE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 4 5.6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-5.6-4-9s1.5-6.4 4-9z"/></svg>';
 
   /* ---------- toast: feedback de ações ---------- */
   function toast(msg, kind) {
@@ -40,9 +44,9 @@
 
   /* ---------- helpers de render ---------- */
   function countUp(el, target) {
-    if (!hasGsap) { el.textContent = target; return; }
+    if (!hasGsap) { el.textContent = fmtInt(target); return; }
     var o = { v: 0 };
-    window.gsap.to(o, { v: target, duration: 0.9, ease: 'expo.out', onUpdate: function () { el.textContent = Math.round(o.v); } });
+    window.gsap.to(o, { v: target, duration: 0.9, ease: 'expo.out', onUpdate: function () { el.textContent = fmtInt(Math.round(o.v)); } });
   }
 
   var CIRC = 2 * Math.PI * 15.5;
@@ -58,6 +62,12 @@
       if (!hasGsap) { c.setAttribute('stroke-dashoffset', target.toFixed(1)); return; }
       window.gsap.to(c, { strokeDashoffset: target, duration: 0.7, ease: 'expo.out', delay: 0.35 });
     });
+  }
+
+  /* estado vazio compartilhado por gráficos e listas */
+  function emptyBox(title, text) {
+    return '<div class="empty-box"><span class="empty-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V8l6-5v18"/><path d="M10 21V12l8-4v13"/><path d="M2 21h20"/></svg></span>' +
+      '<strong>' + escapeHtml(title) + '</strong><p>' + escapeHtml(text) + '</p></div>';
   }
 
   /* ---------- estado da captura (API) ---------- */
@@ -266,23 +276,46 @@
     } catch (e) { fallbackMap(); }
   }
 
+  /* ---------- qualidade da base (consumo defensivo: só existe se a API mandar) ---------- */
+  function renderQuality(q) {
+    var row = document.getElementById('qualityRow');
+    if (!row) return;
+    var chips = [];
+    function n(v) { return (typeof v === 'number' && isFinite(v)) ? Math.round(v) : null; }
+    if (q && typeof q === 'object') {
+      [['semTelefone', 'sem telefone'], ['semSite', 'sem site'], ['semAvaliacao', 'sem avaliação'], ['semEndereco', 'sem endereço']]
+        .forEach(function (pair) {
+          var v = n(q[pair[0]]);
+          if (v != null) chips.push('<span class="q-chip"><b>' + fmtInt(v) + '</b> ' + pair[1] + '</span>');
+        });
+      var comp = n(q.completude);
+      if (comp != null) {
+        if (comp <= 1 && comp >= 0 && q.completude !== 100) comp = Math.round(q.completude * 100);
+        chips.push('<span class="q-chip ok"><b>' + comp + '%</b> completude</span>');
+      }
+    }
+    row.innerHTML = chips.join('');
+    row.hidden = !chips.length;
+  }
+
   /* ---------- render principal ---------- */
+
   function render(D) {
     var S = D.stats || {};
-    $('#capSub').textContent = 'Brasília/DF · ' + (S.total || 0) + ' empresas';
-    $('#kSiteSub').textContent = (S.pctSite || 0) + '% do total';
-    $('#kAltaSub').textContent = (S.pctAlta || 0) + '% do total';
-    $('#kQualSub').textContent = (S.pctQualif || 0) + '% do total';
+    $('#capSub').textContent = 'Brasília/DF · ' + fmtInt(S.total) + ' empresas';
+    $('#kSiteSub').textContent = (S.pctSite || 0) + '% do total · ' + fmtInt(S.semSite) + ' sem site';
+    $('#kAltaSub').textContent = (S.pctAlta || 0) + '% · nota 4,5★+ com 20+ resenhas';
+    $('#kQualSub').textContent = (S.pctQualif || 0) + '% · site + telefone + nota 4,5';
     var dEl = $('#kDelta');
     if (dEl) {
-      if (D.delta_pct == null) { dEl.textContent = 'base atual'; dEl.className = 'flat'; }
+      if (D.delta_pct == null) { dEl.textContent = '1ª captura'; dEl.className = 'flat'; }
       else { dEl.textContent = (D.delta_pct >= 0 ? '↑ +' : '↓ ') + D.delta_pct + '% vs anterior'; dEl.className = D.delta_pct >= 0 ? 'up' : 'down'; }
     }
+    renderQuality(D.quality);
 
     /* destaques + filtro por área */
     var pool = D.pool && D.pool.length ? D.pool : (D.top || []);
     var activeArea = '';
-    var WA_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>';
     function waBtn(l) {
       if (l.wa) {
         return '<a class="wa-btn" href="' + escapeHtml(l.wa) + '" target="_blank" rel="noopener noreferrer" aria-label="Conversar no WhatsApp com ' + escapeHtml(l.name) + '" title="Abrir WhatsApp">' + WA_SVG + '</a>';
@@ -369,14 +402,17 @@
       var list = chartData[key] || [];
       var host = $('#barsChart');
       if (!host) return;
+      var sum = list.reduce(function (a, x) { return a + (x.value || 0); }, 0);
       var max = Math.max.apply(null, list.map(function (x) { return x.value; }).concat([1]));
       host.innerHTML = list.map(function (x, i) {
-        return '<div class="bar-row" style="animation-delay:' + (i * 45) + 'ms" title="' + escapeHtml(x.label) + ': ' + x.value + '">' +
+        var pct = sum ? Math.round((100 * (x.value || 0)) / sum) : 0;
+        var sub = pct + '%' + (x.sub ? ' · ' + x.sub : '');
+        return '<div class="bar-row" role="img" aria-label="' + escapeHtml(x.label) + ': ' + x.value + ' (' + pct + '%)" style="animation-delay:' + (i * 45) + 'ms" title="' + escapeHtml(x.label) + ': ' + x.value + ' (' + pct + '%)">' +
           '<span class="bar-label">' + escapeHtml(x.label) + '</span>' +
           '<div class="bar-track"><i class="bar-fill" data-frac="' + (x.value / max).toFixed(3) + '" style="transition-delay:' + (i * 45) + 'ms"></i></div>' +
-          '<span class="bar-val">' + x.value + (x.sub ? '<small>' + escapeHtml(x.sub) + '</small>' : '') + '</span>' +
+          '<span class="bar-val">' + x.value + '<small>' + sub + '</small></span>' +
           '</div>';
-      }).join('') || '<div class="feat-empty">Sem dados para este recorte</div>';
+      }).join('') || emptyBox('Sem dados para este recorte', 'Os números desta aba aparecem quando a categoria tem leads.');
       requestAnimationFrame(function () {
         requestAnimationFrame(function () {
           host.querySelectorAll('.bar-fill').forEach(function (f) {
@@ -401,22 +437,32 @@
     /* donut */
     var NS = 'http://www.w3.org/2000/svg';
     var donut = $('#donut'), R = 54, CC = 2 * Math.PI * R;
-    var tot3 = (D.donut || []).reduce(function (a, s) { return a + s.value; }, 0) || 1;
-    var acc = 0;
-    (D.donut || []).forEach(function (s) {
-      var frac = s.value / tot3;
-      var c = document.createElementNS(NS, 'circle');
-      [['cx', 70], ['cy', 70], ['r', R], ['fill', 'none'], ['stroke', s.color], ['stroke-width', 13],
-       ['stroke-dasharray', (frac * CC).toFixed(1) + ' ' + CC.toFixed(1)],
-       ['stroke-dashoffset', (-acc * CC).toFixed(1)], ['transform', 'rotate(-90 70 70)'], ['data-donut', '1']].forEach(function (a) { c.setAttribute(a[0], a[1]); });
-      donut.appendChild(c);
-      acc += frac;
-    });
-    $('#donutTotal').textContent = S.total || 0;
-    $('#donutLegend').innerHTML = (D.donut || []).map(function (s) {
-      var pct = Math.round((100 * s.value) / (S.total || 1));
-      return '<li><i style="background:' + s.color + '"></i>' + s.label + '<b>' + s.value + ' <span style="color:var(--faint)">(' + pct + '%)</span></b></li>';
-    }).join('');
+    var donutData = (D.donut || []).filter(function (s) { return s && s.value > 0; });
+    if (donut) donut.innerHTML = '';
+    $('#donutTotal').textContent = fmtInt(S.total || 0);
+    if (!donutData.length) {
+      $('#donutLegend').innerHTML = '<li class="empty-box"><strong>Sem composição ainda</strong><p>Os segmentos aparecem quando a categoria tem leads.</p></li>';
+    } else {
+      var acc = 0;
+      var donutSum = donutData.reduce(function (a, x) { return a + x.value; }, 0) || 1;
+      donutData.forEach(function (s) {
+        var frac = s.value / donutSum;
+        var pct = Math.round((100 * s.value) / (S.total || 1));
+        var c = document.createElementNS(NS, 'circle');
+        [['cx', 70], ['cy', 70], ['r', R], ['fill', 'none'], ['stroke', s.color], ['stroke-width', 13],
+         ['stroke-dasharray', (frac * CC).toFixed(1) + ' ' + CC.toFixed(1)],
+         ['stroke-dashoffset', (-acc * CC).toFixed(1)], ['transform', 'rotate(-90 70 70)'], ['data-donut', '1']].forEach(function (a) { c.setAttribute(a[0], a[1]); });
+        var t = document.createElementNS(NS, 'title');
+        t.textContent = s.label + ': ' + fmtInt(s.value) + ' (' + pct + '%)';
+        c.appendChild(t);
+        if (donut) donut.appendChild(c);
+        acc += frac;
+      });
+      $('#donutLegend').innerHTML = donutData.map(function (s) {
+        var pct = Math.round((100 * s.value) / (S.total || 1));
+        return '<li><i style="background:' + s.color + '"></i>' + escapeHtml(s.label) + '<b>' + fmtInt(s.value) + ' <span style="color:var(--faint)">(' + pct + '%)</span></b></li>';
+      }).join('');
+    }
 
     /* oportunidades reais derivadas da base */
     var oppIcons = {
@@ -449,11 +495,14 @@
         '<span class="rec-when">' + escapeHtml(r.when) + '</span></li>';
     }).join('') || '<li class="feat-empty">Nenhuma captura ainda</li>';
 
+    /* tabela densa da base (módulo web/table.js) */
+    if (window.VS_TABLE) window.VS_TABLE.render(D);
+
     /* motion: momento único de entrada */
     function finalStates() {
       document.querySelectorAll('[data-count]').forEach(function (el2) {
         var m = { kTotal: S.total, kSite: S.comSite, kAlta: S.alta, kQual: S.qualif };
-        el2.textContent = m[el2.id] || 0;
+        el2.textContent = fmtInt(m[el2.id] || 0);
       });
       drawRings(document);
       document.querySelectorAll('[data-w]').forEach(function (t) { t.style.width = t.getAttribute('data-w') + '%'; });
@@ -466,6 +515,7 @@
         .from('.greet', { y: 10, autoAlpha: 0, duration: 0.26 }, 0.08)
         .from('.hero .card', { y: 12, autoAlpha: 0, duration: 0.28, stagger: 0.07 }, 0.12)
         .from('.kpi', { y: 12, autoAlpha: 0, duration: 0.26, stagger: 0.06 }, 0.18)
+        .from('.leads-sec', { y: 14, autoAlpha: 0, duration: 0.28 }, 0.26)
         .from('.filter-row .chip', { y: 6, autoAlpha: 0, duration: 0.22, stagger: 0.04 }, 0.34)
         .from('.row-2 .card, .row-3 .card', { y: 14, autoAlpha: 0, duration: 0.28, stagger: 0.07 }, 0.24)
         .from('.ia > *', { x: 14, autoAlpha: 0, duration: 0.26, stagger: 0.06 }, 0.2)
@@ -498,18 +548,50 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).catch(function () {});
     toast(okMsg, 'ok');
   }
+  function srRegion(l) {
+    if (l.cat) {
+      var i = l.cat.indexOf('·');
+      if (i !== -1) { var r = l.cat.slice(i + 1).trim(); if (r) return r; }
+    }
+    return l.region || l.city || '';
+  }
+  function srMeta(l) {
+    var bits = [];
+    if (l.area && l.area !== 'Geral') bits.push(l.area);
+    var r = srRegion(l);
+    if (r) bits.push(r);
+    if (l.site === true || l.website) bits.push('com site');
+    return bits.join(' · ');
+  }
+  function srRating(l) {
+    if (typeof l.rating !== 'number' || !isFinite(l.rating)) return 'sem nota';
+    var s = String(l.rating).replace('.', ',') + '★';
+    if (typeof l.reviews === 'number' && isFinite(l.reviews)) s += ' · ' + fmtInt(l.reviews) + ' avaliações';
+    return s;
+  }
   function runSearch() {
     var q = norm(search.value.trim());
     if (q.length < 2) { closeResults(); return; }
     var pool = (currentPayload && currentPayload.pool) || [];
     var hits = pool.filter(function (l) {
-      return norm(l.name).indexOf(q) !== -1 || norm(l.cat).indexOf(q) !== -1 || norm(l.area).indexOf(q) !== -1;
-    }).slice(0, 6);
+      return norm(l.name).indexOf(q) !== -1 || norm(l.cat).indexOf(q) !== -1 || norm(l.area).indexOf(q) !== -1 ||
+        norm(l.phone_raw).indexOf(q) !== -1 || norm(srRegion(l)).indexOf(q) !== -1;
+    }).slice(0, 7);
     srIndex = hits.length ? 0 : -1;
     results.innerHTML = hits.length
       ? hits.map(function (l, i) {
+          var acts = '';
+          if (l.wa) acts += '<a class="sr-act wa" href="' + escapeHtml(l.wa) + '" target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" aria-label="WhatsApp de ' + escapeHtml(l.name) + '">' + WA_SVG + '</a>';
+          if (l.website) {
+            var url = /^https?:/i.test(l.website) ? l.website : 'https://' + l.website;
+            acts += '<a class="sr-act" href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer" title="Abrir site" aria-label="Site de ' + escapeHtml(l.name) + '">' + SITE_SVG + '</a>';
+          }
           return '<div class="sr-item" role="option" data-name="' + escapeHtml(l.name) + '" data-i="' + i + '" aria-selected="' + (i === 0) + '">' +
-            '<strong>' + escapeHtml(l.name) + '</strong><span>' + escapeHtml(l.cat) + '</span><b>' + l.score + '</b></div>';
+            '<span class="sr-main"><strong>' + escapeHtml(l.name) + '</strong><span>' + escapeHtml(srRating(l)) + '</span></span>' +
+            '<span class="sr-meta">' + escapeHtml(srMeta(l)) + '</span>' +
+            '<span class="sr-score">' + (typeof l.score === 'number' ? l.score : '—') + '<span class="sr-only"> potencial</span></span>' +
+            '<span class="sr-acts">' + acts + '</span>' +
+            '</div>';
         }).join('')
       : '<div class="sr-empty">Nenhum lead encontrado para “' + escapeHtml(search.value.trim()) + '”</div>';
     srRows = [].slice.call(results.querySelectorAll('.sr-item'));
@@ -536,6 +618,7 @@
       else if (e.key === 'Enter') { e.preventDefault(); pickResult(srRows[srIndex]); }
     });
     results.addEventListener('click', function (e) {
+      if (e.target && e.target.closest && e.target.closest('.sr-act')) return;
       var row = e.target.closest ? e.target.closest('.sr-item') : null;
       pickResult(row);
     });

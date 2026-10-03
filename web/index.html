@@ -92,6 +92,71 @@
         <div><span>Leads Qualificados</span><strong data-count id="kQual">0</strong><small id="kQualSub">— do total</small></div></div>
     </section>
 
+    <div class="quality-row" id="qualityRow" hidden></div>
+
+    <!-- ============ BASE DE LEADS (tabela densa) ============ -->
+    <section class="leads-sec" id="leadsSection" aria-labelledby="leadsTitle">
+      <div class="card tbl-card">
+        <div class="card-head">
+          <span class="head-ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M9.5 9.5V20"/></svg></span>
+          <h2 id="leadsTitle">Base de Leads</h2>
+          <span class="tbl-summary" id="tblSummary">…</span>
+        </div>
+
+        <div class="tbl-tools">
+          <label class="tbl-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="search" id="tblSearch" placeholder="Filtrar por nome, telefone ou área..." aria-label="Filtrar leads na tabela" autocomplete="off">
+          </label>
+          <select class="tbl-select" id="tblRegion" aria-label="Filtrar por cidade ou região">
+            <option value="">Todas as regiões</option>
+          </select>
+          <select class="tbl-select" id="tblArea" aria-label="Filtrar por área de atuação">
+            <option value="">Todas as áreas</option>
+          </select>
+          <select class="tbl-select" id="tblMinRating" aria-label="Nota mínima">
+            <option value="0">Qualquer nota</option>
+            <option value="3">Nota ≥ 3,0</option>
+            <option value="4">Nota ≥ 4,0</option>
+            <option value="4.5">Nota ≥ 4,5</option>
+          </select>
+          <label class="tbl-check" id="tblPhoneBox"><input type="checkbox" id="tblHasPhone"><span>Com telefone</span></label>
+          <label class="tbl-check" id="tblSiteBox"><input type="checkbox" id="tblHasSite"><span>Com site</span></label>
+          <button type="button" class="tbl-clear" id="tblClear" hidden>Limpar filtros</button>
+        </div>
+
+        <div class="tbl-scroll" id="tblScroll">
+          <table class="lead-table" id="leadTable">
+            <caption class="sr-only">Leads da categoria ativa: empresa, nota e avaliações, cidade ou região, área de atuação, telefone, site e data de captura</caption>
+            <colgroup id="tblCols"></colgroup>
+            <thead id="tblHead"></thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+          <div class="empty-box tbl-empty" id="tblEmpty" hidden>
+            <span class="empty-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+            <strong id="tblEmptyTitle">Nenhum lead com esses filtros</strong>
+            <p id="tblEmptyText">Ajuste a busca ou limpe os filtros para ver a base completa.</p>
+            <button type="button" class="tbl-clear" id="tblEmptyClear">Limpar filtros</button>
+          </div>
+        </div>
+
+        <div class="tbl-foot">
+          <span class="tbl-count" id="tblCount" role="status">…</span>
+          <div class="tbl-pager">
+            <label class="pg-size">Por página
+              <select id="tblPageSize" aria-label="Linhas por página">
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+            </label>
+            <button type="button" class="pg-btn" id="tblPrev" aria-label="Página anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+            <span class="pg-label" id="tblPage">Página 1 de 1</span>
+            <button type="button" class="pg-btn" id="tblNext" aria-label="Próxima página"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="row-2">
       <div class="card map-card">
         <div class="card-head"><span class="head-ico"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span><h2>Distribuição dos Leads</h2><button class="chip">Regiões do DF <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>
@@ -164,6 +229,7 @@
 <script src="vendor/gsap.min.js"></script>
 <script src="vendor/maplibre-gl.js"></script>
 <script src="data/leads.js"></script>
+<script src="table.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
