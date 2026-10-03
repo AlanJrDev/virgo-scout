@@ -103,7 +103,7 @@ test('newestLeadsFile por categoria: arquitetura e advogados isolados', () => {
   assert.ok(newestLeadsFile(TMP, 'advogados') === adv);
 });
 
-test('syncLeads categoria arquitetura: lê arquivo arq e grava source=arquitetura', async () => {
+test('syncLeads categoria arquitetura: tag em source, query em origin', async () => {
   fs.writeFileSync(path.join(TMP, 'arquitetura-df-max.json'), JSON.stringify([{ name: 'Esc Arq', address: 'Rua 1', source: 'topografia Gama' }]));
   const { syncLeads } = require('../../scripts/sync-supabase');
   const calls = [];
@@ -114,9 +114,10 @@ test('syncLeads categoria arquitetura: lê arquivo arq e grava source=arquitetur
   const rows = JSON.parse(leadCall.opts.body);
   assert.strictEqual(rows[0].name, 'Esc Arq');
   assert.strictEqual(rows[0].source, 'arquitetura');
+  assert.strictEqual(rows[0].origin, 'topografia Gama');
 });
 
-test('syncLeads categoria advogados preserva a query no source', async () => {
+test('syncLeads categoria advogados: tag em source, query em origin', async () => {
   fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([{ name: 'Adv Teste', address: 'Rua A', source: 'advogados Distrito Federal' }]));
   const { syncLeads } = require('../../scripts/sync-supabase');
   const calls = [];
@@ -124,5 +125,40 @@ test('syncLeads categoria advogados preserva a query no source', async () => {
   await syncLeads({ dataDir: TMP, category: 'advogados', runBuild: false });
   const leadCalls = calls.filter((c) => c.url.includes('/rest/v1/leads'));
   const firstRow = JSON.parse(leadCalls[0].opts.body)[0];
-  assert.strictEqual(firstRow.source, 'advogados Distrito Federal');
+  assert.strictEqual(firstRow.source, 'advogados');
+  assert.strictEqual(firstRow.origin, 'advogados Distrito Federal');
+});
+
+test('toRow grava origin e normaliza telefone/endereço BR', () => {
+  const { toRow, normPhone } = require('../../scripts/sync-supabase');
+  const r = toRow({ name: 'X', address: '  Rua   A , 10 ', source: 'advogados DF', phone: '55 (61) 98144-7373' });
+  assert.strictEqual(r.origin, 'advogados DF');
+  assert.strictEqual(r.phone, '61981447373');
+  assert.strictEqual(r.address, 'Rua A , 10');
+  assert.strictEqual(normPhone('061 98144-7373'), '61981447373');
+  assert.strictEqual(normPhone('+55 61 99999-9999'), '61999999999');
+  assert.strictEqual(normPhone('12345'), '12345'); // inválido: não degrada
+  assert.strictEqual(normPhone(null), null);
+  assert.strictEqual(toRow({ name: 'Y' }).origin, null);
+});
+
+test('dedupe por id (nome+endereço) mantém a linha mais rica', async () => {
+  fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([
+    { name: 'Mesmo Escritório', address: 'Rua A', rating: 4.0, reviews: 5, phone: null, website: null, source: 'q' },
+    { name: 'mesmo escritório', address: 'rua a', rating: 4.8, reviews: 100, phone: '61999999999', website: 'https://r.com', source: 'q' },
+    { name: 'Outro', address: 'Rua B', rating: 3, reviews: 1, source: 'q' },
+  ]));
+  const { syncLeads } = require('../../scripts/sync-supabase');
+  const calls = [];
+  global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
+  const r = await syncLeads({ dataDir: TMP, runBuild: false });
+  assert.strictEqual(r.synced, 2);
+  assert.strictEqual(r.deduped, 1);
+  const rows = JSON.parse(calls.find((c) => c.url.includes('/rest/v1/leads')).opts.body);
+  assert.strictEqual(rows.length, 2);
+  const keeper = rows.find((x) => /mesmo/i.test(x.name));
+  assert.strictEqual(keeper.reviews, 100);
+  assert.strictEqual(keeper.website, 'https://r.com');
+  const cap = JSON.parse(calls.find((c) => c.url.includes('/rest/v1/captures')).opts.body);
+  assert.strictEqual(cap[0].leads_count, 2);
 });

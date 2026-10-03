@@ -87,3 +87,20 @@ test('areaDistribution aceita categoria arquitetura', () => {
   assert.ok(dist.some((d) => d.label === 'Topografia'));
   assert.ok(dist.some((d) => d.label === 'Outros'));
 });
+
+test('quando source virou tag de categoria, o contexto vem de origin', () => {
+  const { classifyLead } = require('../../src/utils/classify');
+  const arq = classifyLead({ name: 'Escritorio Generico', source: 'arquitetura', origin: 'topografia no Gama' }, 'arquitetura');
+  assert.strictEqual(arq.area, 'Topografia');
+  assert.strictEqual(arq.confidence, 0.7);
+  const adv = classifyLead({ name: 'Nome Generico SA', source: 'advogados', origin: 'advogados trabalhista Brasilia' }, 'advogados');
+  assert.strictEqual(adv.area, 'Trabalhista');
+  assert.strictEqual(adv.confidence, 0.7);
+});
+
+test('sem origin (linha legada) o contexto continua vindo de source', () => {
+  const { classifyLead } = require('../../src/utils/classify');
+  const r = classifyLead({ name: 'Nome Generico SA', source: 'advogados criminal DF' }, 'advogados');
+  assert.strictEqual(r.area, 'Criminal');
+  assert.strictEqual(r.confidence, 0.7);
+});

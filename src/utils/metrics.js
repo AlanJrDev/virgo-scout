@@ -39,7 +39,7 @@ function matchCategory(file, category) {
 
 // região a partir de endereço + query de origem; fallback = Brasília
 function regionOfLead(lead) {
-  const txt = normTxt([lead.address, lead.source].filter(Boolean).join(' '));
+  const txt = normTxt([lead.address, lead.origin || lead.source].filter(Boolean).join(' '));
   for (const r of REGIONS) {
     if (new RegExp(`\\b${r.key}\\b`).test(txt)) return r;
   }
@@ -153,7 +153,20 @@ function buildTop(leads, n = 5) {
       phone: /\d{8,}/.test(l.phone || ''),
       phone_raw: l.phone || '',
       wa: l.phone ? waLink(l.phone, waMessage(l.name)) : null,
+      captured_at: l.captured_at || null,
     }));
+}
+
+// completude da base: 4 checagens (telefone, site, nota, endereço) por lead
+function buildQuality(leads) {
+  const t = leads.length;
+  const semTelefone = leads.filter((l) => !/\d{8,}/.test(l.phone || '')).length;
+  const semSite = leads.filter((l) => !l.website).length;
+  const semAvaliacao = leads.filter((l) => l.rating == null).length;
+  const semEndereco = leads.filter((l) => !String(l.address || '').trim()).length;
+  const missing = semTelefone + semSite + semAvaliacao + semEndereco;
+  const completude = t ? Math.round((100 * (4 * t - missing)) / (4 * t)) : 100;
+  return { semTelefone, semSite, semAvaliacao, semEndereco, completude };
 }
 
 function seedRand(seed) {
@@ -272,7 +285,8 @@ function buildPayload(leads, opts = {}) {
     regions: regionAgg(prepared),
     ratingBuckets: ratingBuckets(prepared),
     top: buildTop(prepared),
-    pool: buildTop(prepared, 30),
+    pool: buildTop(prepared, prepared.length), // base completa (antes cap de 30)
+    quality: buildQuality(prepared),
     dots: buildDots(scored),
     series: buildSeries(prepared, opts.fallbackTs),
     donut: [

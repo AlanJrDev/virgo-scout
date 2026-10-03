@@ -41,3 +41,26 @@ test('recent e delta filtram arquivos por categoria', () => {
   assert.strictEqual(adv.delta_pct, null);
   assert.strictEqual(arq.delta_pct, null);
 });
+
+test('payload ganha quality (completude) e pool com a base completa', () => {
+  const leads = [
+    { name: 'Completo SA', address: 'Rua 1, Brasilia', phone: '61999999999', website: 'https://x.com', rating: 4.8, reviews: 10, captured_at: '2026-10-01T00:00:00.000Z' },
+    { name: 'Sem Nada ME', address: '', phone: null, website: null, rating: null, reviews: null },
+    { name: 'Quase La Ltda', address: 'Quadra 2', phone: null, website: 'https://y.com', rating: 4.0, reviews: 3 },
+  ];
+  const p = buildPayload(leads, { dataDir: TMP, category: 'advogados' });
+  assert.strictEqual(p.pool.length, 3); // pool = base completa (antes cap 30)
+  assert.ok(p.pool[0].captured_at); // coluna "Capturado em" ganha dado
+  const q = p.quality;
+  assert.strictEqual(q.semTelefone, 2);
+  assert.strictEqual(q.semSite, 1);
+  assert.strictEqual(q.semAvaliacao, 1);
+  assert.strictEqual(q.semEndereco, 1);
+  // 4 checks x 3 leads = 12; faltam 5 (L2: 4, L3: telefone) => 7/12 = 58%
+  assert.strictEqual(q.completude, 58);
+});
+
+test('região da categoria usa origin quando source é tag', () => {
+  const p = buildPayload([{ name: 'Esc Topo', address: 'Rua Sem DF', source: 'arquitetura', origin: 'topografia Gama' }], { dataDir: TMP, category: 'arquitetura' });
+  assert.strictEqual(p.regions[0].label, 'Gama');
+});

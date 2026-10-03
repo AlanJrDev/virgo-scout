@@ -53,7 +53,8 @@ function norm(s) {
 function classifyLead(lead = {}, category) {
   const { areas, rules, fallback } = rulesFor(category);
   const nameText = norm(lead.name);
-  const sourceText = norm(lead.source);
+  // origin = query original da captura; source virou tag de categoria ('arquitetura'|'advogados')
+  const sourceText = norm(lead.origin || lead.source);
   for (const area of areas) {
     if (rules[area].some((kw) => nameText.includes(kw))) return { area, confidence: 0.9 };
   }

@@ -11,6 +11,7 @@
     "build:web": "node scripts/build-web-data.js",
     "capture:arq": "node scripts/capture-arquitetura.js",
     "sync": "node scripts/sync-supabase.js",
+    "repair": "node scripts/repair-data.js",
     "serve": "node scripts/serve-web.js"
   },
   "keywords": [],
