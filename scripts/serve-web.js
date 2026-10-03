@@ -84,7 +84,7 @@ function jobStatus() {
 function startCapture() {
   const st = jobStatus();
   if (st.status === 'running') return { code: 409, body: { error: 'already_running', job: st } };
-  const { QUERIES } = require('./capture-advogados-df');
+  const { QUERIES } = require('./queries');
   const effective = process.env.QUERIES ? process.env.QUERIES.split('|').filter(Boolean) : QUERIES;
   const out = fs.openSync(JOB_LOG, 'w');
   const err = fs.openSync(JOB_ERR, 'w');
@@ -186,7 +186,7 @@ async function handler(req, res) {
       return;
     }
     if (url === '/api/queries' && req.method === 'GET') {
-      try { const { QUERIES } = require('./capture-advogados-df'); json(res, 200, { queries: QUERIES }); } catch (e) { json(res, 500, { error: e.message }); }
+      try { const { QUERIES } = require('./queries'); json(res, 200, { queries: QUERIES }); } catch (e) { json(res, 500, { error: e.message }); }
       return;
     }
     json(res, 404, { error: 'not_found' });

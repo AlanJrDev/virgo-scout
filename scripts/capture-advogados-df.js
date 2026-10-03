@@ -2,35 +2,9 @@ require('dotenv').config();
 const { scrapeMany } = require('../src/scraper/mapsScraper');
 const { dedupeLeads } = require('../src/utils/leads');
 const { saveLeads } = require('../src/utils/spreadsheet');
-
-const QUERIES = [
-  'advogados Distrito Federal',
-  'advogado Brasília DF',
-  'escritório de advocacia Brasília',
-  'advocacia Asa Sul Brasília',
-  'advocacia Asa Norte Brasília',
-  'advogado Taguatinga DF',
-  'advogado Ceilândia DF',
-  'advogado Águas Claras DF',
-  'advogado trabalhista Brasília',
-  'advogado criminal Brasília',
-  'advogado civil Brasília',
-  'advogado previdenciário Brasília',
-  'advogado empresarial Brasília',
-  'advogado família Brasília',
-  'advogado Guará DF',
-  'advogado Samambaia DF',
-  'advogado Sobradinho DF',
-  'advogado Gama DF',
-  'advogado Santa Maria DF',
-  'advogado Planaltina DF',
-  'advogado tributário Brasília',
-  'advogado imobiliário Brasília',
-  'advogado consumidor Brasília',
-  'advogado trânsito Brasília',
-  'advogado previdência Brasília',
-  'advogado inventário Brasília',
-];
+const { QUERIES } = require('./queries');
+const { sbEnabled } = require('../src/utils/sb');
+const { syncLeads } = require('./sync-supabase');
 
 async function main() {
   const only = process.env.QUERIES ? process.env.QUERIES.split('|') : QUERIES;
@@ -45,6 +19,14 @@ async function main() {
   const out = await saveLeads(uniq, { basename, outDir: './data', formats: ['csv', 'json', 'xlsx'] });
   console.log(`[capture] RAW=${raw.length} UNICOS=${uniq.length} em ${Math.round((Date.now() - t0) / 1000)}s`);
   console.log(JSON.stringify(out, null, 2));
+  if (sbEnabled()) {
+    try {
+      const s = await syncLeads({ runBuild: true });
+      console.log(`[sync] ${s.synced} leads → Supabase (${s.file})`);
+    } catch (e) {
+      console.error('[sync] falhou (captura salva localmente):', e.message);
+    }
+  }
 }
 
 if (require.main === module) {

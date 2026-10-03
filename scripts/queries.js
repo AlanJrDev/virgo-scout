@@ -1,0 +1,31 @@
+/* Queries de captura — módulo leve sem Playwright (compartilhado por capture, serve-web e Vercel) */
+const QUERIES = [
+  'advogados Distrito Federal',
+  'advogado Brasília DF',
+  'escritório de advocacia Brasília',
+  'advocacia Asa Sul Brasília',
+  'advocacia Asa Norte Brasília',
+  'advogado Taguatinga DF',
+  'advogado Ceilândia DF',
+  'advogado Águas Claras DF',
+  'advogado trabalhista Brasília',
+  'advogado criminal Brasília',
+  'advogado civil Brasília',
+  'advogado previdenciário Brasília',
+  'advogado empresarial Brasília',
+  'advogado família Brasília',
+  'advogado Guará DF',
+  'advogado Samambaia DF',
+  'advogado Sobradinho DF',
+  'advogado Gama DF',
+  'advogado Santa Maria DF',
+  'advogado Planaltina DF',
+  'advogado tributário Brasília',
+  'advogado imobiliário Brasília',
+  'advogado consumidor Brasília',
+  'advogado trânsito Brasília',
+  'advogado previdência Brasília',
+  'advogado inventário Brasília',
+];
+
+module.exports = { QUERIES };
