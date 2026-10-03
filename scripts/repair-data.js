@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { sbEnabled } = require('../src/utils/sb');
 const { newestLeadsFile } = require('../src/utils/leads-io');
-const { toRow, dedupeRows, upsertRows } = require('./sync-supabase');
+const { toRow, dedupeRows, upsertRows, isLead } = require('./sync-supabase');
 const { classifyLead } = require('../src/utils/classify');
 
 async function repair({ dataDir } = {}) {
@@ -17,7 +17,7 @@ async function repair({ dataDir } = {}) {
   for (const category of ['advogados', 'arquitetura']) {
     const file = newestLeadsFile(dir, category);
     if (!file) { console.warn(`[repair] sem JSON de leads p/ ${category} em ${dir}`); continue; }
-    const leads = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const leads = JSON.parse(fs.readFileSync(file, 'utf8')).filter(isLead);
     const tag = category === 'arquitetura' ? 'arquitetura' : 'advogados';
     const rows0 = leads.map((l) => {
       const row = toRow(l);

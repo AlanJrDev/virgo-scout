@@ -162,3 +162,19 @@ test('dedupe por id (nome+endereço) mantém a linha mais rica', async () => {
   const cap = JSON.parse(calls.find((c) => c.url.includes('/rest/v1/captures')).opts.body);
   assert.strictEqual(cap[0].leads_count, 2);
 });
+
+test('descarta artefato de paginação do Maps (nome vazio ou Resultados)', async () => {
+  fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([
+    { name: 'Resultados', address: '' },
+    { name: '  ', address: 'Rua Z' },
+    { name: 'Advogado Real', address: 'Rua A' },
+  ]));
+  const { syncLeads } = require('../../scripts/sync-supabase');
+  const calls = [];
+  global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
+  const r = await syncLeads({ dataDir: TMP, runBuild: false });
+  assert.strictEqual(r.synced, 1);
+  const rows = JSON.parse(calls.find((c) => c.url.includes('/rest/v1/leads')).opts.body);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].name, 'Advogado Real');
+});

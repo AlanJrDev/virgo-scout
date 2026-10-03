@@ -54,6 +54,13 @@ function cleanAddr(v) {
   return s || null;
 }
 
+/* Artefato de paginação do Google Maps ("Resultados") ou nome vazio não é lead —
+   mesma regra do prepare() dos metrics (evita id colidindo entre categorias). */
+function isLead(l) {
+  const name = String((l && l.name) || '').trim();
+  return !!name && !/^resultados?$/i.test(name);
+}
+
 function toRow(l) {
   return {
     id: leadId(l),
@@ -108,7 +115,7 @@ async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = 
   const dir = dataDir || path.join(__dirname, '..', 'data');
   const file = newestLeadsFile(dir, category);
   if (!file) throw new Error(`nenhum JSON de leads (${category}) em ${dir}`);
-  const leads = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const leads = JSON.parse(fs.readFileSync(file, 'utf8')).filter(isLead);
   const tag = category === 'arquitetura' ? 'arquitetura' : 'advogados';
   const rows0 = leads.map((l) => {
     const row = toRow(l);
@@ -132,4 +139,4 @@ if (require.main === module) {
     .catch((e) => { console.error('[sync]', e.message); process.exit(1); });
 }
 
-module.exports = { norm, leadId, toRow, normPhone, cleanAddr, dedupeRows, upsertRows, syncLeads };
+module.exports = { norm, leadId, toRow, normPhone, cleanAddr, isLead, dedupeRows, upsertRows, syncLeads };
