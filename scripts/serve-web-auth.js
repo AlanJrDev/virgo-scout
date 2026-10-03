@@ -1,12 +1,35 @@
+/* Autenticação comum local + Vercel: tentativa de login e leitura de sessão */
 const crypto = require('node:crypto');
 const store = require('../src/utils/user-store');
+const { createSession, getSession } = require('../src/utils/session-store');
+const { SbError } = require('../src/utils/sb');
 
-// autentica no user-store local; 503 = sem users.json (fail-closed), 401 = inválido
-function authenticate(email, pass) {
-  if (!store.readStore()) return { status: 503 };
-  const user = store.findUser(email);
-  if (!user || !store.verifyPassword(user, pass)) return { status: 401 };
-  return { status: 200, user: { email: user.email, role: user.role } };
+const DAY = 24 * 60 * 60 * 1000;
+
+// valida credenciais, cria sessão (banco ou memória) e devolve token pronto p/ cookie
+async function attemptLogin({ email, pass, keep = false, ip = '?' }) {
+  if (!loginAllowed(ip)) return { status: 429, body: { error: 'locked' } };
+  try {
+    const user = await store.findUser(email);
+    if (!user || !store.verifyPassword(user, pass)) {
+      const locked = registerFail(ip);
+      return { status: locked ? 429 : 401, body: { error: locked ? 'locked' : 'invalid' } };
+    }
+    clearFails(ip);
+    const ttlMs = keep ? 7 * DAY : DAY;
+    const token = await createSession({ email: user.email, role: user.role, ttlMs });
+    return { status: 200, token, ttlMs, keep, body: { ok: true, user: user.email, role: user.role } };
+  } catch (e) {
+    if (e instanceof SbError || (e && e.code === 'store_unavailable')) {
+      return { status: 503, body: { error: 'setup_required' } };
+    }
+    throw e;
+  }
+}
+
+// sessão → usuário; ausência/expiração/falha de store → null (fail-closed, nunca lança)
+async function sessionUser(token) {
+  try { return await getSession(token); } catch { return null; }
 }
 
 function newSessionToken() {
@@ -31,4 +54,4 @@ function registerFail(ip) {
 }
 function clearFails(ip) { attempts.delete(ip); }
 
-module.exports = { authenticate, newSessionToken, loginAllowed, registerFail, clearFails };
+module.exports = { attemptLogin, sessionUser, newSessionToken, loginAllowed, registerFail, clearFails };

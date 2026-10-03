@@ -4,7 +4,10 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 require('dotenv').config();
 const { buildPayload } = require('../src/utils/metrics');
-const { authenticate, newSessionToken, loginAllowed, registerFail, clearFails } = require('./serve-web-auth');
+const { attemptLogin, sessionUser } = require('./serve-web-auth');
+const { destroySession } = require('../src/utils/session-store');
+const { parseCookies, authCookie, clearAuthCookie } = require('../src/utils/cookies');
+const { json } = require('../src/utils/http-json');
 const { askGroq, formatContext } = require('./groq');
 
 const ROOT = path.join(__dirname, '..', 'web');
@@ -14,31 +17,8 @@ const JOB_LOG = path.join(DATA, 'capture-live.log');
 const JOB_ERR = path.join(DATA, 'capture-live.err.log');
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 
-/* ---------- sessões locais (em memória; reinício do servidor desloga) ---------- */
-const sessions = new Map(); // token -> { exp, email, role }
-const DAY = 24 * 60 * 60 * 1000;
-function sessionValid(token) {
-  if (!token) return null;
-  const s = sessions.get(token);
-  if (!s) return null;
-  if (Date.now() > s.exp) { sessions.delete(token); return null; }
-  return s;
-}
-function parseCookies(header) {
-  const out = {};
-  (header || '').split(';').forEach((p) => {
-    const i = p.indexOf('=');
-    if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
-  });
-  return out;
-}
 // arquivos que a tela de login precisa sem sessão
 const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor/gsap.min.js', '/assets/LOGO.png']);
-
-function json(res, code, obj) {
-  res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-  res.end(JSON.stringify(obj));
-}
 
 function newestLeadsFile() {
   const preferred = [process.env.BASENAME ? `${process.env.BASENAME}.v2.json` : null, 'advogados-df-max.v2.json', 'advogados-df-max.json'].filter(Boolean);
@@ -144,10 +124,10 @@ function livePayload() {
   return payload;
 }
 
-const server = http.createServer((req, res) => {
+async function handler(req, res) {
   const url = decodeURIComponent(req.url.split('?')[0]);
   const cookies = parseCookies(req.headers.cookie);
-  const sess = sessionValid(cookies.vs_auth);
+  const sess = await sessionUser(cookies.vs_auth);
   const authed = !!sess;
   const ip = req.socket.remoteAddress || '?';
 
@@ -161,31 +141,25 @@ const server = http.createServer((req, res) => {
 
   /* login / logout (livres) */
   if (url === '/api/login' && req.method === 'POST') {
-    if (!loginAllowed(ip)) { json(res, 429, { error: 'locked' }); return; }
     let body = '';
     req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
-    req.on('end', () => {
+    req.on('end', async () => {
       let u = '', p = '', keep = false;
       try { const j = JSON.parse(body || '{}'); u = j.user; p = j.pass; keep = !!j.keep; } catch {}
-      const r = authenticate(u, p);
-      if (r.status === 503) { json(res, 503, { error: 'setup_required' }); return; }
-      if (r.status !== 200) {
-        const locked = registerFail(ip);
-        json(res, locked ? 429 : 401, { error: locked ? 'locked' : 'invalid' });
-        return;
+      try {
+        const r = await attemptLogin({ email: u, pass: p, keep, ip });
+        if (r.token) res.setHeader('Set-Cookie', authCookie(r.token, { maxAge: r.keep ? Math.floor(r.ttlMs / 1000) : 0 }));
+        json(res, r.status, r.body);
+      } catch (e) {
+        console.error('[serve-web] login', e);
+        json(res, 500, { error: 'internal' });
       }
-      clearFails(ip);
-      const token = newSessionToken();
-      sessions.set(token, { exp: Date.now() + (keep ? 7 * DAY : DAY), email: r.user.email, role: r.user.role });
-      const cookie = `vs_auth=${token}; Path=/; HttpOnly; SameSite=Lax${keep ? `; Max-Age=${7 * 86400}` : ''}`;
-      res.setHeader('Set-Cookie', cookie);
-      json(res, 200, { ok: true, user: r.user.email, role: r.user.role });
     });
     return;
   }
   if (url === '/api/logout' && req.method === 'POST') {
-    if (cookies.vs_auth) sessions.delete(cookies.vs_auth);
-    res.setHeader('Set-Cookie', 'vs_auth=; Path=/; HttpOnly; Max-Age=0');
+    if (cookies.vs_auth) await destroySession(cookies.vs_auth);
+    res.setHeader('Set-Cookie', clearAuthCookie());
     json(res, 200, { ok: true });
     return;
   }
@@ -250,6 +224,13 @@ const server = http.createServer((req, res) => {
     return;
   }
   serveFile(file);
+}
+
+const server = http.createServer((req, res) => {
+  handler(req, res).catch((e) => {
+    console.error('[serve-web]', e);
+    try { json(res, 500, { error: 'internal' }); } catch {}
+  });
 });
 
 const PORT = parseInt(process.env.PORT || '8901', 10);

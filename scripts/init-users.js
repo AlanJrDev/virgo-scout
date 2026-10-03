@@ -1,6 +1,8 @@
-/* Seed de auth/users.json — recebe trios email:senha:role; nunca imprime senhas */
+/* Seed de usuários — recebe trios email:senha:role; nunca imprime senhas;
+   destino: Supabase (se SUPABASE_URL/SECRET setados) ou auth/users.json */
 require('dotenv').config();
 const { addUser, usersFile } = require('../src/utils/user-store');
+const { sbEnabled } = require('../src/utils/sb');
 
 const args = process.argv.slice(2);
 const force = args.includes('--force');
@@ -17,11 +19,19 @@ if (!pairs.length) {
   console.error('     SEED_USERS="email:senha:role|..." node scripts/init-users.js');
   process.exit(1);
 }
-for (const pair of pairs) {
-  const m = pair.match(/^([^:\s]+@[^:\s]+):([^:\s]+):([a-z]+)$/);
-  if (!m) { console.error('Formato inválido (email:senha:role): entrada sem senha exibida'); process.exit(1); }
-  const [, email, pass, role] = m;
-  const u = addUser(email, role, pass, { force });
-  console.log(`ok: ${u.email} (${u.role}) — hash scrypt gravado`);
-}
-console.log('Pronto:', usersFile());
+
+(async () => {
+  for (const pair of pairs) {
+    const m = pair.match(/^([^:\s]+@[^:\s]+):([^:\s]+):([a-z]+)$/);
+    if (!m) { console.error('Formato inválido (email:senha:role): entrada sem senha exibida'); process.exit(1); }
+    const [, email, pass, role] = m;
+    try {
+      const u = await addUser(email, role, pass, { force });
+      console.log(`ok: ${u.email} (${u.role}) — hash scrypt gravado em ${sbEnabled() ? 'Supabase' : usersFile()}`);
+    } catch (e) {
+      console.error('erro:', e.message);
+      process.exitCode = 1;
+    }
+  }
+  console.log(sbEnabled() ? 'Pronto: Supabase' : `Pronto: ${usersFile()}`);
+})();

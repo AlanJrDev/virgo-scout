@@ -7,6 +7,8 @@ const path = require('node:path');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-users-'));
 process.env.USERS_FILE = path.join(TMP, 'users.json');
+delete process.env.SUPABASE_URL;
+delete process.env.SUPABASE_SECRET_KEY;
 
 const store = require('../../src/utils/user-store');
 
@@ -78,4 +80,24 @@ test('papel desconhecido é ignorado pelo findUser', () => {
   }));
   assert.strictEqual(store.findUser('ghost@x.com'), null);
   assert.deepStrictEqual(store.listUsers(), []);
+});
+
+test('dispatcher: com SUPABASE configurado, findUser consulta o PostgREST', async () => {
+  const nativeFetch = global.fetch;
+  process.env.SUPABASE_URL = 'https://x.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_t';
+  const urls = [];
+  global.fetch = async (url) => {
+    urls.push(url);
+    return { ok: true, status: 200, text: async () => JSON.stringify([{ email: 'remoto@x.com', role: 'founder', salt: 'aGk=', hash: 'aGk=' }]) };
+  };
+  try {
+    const u = await store.findUser('remoto@x.com');
+    assert.strictEqual(u.role, 'founder');
+    assert.ok(urls[0].includes('/rest/v1/users?email=eq.remoto%40x.com'));
+  } finally {
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+    global.fetch = nativeFetch;
+  }
 });
