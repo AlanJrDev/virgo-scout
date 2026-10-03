@@ -18,18 +18,38 @@ function leadId(lead) {
   return crypto.createHash('sha1').update(`${norm(lead.name)}|${norm(lead.address)}`).digest('hex');
 }
 
+/* Dado bruto do Maps pode vir "4,5" (vírgula BR) ou "1.234" (milhar) — normaliza p/ numeric/int */
+function num(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  let s = String(v).trim();
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+function int(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v) : null;
+  let s = String(v).trim();
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  else s = s.replace(',', '.');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
 function toRow(l) {
   return {
     id: leadId(l),
     name: l.name || null,
-    rating: l.rating ?? null,
-    reviews: l.reviews ?? null,
+    rating: num(l.rating),
+    reviews: int(l.reviews),
     address: l.address || null,
     phone: l.phone || null,
     website: l.website || null,
     source: l.source || null,
     area: l.area || null,
-    area_conf: l.area_conf ?? null,
+    area_conf: num(l.area_conf),
     captured_at: l.captured_at || null,
   };
 }
@@ -62,4 +82,4 @@ if (require.main === module) {
     .catch((e) => { console.error('[sync]', e.message); process.exit(1); });
 }
 
-module.exports = { norm, leadId, syncLeads };
+module.exports = { norm, leadId, toRow, syncLeads };

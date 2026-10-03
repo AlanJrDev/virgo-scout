@@ -63,6 +63,21 @@ test('syncLeads sem env configurado → erro claro', async () => {
   await assert.rejects(syncLeads({ dataDir: TMP, runBuild: false }), /SUPABASE_URL/);
 });
 
+test('toRow normaliza números brasileiros (rating "4,5", reviews "1.234")', () => {
+  const { toRow } = require('../../scripts/sync-supabase');
+  const r = toRow({ name: 'X', address: 'Y', rating: '4,5', reviews: '1.234', area_conf: '0,8' });
+  assert.strictEqual(r.rating, 4.5);
+  assert.strictEqual(r.reviews, 1234);
+  assert.strictEqual(r.area_conf, 0.8);
+  const r2 = toRow({ name: 'X', rating: 4.2, reviews: 10, area_conf: 0.75 });
+  assert.strictEqual(r2.rating, 4.2);
+  assert.strictEqual(r2.reviews, 10);
+  const r3 = toRow({ name: 'X', rating: 'n/a', reviews: '', area_conf: null });
+  assert.strictEqual(r3.rating, null);
+  assert.strictEqual(r3.reviews, null);
+  assert.strictEqual(r3.area_conf, null);
+});
+
 test('batching: 1346 leads → 3 requisições (500+500+346)', async () => {
   const big = Array.from({ length: 1346 }, (_, i) => ({ name: `Lead ${i}`, address: `End ${i}` }));
   fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify(big));
