@@ -5,3 +5,5 @@ auth/
 playwright-report/
 test-results/
 docs/qa/
+.vercel/
+data/job.json
