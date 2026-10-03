@@ -4,12 +4,18 @@ const { sbFetch, SbError } = require('../src/utils/sb');
 const { buildPayload } = require('../src/utils/metrics');
 const { json } = require('../src/utils/http-json');
 
+function categoryOf(req) {
+  const qs = new URLSearchParams((req.url || '').split('?')[1] || '');
+  return qs.get('category') === 'arquitetura' ? 'arquitetura' : 'advogados';
+}
+
 module.exports = async (req, res) => {
   const sess = await sessionUser(parseCookies(req.headers.cookie).vs_auth);
   if (!sess) { json(res, 401, { error: 'unauthorized' }); return; }
+  const category = categoryOf(req);
   try {
-    const rows = await sbFetch('leads?select=*');
-    const payload = buildPayload(rows || [], { dataDir: '/tmp' });
+    const rows = await sbFetch(`leads?select=*&source=${category === 'arquitetura' ? 'eq.arquitetura' : 'neq.arquitetura'}`);
+    const payload = buildPayload(rows || [], { dataDir: '/tmp', category });
     payload.source = 'supabase';
     json(res, 200, payload);
   } catch (e) {

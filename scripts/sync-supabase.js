@@ -54,13 +54,17 @@ function toRow(l) {
   };
 }
 
-async function syncLeads({ dataDir, runBuild = true } = {}) {
+async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = {}) {
   if (!sbEnabled()) throw new Error('SUPABASE_URL/SUPABASE_SECRET_KEY não configurados');
   const dir = dataDir || path.join(__dirname, '..', 'data');
-  const file = newestLeadsFile(dir);
-  if (!file) throw new Error(`nenhum JSON de leads em ${dir}`);
+  const file = newestLeadsFile(dir, category);
+  if (!file) throw new Error(`nenhum JSON de leads (${category}) em ${dir}`);
   const leads = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const rows = leads.map(toRow);
+  const rows = leads.map((l) => {
+    const row = toRow(l);
+    if (category === 'arquitetura') row.source = 'arquitetura';
+    return row;
+  });
   for (let i = 0; i < rows.length; i += CHUNK) {
     await sbFetch('leads?on_conflict=id', {
       method: 'POST',
@@ -77,7 +81,8 @@ async function syncLeads({ dataDir, runBuild = true } = {}) {
 }
 
 if (require.main === module) {
-  syncLeads()
+  const category = process.argv[2] || 'advogados';
+  syncLeads({ category })
     .then((r) => console.log(`[sync] ${r.synced} leads → Supabase (${r.file})`))
     .catch((e) => { console.error('[sync]', e.message); process.exit(1); });
 }

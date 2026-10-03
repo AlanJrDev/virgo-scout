@@ -49,3 +49,41 @@ test('areaDistribution cobre todos os leads e ordena desc', () => {
 test('lista de áreas cobre as especialidades do escopo', () => {
   assert.ok(AREAS.includes('Trabalhista') && AREAS.includes('Criminal') && AREAS.includes('Tributário'));
 });
+
+test('categoria arquitetura: classifica por nome (3 áreas)', () => {
+  assert.strictEqual(classifyLead({ name: 'Marcos Topógrafos e Consultoria', source: '' }, 'arquitetura').area, 'Topografia');
+  assert.strictEqual(classifyLead({ name: 'Studio de Projeto Arquitetônico', source: '' }, 'arquitetura').area, 'Arquitetura');
+  assert.strictEqual(classifyLead({ name: 'Planejamento Urbano DF Ltda', source: '' }, 'arquitetura').area, 'Urbanismo');
+});
+
+test('categoria arquitetura: origem (query) com nome genérico; fallback Outros', () => {
+  const r = classifyLead({ name: 'Almeida Comércio', source: 'escritório de arquitetura Taguatinga' }, 'arquitetura');
+  assert.strictEqual(r.area, 'Arquitetura');
+  assert.strictEqual(r.confidence, 0.7);
+  const g = classifyLead({ name: 'Loja de Roupas', source: 'mercado central' }, 'arquitetura');
+  assert.strictEqual(g.area, 'Outros');
+  assert.strictEqual(g.confidence, 0.3);
+});
+
+test('categoria padrão (advogados) não muda comportamento', () => {
+  const a = classifyLead({ name: 'Souza & Lima Advocacia Trabalhista', source: 'advogados DF' });
+  const b = classifyLead({ name: 'Souza & Lima Advocacia Trabalhista', source: 'advogados DF' }, 'advogados');
+  assert.deepStrictEqual(a, b);
+  assert.strictEqual(a.area, 'Trabalhista');
+});
+
+test('areaDistribution aceita categoria arquitetura', () => {
+  const leads = [
+    { name: 'Escritório de Arquitetura A', source: '' },
+    { name: 'Escritório de Arquitetura B', source: '' },
+    { name: 'Topografia Gama', source: '' },
+    { name: 'Loja X', source: 'nada' },
+  ];
+  const dist = areaDistribution(leads, 'arquitetura');
+  const sum = dist.reduce((a, d) => a + d.value, 0);
+  assert.strictEqual(sum, 4);
+  assert.strictEqual(dist[0].label, 'Arquitetura');
+  assert.strictEqual(dist[0].value, 2);
+  assert.ok(dist.some((d) => d.label === 'Topografia'));
+  assert.ok(dist.some((d) => d.label === 'Outros'));
+});

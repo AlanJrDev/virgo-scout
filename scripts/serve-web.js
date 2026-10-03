@@ -21,8 +21,12 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript
 // arquivos que a tela de login precisa sem sessão
 const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor/gsap.min.js', '/assets/LOGO.png']);
 
-function readLeads() {
-  const file = newestLeadsFile(DATA);
+function catOf(params) {
+  return params.get('category') === 'arquitetura' ? 'arquitetura' : 'advogados';
+}
+
+function readLeads(category) {
+  const file = newestLeadsFile(DATA, category);
   if (!file) return { leads: [], file: null, mtime: 0, fallbackTs: Date.now() };
   // data da captura real = mtime do JSON bruto (o .v2 é gerado depois)
   const raw = file.replace(/\.v2\.json$/, '.json');
@@ -69,7 +73,7 @@ function jobStatus() {
         }
       }
     } catch {}
-    return { status: 'running', pid: job.pid, started_at: job.started_at, total: job.queries, done, current };
+    return { status: 'running', pid: job.pid, started_at: job.started_at, total: job.queries, done, current, category: job.category || 'advogados' };
   }
   let summary = null;
   try {
@@ -78,23 +82,25 @@ function jobStatus() {
       if (l.includes('[capture] RAW=')) summary = l;
     }
   } catch {}
-  return { status: summary ? 'done' : 'failed', started_at: job.started_at, finished_at: job.finished_at || null, summary };
-}
+    return { status: summary ? 'done' : 'failed', started_at: job.started_at, finished_at: job.finished_at || null, category: job.category || 'advogados', summary };
+  }
 
-function startCapture() {
+function startCapture(category = 'advogados') {
   const st = jobStatus();
   if (st.status === 'running') return { code: 409, body: { error: 'already_running', job: st } };
-  const { QUERIES } = require('./queries');
-  const effective = process.env.QUERIES ? process.env.QUERIES.split('|').filter(Boolean) : QUERIES;
+  const isArq = category === 'arquitetura';
+  const queries = isArq ? require('./queries-arquitetura').QUERIES_ARQ : require('./queries').QUERIES;
+  const effective = process.env.QUERIES ? process.env.QUERIES.split('|').filter(Boolean) : queries;
+  const script = isArq ? 'capture-arquitetura.js' : 'capture-advogados-df.js';
   const out = fs.openSync(JOB_LOG, 'w');
   const err = fs.openSync(JOB_ERR, 'w');
-  const child = spawn(process.execPath, [path.join(__dirname, 'capture-advogados-df.js')], {
+  const child = spawn(process.execPath, [path.join(__dirname, script)], {
     detached: true,
     stdio: ['ignore', out, err],
     cwd: path.join(__dirname, '..'),
     env: process.env,
   });
-  const job = { pid: child.pid, started_at: new Date().toISOString(), queries: effective.length, log: path.basename(JOB_LOG) };
+  const job = { pid: child.pid, started_at: new Date().toISOString(), queries: effective.length, category, log: path.basename(JOB_LOG) };
   fs.writeFileSync(JOB_FILE, JSON.stringify(job, null, 2));
   child.unref();
   return { code: 202, body: { ok: true, job: { ...job, status: 'running', done: 0, total: job.queries } } };
@@ -102,10 +108,10 @@ function startCapture() {
 
 let payloadCache = { mtime: 0, payload: null };
 
-function livePayload() {
-  const { leads, file, mtime, fallbackTs } = readLeads();
+function livePayload(category) {
+  const { leads, file, mtime, fallbackTs } = readLeads(category);
   if (payloadCache.mtime === mtime && payloadCache.payload && payloadCache.source === file) return payloadCache.payload;
-  const payload = buildPayload(leads, { dataDir: DATA, fallbackTs });
+  const payload = buildPayload(leads, { dataDir: DATA, fallbackTs, category });
   payload.source = file;
   payloadCache = { mtime, payload, source: file };
   return payload;
@@ -154,6 +160,8 @@ async function handler(req, res) {
   /* API exige sessão */
   if (url.startsWith('/api')) {
     if (!authed) { json(res, 401, { error: 'unauthorized' }); return; }
+    const qs = new URLSearchParams(req.url.split('?')[1] || '');
+    const category = catOf(qs);
     if (url === '/api/me') { json(res, 200, { user: sess.email, role: sess.role }); return; }
     if (url === '/api/insight' && req.method === 'POST') {
       let body = '';
@@ -161,14 +169,16 @@ async function handler(req, res) {
       req.on('end', async () => {
         let q = '';
         let history = [];
+        let cat = category;
         try {
           const j = JSON.parse(body || '{}');
           q = String(j.q || '').slice(0, 1000);
           history = Array.isArray(j.history) ? j.history.slice(-6) : [];
+          if (j.category === 'arquitetura') cat = 'arquitetura';
         } catch {}
         if (!q) { json(res, 400, { error: 'empty_q' }); return; }
         try {
-          const r = await askGroq({ question: q, context: formatContext(livePayload()), history });
+          const r = await askGroq({ question: q, context: formatContext(livePayload(cat)), history });
           json(res, 200, { answer: r.answer, source: 'groq' });
         } catch (e) {
           json(res, 503, { error: e.code || 'groq_error' });
@@ -177,16 +187,25 @@ async function handler(req, res) {
       return;
     }
     if (url === '/api/leads') {
-      try { json(res, 200, livePayload()); } catch (e) { json(res, 500, { error: e.message }); }
+      try { json(res, 200, livePayload(category)); } catch (e) { json(res, 500, { error: e.message }); }
       return;
     }
     if (url === '/api/capture' && req.method === 'GET') { json(res, 200, jobStatus()); return; }
     if (url === '/api/capture' && req.method === 'POST') {
-      try { const r = startCapture(); json(res, r.code, r.body); } catch (e) { json(res, 500, { error: e.message }); }
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 1024) req.destroy(); });
+      req.on('end', () => {
+        let cat = category;
+        try { const j = JSON.parse(body || '{}'); if (j.category === 'arquitetura') cat = 'arquitetura'; } catch {}
+        try { const r = startCapture(cat); json(res, r.code, r.body); } catch (e) { json(res, 500, { error: e.message }); }
+      });
       return;
     }
     if (url === '/api/queries' && req.method === 'GET') {
-      try { const { QUERIES } = require('./queries'); json(res, 200, { queries: QUERIES }); } catch (e) { json(res, 500, { error: e.message }); }
+      try {
+        const queries = category === 'arquitetura' ? require('./queries-arquitetura').QUERIES_ARQ : require('./queries').QUERIES;
+        json(res, 200, { queries, category });
+      } catch (e) { json(res, 500, { error: e.message }); }
       return;
     }
     json(res, 404, { error: 'not_found' });

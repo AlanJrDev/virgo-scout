@@ -7,6 +7,7 @@ const { sbEnabled } = require('../src/utils/sb');
 const { syncLeads } = require('./sync-supabase');
 
 async function main() {
+  const category = process.env.CAPTURE_CATEGORY || 'advogados';
   const only = process.env.QUERIES ? process.env.QUERIES.split('|') : QUERIES;
   const maxDetails = parseInt(process.env.MAX_DETAILS || '80', 10);
   const maxScrolls = parseInt(process.env.MAX_SCROLLS || '40', 10);
@@ -21,7 +22,7 @@ async function main() {
   console.log(JSON.stringify(out, null, 2));
   if (sbEnabled()) {
     try {
-      const s = await syncLeads({ runBuild: true });
+      const s = await syncLeads({ category, runBuild: true });
       console.log(`[sync] ${s.synced} leads → Supabase (${s.file})`);
     } catch (e) {
       console.error('[sync] falhou (captura salva localmente):', e.message);
@@ -36,4 +37,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { QUERIES };
+module.exports = { QUERIES, main };

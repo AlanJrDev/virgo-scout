@@ -91,3 +91,38 @@ test('batching: 1346 leads → 3 requisições (500+500+346)', async () => {
   assert.strictEqual(JSON.parse(leadCalls[0].opts.body).length, 500);
   assert.strictEqual(JSON.parse(leadCalls[2].opts.body).length, 346);
 });
+
+test('newestLeadsFile por categoria: arquitetura e advogados isolados', () => {
+  const { newestLeadsFile } = require('../../src/utils/leads-io');
+  fs.writeFileSync(path.join(TMP, 'arquitetura-df-max.json'), JSON.stringify([{ name: 'Esc Arq', address: 'Rua 1' }]));
+  const arq = newestLeadsFile(TMP, 'arquitetura');
+  assert.ok(arq && arq.endsWith('arquitetura-df-max.json'), `esperava arq, veio ${arq}`);
+  const adv = newestLeadsFile(TMP, 'advogados');
+  assert.ok(adv && !adv.includes('arquitetura'), `advogados pegou arquivo de arquitetura: ${adv}`);
+  assert.ok(adv.endsWith('leads-teste.v2.json'));
+  assert.ok(newestLeadsFile(TMP, 'advogados') === adv);
+});
+
+test('syncLeads categoria arquitetura: lê arquivo arq e grava source=arquitetura', async () => {
+  fs.writeFileSync(path.join(TMP, 'arquitetura-df-max.json'), JSON.stringify([{ name: 'Esc Arq', address: 'Rua 1', source: 'topografia Gama' }]));
+  const { syncLeads } = require('../../scripts/sync-supabase');
+  const calls = [];
+  global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
+  const r = await syncLeads({ dataDir: TMP, category: 'arquitetura', runBuild: false });
+  assert.strictEqual(r.synced, 1);
+  const leadCall = calls.find((c) => c.url.includes('/rest/v1/leads'));
+  const rows = JSON.parse(leadCall.opts.body);
+  assert.strictEqual(rows[0].name, 'Esc Arq');
+  assert.strictEqual(rows[0].source, 'arquitetura');
+});
+
+test('syncLeads categoria advogados preserva a query no source', async () => {
+  fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([{ name: 'Adv Teste', address: 'Rua A', source: 'advogados Distrito Federal' }]));
+  const { syncLeads } = require('../../scripts/sync-supabase');
+  const calls = [];
+  global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
+  await syncLeads({ dataDir: TMP, category: 'advogados', runBuild: false });
+  const leadCalls = calls.filter((c) => c.url.includes('/rest/v1/leads'));
+  const firstRow = JSON.parse(leadCalls[0].opts.body)[0];
+  assert.strictEqual(firstRow.source, 'advogados Distrito Federal');
+});

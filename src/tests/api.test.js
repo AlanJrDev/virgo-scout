@@ -22,8 +22,8 @@ const queriesH = require('../../api/queries');
 before(() => addUser('landevbrasil.ia@gmail.com', 'founder', 'iloveTI@26'));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
-function fakeReq({ method = 'GET', cookie, body, ip = '10.0.0.1' } = {}) {
-  return { method, headers: { ...(cookie ? { cookie } : {}), 'x-forwarded-for': ip }, body, socket: { remoteAddress: ip } };
+function fakeReq({ method = 'GET', cookie, body, ip = '10.0.0.1', url = '/' } = {}) {
+  return { method, url, headers: { ...(cookie ? { cookie } : {}), 'x-forwarded-for': ip }, body, socket: { remoteAddress: ip } };
 }
 function fakeRes() {
   return {
@@ -134,4 +134,51 @@ test('insight: 400 em q vazia; queries devolve a lista de 26', async () => {
   await queriesH(fakeReq({ cookie: ck }), r2);
   assert.strictEqual(r2.statusCode, 200);
   assert.strictEqual(r2.body.queries.length, 26);
+});
+
+test('leads filtra por categoria no banco (eq/neq arquitetura) e no payload', async () => {
+  const r0 = fakeRes();
+  await loginH(fakeReq({ method: 'POST', body: { user: 'landevbrasil.ia@gmail.com', pass: 'iloveTI@26' }, ip: 'api-g' }), r0);
+  const ck = cookieDe(r0);
+  const nativeFetch = global.fetch;
+  process.env.SUPABASE_URL = 'https://x.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_t';
+  process.env.GROQ_API_KEY = 'gsk_test';
+  const urls = [];
+  global.fetch = async (url, opts) => {
+    urls.push(String(url));
+    if (String(url).includes('/sessions?')) {
+      return { ok: true, status: 200, text: async () => JSON.stringify([{ token_hash: 'h', email: 'landevbrasil.ia@gmail.com', role: 'founder', exp: new Date(Date.now() + 60000).toISOString() }]) };
+    }
+    if (String(url).includes('api.groq.com')) {
+      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
+    }
+    return { ok: true, status: 200, text: async () => JSON.stringify([{ name: 'X', source: 'topografia Gama', address: 'Gama' }]) };
+  };
+  try {
+    const r1 = fakeRes();
+    await leadsH(fakeReq({ cookie: ck, url: '/api/leads?category=arquitetura' }), r1);
+    assert.strictEqual(r1.statusCode, 200);
+    const leadUrl = urls.find((u) => u.includes('/leads'));
+    assert.ok(leadUrl.includes('source=eq.arquitetura'), `url: ${leadUrl}`);
+    assert.strictEqual(r1.body.areas[0].label, 'Topografia');
+
+    urls.length = 0;
+    const r2 = fakeRes();
+    await leadsH(fakeReq({ cookie: ck, url: '/api/leads' }), r2);
+    const leadUrl2 = urls.find((u) => u.includes('/leads'));
+    assert.ok(leadUrl2.includes('source=neq.arquitetura'), `url: ${leadUrl2}`);
+
+    urls.length = 0;
+    const r3 = fakeRes();
+    await insightH(fakeReq({ method: 'POST', cookie: ck, body: { q: 'topo', category: 'arquitetura' } }), r3);
+    assert.strictEqual(r3.statusCode, 200);
+    const insightLeadUrl = urls.find((u) => u.includes('/leads'));
+    assert.ok(insightLeadUrl.includes('source=eq.arquitetura'), `url: ${insightLeadUrl}`);
+  } finally {
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SECRET_KEY;
+    delete process.env.GROQ_API_KEY;
+    global.fetch = nativeFetch;
+  }
 });

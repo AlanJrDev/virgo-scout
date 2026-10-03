@@ -2,7 +2,7 @@
 // e a API ao vivo (serve-web), garantindo os mesmos números nos dois caminhos.
 const fs = require('node:fs');
 const path = require('node:path');
-const { areaDistribution } = require('./classify');
+const { areaDistribution, classifyLead } = require('./classify');
 const { parseRating, parseReviews } = require('./leads');
 const { waLink, waMessage } = require('./wa');
 
@@ -30,6 +30,11 @@ function normTxt(s) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+}
+
+// arquivos de uma categoria: arquitetura* p/ arquitetura, o resto p/ advogados
+function matchCategory(file, category) {
+  return category === 'arquitetura' ? file.startsWith('arquitetura') : !file.startsWith('arquitetura');
 }
 
 // região a partir de endereço + query de origem; fallback = Brasília
@@ -202,11 +207,11 @@ function relTime(ts) {
 }
 
 // capturas reais lidas dos arquivos em data/ (exclui .v2 e arquivos de teste)
-function buildRecent(dataDir) {
+function buildRecent(dataDir, category = 'advogados') {
   try {
     const files = fs
       .readdirSync(dataDir)
-      .filter((f) => f.endsWith('.json') && !f.includes('.v2') && !f.includes('validacao'))
+      .filter((f) => f.endsWith('.json') && !f.includes('.v2') && !f.includes('validacao') && matchCategory(f, category))
       .map((f) => {
         const p = path.join(dataDir, f);
         let count = 0;
@@ -230,11 +235,11 @@ function buildRecent(dataDir) {
 }
 
 // variação % entre as duas capturas mais recentes de data/ (null se só há uma)
-function buildDelta(dataDir) {
+function buildDelta(dataDir, category = 'advogados') {
   try {
     const files = fs
       .readdirSync(dataDir)
-      .filter((f) => f.endsWith('.json') && !f.includes('.v2') && !f.includes('validacao') && !f.includes('job'))
+      .filter((f) => f.endsWith('.json') && !f.includes('.v2') && !f.includes('validacao') && !f.includes('job') && matchCategory(f, category))
       .map((f) => {
         const p = path.join(dataDir, f);
         let count = 0;
@@ -254,14 +259,16 @@ function buildDelta(dataDir) {
 
 function buildPayload(leads, opts = {}) {
   const dataDir = opts.dataDir || path.join(__dirname, '..', '..', 'data');
-  const prepared = prepare(leads);
+  const category = opts.category || 'advogados';
+  let prepared = prepare(leads);
+  if (category === 'arquitetura') prepared = prepared.map((l) => ({ ...l, area: l.area || classifyLead(l, category).area }));
   const scored = prepared.map((l) => ({ ...l, score: scoreOf(l) })).sort((a, b) => b.score - a.score);
   const stats = buildStats(prepared);
   return {
     generated_at: new Date().toISOString(),
     stats,
-    delta_pct: buildDelta(dataDir),
-    areas: areaDistribution(prepared),
+    delta_pct: buildDelta(dataDir, category),
+    areas: areaDistribution(prepared, category),
     regions: regionAgg(prepared),
     ratingBuckets: ratingBuckets(prepared),
     top: buildTop(prepared),
@@ -273,7 +280,7 @@ function buildPayload(leads, opts = {}) {
       { label: 'Sem site', value: stats.semSite, color: '#38BDF8' },
       { label: 'Alta prioridade', value: stats.alta, color: '#F87171' },
     ],
-    recent: buildRecent(dataDir),
+    recent: buildRecent(dataDir, category),
   };
 }
 
