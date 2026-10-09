@@ -511,7 +511,8 @@
       var card = document.getElementById('queueCard');
       if (!card) return;
       card.hidden = !queue.length;
-      document.getElementById('queueSub').textContent = queue.length + ' leads contatáveis ainda não abordados';
+      var n = queue.length;
+      document.getElementById('queueSub').textContent = n + (n === 1 ? ' lead contatável ainda não abordado' : ' leads contatáveis ainda não abordados');
       document.getElementById('queueList').innerHTML = queue.map(function (l) {
         var why = [];
         if (!l.site) why.push('sem site');
@@ -667,6 +668,7 @@
     d.hidden = v === 'leads';
     l.hidden = v !== 'leads';
     document.querySelectorAll('.nav-item[data-view]').forEach(function (n) {
+      if (n.hasAttribute('data-scroll')) return; // atalho de ação, não local
       var on = n.getAttribute('data-view') === v;
       n.classList.toggle('active', on);
       if (on) n.setAttribute('aria-current', 'page');
@@ -730,7 +732,7 @@
       var qSub = document.getElementById('queueSub');
       var qN = document.getElementById('queueList').children.length;
       if (qCard) qCard.hidden = !qN;
-      if (qSub) qSub.textContent = qN + ' leads contatáveis ainda não abordados';
+      if (qSub) qSub.textContent = qN + (qN === 1 ? ' lead contatável ainda não abordado' : ' leads contatáveis ainda não abordados');
     }
     markContact(id);
   });
