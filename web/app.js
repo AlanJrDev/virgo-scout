@@ -502,6 +502,30 @@
     /* tabela densa da base (módulo web/table.js) */
     if (window.VS_TABLE) window.VS_TABLE.render(D);
 
+    /* fila "Contatar hoje": top 10 contatáveis ainda não abordados */
+    function renderQueue() {
+      var qPool = (currentPayload && currentPayload.pool) || [];
+      var queue = qPool.filter(function (l) { return l.score > 0 && !l.closed && (l.status || 'novo') === 'novo'; })
+        .sort(function (a, b) { return (b.site ? 0 : 1) - (a.site ? 0 : 1) || b.score - a.score; })
+        .slice(0, 10);
+      var card = document.getElementById('queueCard');
+      if (!card) return;
+      card.hidden = !queue.length;
+      document.getElementById('queueSub').textContent = queue.length + ' leads contatáveis ainda não abordados';
+      document.getElementById('queueList').innerHTML = queue.map(function (l) {
+        var why = [];
+        if (!l.site) why.push('sem site');
+        if (l.email) why.push('e-mail');
+        if (l.instagram) why.push('Instagram');
+        if (l.since_year) why.push('desde ' + l.since_year);
+        return '<li data-id="' + escapeHtml(l.id || '') + '">' +
+          '<div class="q-info"><strong>' + escapeHtml(l.name) + '</strong><span>' + escapeHtml((l.area || 'Geral') + (why.length ? ' · ' + why.join(' · ') : '')) + '</span></div>' +
+          ring(l.score) + (l.wa ? waBtn(l) : '') + '</li>';
+      }).join('');
+      drawRings(document.getElementById('queueList'));
+    }
+    renderQueue();
+
     /* motion: momento único de entrada */
     function finalStates() {
       document.querySelectorAll('[data-count]').forEach(function (el2) {
@@ -659,6 +683,11 @@
     if (!t) return;
     e.preventDefault();
     showView(t.getAttribute('data-view'));
+    var sel = t.getAttribute('data-scroll');
+    if (sel) {
+      var target = document.querySelector(sel);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   });
   (function restoreView() {
     var v = null;
@@ -686,6 +715,23 @@
     var ctx = a.closest('tr') || a.closest('li');
     var badge = ctx && ctx.querySelector('.badge');
     if (badge) { badge.className = 'badge Contatado'; badge.textContent = 'Contatado'; }
+    var qLi = a.closest('#queueList li');
+    if (qLi) {
+      var row = null;
+      document.querySelectorAll('#tblBody [data-contact-id]').forEach(function (wa) {
+        if (!row && wa.getAttribute('data-contact-id') === id) row = wa.closest('tr');
+      });
+      if (row) {
+        var rBadge = row.querySelector('.badge');
+        if (rBadge) { rBadge.className = 'badge Contatado'; rBadge.textContent = 'Contatado'; }
+      }
+      qLi.remove();
+      var qCard = document.getElementById('queueCard');
+      var qSub = document.getElementById('queueSub');
+      var qN = document.getElementById('queueList').children.length;
+      if (qCard) qCard.hidden = !qN;
+      if (qSub) qSub.textContent = qN + ' leads contatáveis ainda não abordados';
+    }
     markContact(id);
   });
 

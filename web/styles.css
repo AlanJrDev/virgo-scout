@@ -64,7 +64,6 @@ svg{display:block}
 .icon-btn{position:relative;width:38px;height:38px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);display:grid;place-items:center;transition:transform 160ms var(--ease-out),color 160ms var(--ease-out),border-color 160ms var(--ease-out)}
 .icon-btn:active{transform:scale(.93)}
 @media(hover:hover) and (pointer:fine){.icon-btn:hover{color:var(--text);border-color:var(--border-strong)}}
-.bell .dot{position:absolute;top:9px;right:10px;width:7px;height:7px;border-radius:50%;background:var(--cyan)}
 .avatar{width:38px;height:38px;border-radius:50%;background:#1d4ed8;display:grid;place-items:center;font-size:12.5px;font-weight:700;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
 .uinfo{display:flex;flex-direction:column;line-height:1.25}
 .uinfo strong{font-size:13px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -367,6 +366,13 @@ button.chip:active{transform:scale(.97)}
 .q-chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);background:rgba(120,160,255,.06);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-variant-numeric:tabular-nums}
 .q-chip b{color:var(--text);font-weight:600}
 .q-chip.ok b{color:var(--green)}
+
+.queue-list{list-style:none;display:flex;flex-direction:column}
+.queue-list li{display:flex;align-items:center;gap:12px;padding:10px 2px;border-top:1px solid var(--border)}
+.queue-list li:first-child{border-top:0}
+.q-info{flex:1;min-width:0}
+.q-info strong{display:block;font-size:13px}
+.q-info span{font-size:11.5px;color:var(--faint)}
 
 .tbl-summary{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tbl-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
