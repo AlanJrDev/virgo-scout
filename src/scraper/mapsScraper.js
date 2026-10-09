@@ -83,6 +83,75 @@ async function extractCards(page, source) {
   }, source).catch(() => []);
 }
 
+// Extrai o painel de detalhe do lugar (página place ou card aberto)
+async function readPlaceDetail(page) {
+  return page.evaluate(() => {
+    const txt = (sel) => document.querySelector(sel)?.innerText?.trim() || '';
+    const name = txt('h1.DUwDvf') || txt('h1');
+    // endereço: botão data-item-id=address
+    let address = '';
+    const addrBtn = document.querySelector('button[data-item-id="address"]');
+    if (addrBtn) address = (addrBtn.querySelector('.Io6YTe')?.innerText || addrBtn.innerText).trim();
+    // telefone: usa o href tel: (innerText costuma ser só o glifo do ícone)
+    let phone = '';
+    const telA = document.querySelector('a[href^="tel:"]');
+    if (telA) phone = (telA.getAttribute('href') || '').replace(/^tel:/, '').trim();
+    if (!phone) {
+      const telBtn = document.querySelector('button[data-item-id^="tel:"]');
+      if (telBtn) phone = (telBtn.querySelector('.Io6YTe')?.innerText || telBtn.innerText).trim();
+    }
+    // site
+    let website = '';
+    const siteA = document.querySelector('a[data-item-id="authority"]');
+    if (siteA) website = siteA.getAttribute('href') || '';
+    // rating no detalhe
+    let rating = '';
+    let reviews = '';
+    const bodyText = document.body.innerText.slice(0, 20000);
+    const m = bodyText.match(/(\d[,.]\d)\s*[\n ]+([\d.]+)\s*avalia/);
+    if (m) {
+      rating = m[1];
+      reviews = m[2];
+    }
+    // categoria: botão após o h1 (fallback: jsaction category)
+    let category = '';
+    const catBtn = document.querySelector('button.DkEaL') || document.querySelector('button[jsaction*="category"]');
+    if (catBtn) category = catBtn.innerText.trim();
+    // plus code: mesmo padrão do endereço
+    let plus_code = '';
+    const olocBtn = document.querySelector('button[data-item-id="oloc"]');
+    if (olocBtn) plus_code = (olocBtn.querySelector('.Io6YTe')?.innerText || olocBtn.innerText).trim();
+    // redes sociais: âncoras externas além do authority
+    let instagram = '';
+    let facebook = '';
+    document.querySelectorAll('a[data-item-id^="http"], a[href*="instagram.com"], a[href*="facebook.com"]').forEach((a) => {
+      const h = a.getAttribute('href') || '';
+      if (/instagram\.com\//.test(h) && !instagram) instagram = h;
+      if (/facebook\.com\//.test(h) && !facebook) facebook = h;
+    });
+    // texto do painel para sinais (não-reclamado primeiro: "claim this business" contém "claim")
+    // Perfis reclamados não exibem mais "Perfil reclamado" — sinais de dono (resposta/foto do
+    // proprietário) são o marcador atual de perfil reclamado; sem sinal algum → null (desconhecido)
+    const panel = bodyText;
+    let claimed = null;
+    if (/reivindicar este perfil|reivindique este perfil|claim this business/i.test(panel)) claimed = false;
+    else if (/perfil reclamado|perfil propriedade do titular|resposta do proprietário|do proprietário|\bclaimed\b/i.test(panel)) claimed = true;
+    const closed = /fechado (definitivamente|permanentemente)|encerrado/i.test(panel);
+    let hours = '';
+    const hm = panel.match(/aberto[^\n]{0,40}fecha[^\n\d]{0,10}(\d{1,2}:\d{2})/i);
+    if (hm) hours = 'Aberto ⋅ Fecha ' + hm[1];
+    let photos = null;
+    const gal = document.querySelector('button[aria-label*="Fotos"], button[aria-label*="photos" i]');
+    if (gal) { const pm = (gal.getAttribute('aria-label') || '').match(/(\d+)/); if (pm) photos = parseInt(pm[1], 10); }
+    // geo + place_id vêm da própria URL do painel
+    const mUrl = (location.href.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || []);
+    const pId = (location.href.match(/!1s(0x[0-9a-f]+:0x[0-9a-f]+)/) || [])[1] || '';
+    const lat = mUrl[1] || '';
+    const lng = mUrl[2] || '';
+    return { name, address, phone, website, rating, reviews, category, plus_code, instagram, facebook, claimed, closed, hours, photos, lat, lng, place_id: pId };
+  });
+}
+
 // Abre cada card p/ detalhe e extrai telefone/site/endereço — otimizado p/ máximo com timeout curto
 async function enrichWithDetails(page, leads, { maxDetails = 120, perLeadTimeoutMs = 9000 } = {}) {
   const enriched = [];
@@ -101,71 +170,7 @@ async function enrichWithDetails(page, leads, { maxDetails = 120, perLeadTimeout
       // espera painel de detalhe: h1 com nome
       await page.waitForSelector('h1', { timeout: 6000 }).catch(() => {});
       await sleep(900);
-      const detail = await page.evaluate(() => {
-        const txt = (sel) => document.querySelector(sel)?.innerText?.trim() || '';
-        const name = txt('h1.DUwDvf') || txt('h1');
-        // endereço: botão data-item-id=address
-        let address = '';
-        const addrBtn = document.querySelector('button[data-item-id="address"]');
-        if (addrBtn) address = (addrBtn.querySelector('.Io6YTe')?.innerText || addrBtn.innerText).trim();
-        // telefone: usa o href tel: (innerText costuma ser só o glifo do ícone)
-        let phone = '';
-        const telA = document.querySelector('a[href^="tel:"]');
-        if (telA) phone = (telA.getAttribute('href') || '').replace(/^tel:/, '').trim();
-        if (!phone) {
-          const telBtn = document.querySelector('button[data-item-id^="tel:"]');
-          if (telBtn) phone = (telBtn.querySelector('.Io6YTe')?.innerText || telBtn.innerText).trim();
-        }
-        // site
-        let website = '';
-        const siteA = document.querySelector('a[data-item-id="authority"]');
-        if (siteA) website = siteA.getAttribute('href') || '';
-        // rating no detalhe
-        let rating = '';
-        let reviews = '';
-        const bodyText = document.body.innerText.slice(0, 20000);
-        const m = bodyText.match(/(\d[,.]\d)\s*[\n ]+([\d.]+)\s*avalia/);
-        if (m) {
-          rating = m[1];
-          reviews = m[2];
-        }
-        // categoria: botão após o h1 (fallback: jsaction category)
-        let category = '';
-        const catBtn = document.querySelector('button.DkEaL') || document.querySelector('button[jsaction*="category"]');
-        if (catBtn) category = catBtn.innerText.trim();
-        // plus code: mesmo padrão do endereço
-        let plus_code = '';
-        const olocBtn = document.querySelector('button[data-item-id="oloc"]');
-        if (olocBtn) plus_code = (olocBtn.querySelector('.Io6YTe')?.innerText || olocBtn.innerText).trim();
-        // redes sociais: âncoras externas além do authority
-        let instagram = '';
-        let facebook = '';
-        document.querySelectorAll('a[data-item-id^="http"], a[href*="instagram.com"], a[href*="facebook.com"]').forEach((a) => {
-          const h = a.getAttribute('href') || '';
-          if (/instagram\.com\//.test(h) && !instagram) instagram = h;
-          if (/facebook\.com\//.test(h) && !facebook) facebook = h;
-        });
-        // texto do painel para sinais (não-reclamado primeiro: "claim this business" contém "claim")
-        // Perfis reclamados não exibem mais "Perfil reclamado" — sinais de dono (resposta/foto do
-        // proprietário) são o marcador atual de perfil reclamado; sem sinal algum → null (desconhecido)
-        const panel = bodyText;
-        let claimed = null;
-        if (/reivindicar este perfil|reivindique este perfil|claim this business/i.test(panel)) claimed = false;
-        else if (/perfil reclamado|perfil propriedade do titular|resposta do proprietário|do proprietário|\bclaimed\b/i.test(panel)) claimed = true;
-        const closed = /fechado (definitivamente|permanentemente)|encerrado/i.test(panel);
-        let hours = '';
-        const hm = panel.match(/aberto[^\n]{0,40}fecha[^\n\d]{0,10}(\d{1,2}:\d{2})/i);
-        if (hm) hours = 'Aberto ⋅ Fecha ' + hm[1];
-        let photos = null;
-        const gal = document.querySelector('button[aria-label*="Fotos"], button[aria-label*="photos" i]');
-        if (gal) { const pm = (gal.getAttribute('aria-label') || '').match(/(\d+)/); if (pm) photos = parseInt(pm[1], 10); }
-        // geo + place_id vêm da própria URL do painel
-        const mUrl = (location.href.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || []);
-        const pId = (location.href.match(/!1s(0x[0-9a-f]+:0x[0-9a-f]+)/) || [])[1] || '';
-        const lat = mUrl[1] || '';
-        const lng = mUrl[2] || '';
-        return { name, address, phone, website, rating, reviews, category, plus_code, instagram, facebook, claimed, closed, hours, photos, lat, lng, place_id: pId };
-      });
+      const detail = await readPlaceDetail(page);
       enriched.push(
         normalizeLead({
           name: detail.name || base.name,
@@ -204,8 +209,8 @@ async function enrichWithDetails(page, leads, { maxDetails = 120, perLeadTimeout
 async function scrapeQuery(page, query, opts = {}) {
   const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  // aceita consent se aparecer
-  await page.getByRole('button', { name: /aceitar|accept|concordo/i }).click({ timeout: 3000 }).catch(() => {});
+  // aceita consent se aparecer ("Concordar"/"Concordo"/"Accept"/"I agree")
+  await page.getByRole('button', { name: /aceitar|accept|concord|agree/i }).click({ timeout: 3000 }).catch(() => {});
   await page.waitForSelector('a.hfpxzc, div[role="feed"]', { timeout: 20000 });
   await sleep(1500);
   const found = await scrollFeedToEnd(page, { maxScrolls: opts.maxScrolls ?? 60 });
@@ -216,6 +221,40 @@ async function scrapeQuery(page, query, opts = {}) {
 
 /* Refill nominal: busca um lead pelo nome e devolve o detalhe do primeiro card */
 async function enrichOneByQuery(page, query, opts = {}) {
+  // Busca nominal que casa um place único cai direto na página do lugar (sem feed/cards) —
+  // detecta e extrai do painel; senão, caminho normal de feed (scrapeQuery).
+  const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.getByRole('button', { name: /aceitar|accept|concord/i }).click({ timeout: 3000 }).catch(() => {});
+  await sleep(1500);
+  const feed = await page.$('div[role="feed"]').catch(() => null);
+  const cards = await page.$$('a.hfpxzc').then((els) => els.length).catch(() => 0);
+  const hasH1 = await page.$('h1').then((el) => !!el).catch(() => false);
+  if (!feed && cards === 0 && hasH1) {
+    const d = await readPlaceDetail(page);
+    if (d.name) {
+      return normalizeLead({
+        name: d.name,
+        rating: d.rating,
+        reviews: d.reviews,
+        address: d.address,
+        phone: d.phone,
+        website: d.website,
+        source: query,
+        category: d.category || '',
+        plus_code: d.plus_code || '',
+        lat: d.lat || '',
+        lng: d.lng || '',
+        place_id: d.place_id || '',
+        claimed: d.claimed ?? null,
+        hours: d.hours || '',
+        closed: d.closed || false,
+        photos: d.photos ?? null,
+        instagram: d.instagram || '',
+        facebook: d.facebook || '',
+      });
+    }
+  }
   const r = await scrapeQuery(page, query, { ...opts, maxDetails: 1 });
   return r.leads[0] || null;
 }
