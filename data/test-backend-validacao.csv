@@ -1,2 +1,2 @@
-﻿name;rating;reviews;address;phone;website;source;captured_at
-Teste;5;10;DF;;;test;2026-10-09T11:55:24.823Z
+﻿name;rating;reviews;address;phone;website;source;captured_at;category;plus_code;lat;lng;place_id;claimed;hours;closed;photos;instagram;facebook
+Teste;5;10;DF;;;test;2026-10-09T20:19:18.552Z;;;;;;;;;;;

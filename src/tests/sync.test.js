@@ -78,6 +78,30 @@ test('toRow normaliza números brasileiros (rating "4,5", reviews "1.234")', () 
   assert.strictEqual(r3.area_conf, null);
 });
 
+test('toRow mapeia novos campos de enriquecimento (lat BR, claimed, photos, closed)', () => {
+  const { toRow } = require('../../scripts/sync-supabase');
+  const r = toRow({ name: 'X', address: 'Y', category: 'Advogado trabalhista', lat: '-15,79', lng: '-47,88',
+    place_id: '0x935a3b:0x1', claimed: false, hours: 'Aberto ⋅ Fecha 18:00', photos: '12',
+    closed: true, instagram: 'https://instagram.com/xadv', facebook: 'https://facebook.com/xadv' });
+  assert.strictEqual(r.category, 'Advogado trabalhista');
+  assert.strictEqual(r.lat, -15.79);
+  assert.strictEqual(r.lng, -47.88);
+  assert.strictEqual(r.place_id, '0x935a3b:0x1');
+  assert.strictEqual(r.claimed, false);
+  assert.strictEqual(r.hours, 'Aberto ⋅ Fecha 18:00');
+  assert.strictEqual(r.photos, 12);
+  assert.strictEqual(r.closed, true);
+  assert.strictEqual(r.instagram, 'https://instagram.com/xadv');
+  assert.strictEqual(r.facebook, 'https://facebook.com/xadv');
+  const r2 = toRow({ name: 'X', claimed: 'x', closed: undefined, photos: 'n/a', lat: '', instagram: '' });
+  assert.strictEqual(r2.claimed, null);
+  assert.strictEqual(r2.closed, false);
+  assert.strictEqual(r2.photos, null);
+  assert.strictEqual(r2.lat, null);
+  assert.strictEqual(r2.instagram, null);
+  assert.strictEqual(r2.category, null);
+});
+
 test('batching: 1346 leads → 3 requisições (500+500+346)', async () => {
   const big = Array.from({ length: 1346 }, (_, i) => ({ name: `Lead ${i}`, address: `End ${i}` }));
   fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify(big));

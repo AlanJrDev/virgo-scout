@@ -69,6 +69,17 @@ function normalizeLead(raw = {}) {
     website,
     source,
     captured_at: raw.captured_at || new Date().toISOString(),
+    category: String(raw.category || '').trim() || null,
+    plus_code: String(raw.plus_code || '').trim() || null,
+    lat: Number.isFinite(parseFloat(raw.lat)) ? parseFloat(raw.lat) : null,
+    lng: Number.isFinite(parseFloat(raw.lng)) ? parseFloat(raw.lng) : null,
+    place_id: String(raw.place_id || '').trim() || null,
+    claimed: raw.claimed === true || raw.claimed === false ? raw.claimed : null,
+    hours: String(raw.hours || '').trim() || null,
+    closed: !!raw.closed,
+    photos: Number.isFinite(parseInt(raw.photos, 10)) ? parseInt(raw.photos, 10) : null,
+    instagram: String(raw.instagram || '').trim() || null,
+    facebook: String(raw.facebook || '').trim() || null,
   };
 }
 
@@ -98,12 +109,13 @@ function escCSV(v) {
 }
 
 function toCSVRow(obj) {
-  const cols = ['name', 'rating', 'reviews', 'address', 'phone', 'website', 'source', 'captured_at'];
+  const cols = ['name', 'rating', 'reviews', 'address', 'phone', 'website', 'source', 'captured_at',
+    'category', 'plus_code', 'lat', 'lng', 'place_id', 'claimed', 'hours', 'closed', 'photos', 'instagram', 'facebook'];
   return cols.map((c) => escCSV(obj[c])).join(';');
 }
 
 function toCSV(leads = []) {
-  const header = 'name;rating;reviews;address;phone;website;source;captured_at';
+  const header = 'name;rating;reviews;address;phone;website;source;captured_at;category;plus_code;lat;lng;place_id;claimed;hours;closed;photos;instagram;facebook';
   return [header, ...leads.map(toCSVRow)].join('\n');
 }
 

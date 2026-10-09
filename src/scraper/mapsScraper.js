@@ -123,13 +123,48 @@ async function enrichWithDetails(page, leads, { maxDetails = 120, perLeadTimeout
         // rating no detalhe
         let rating = '';
         let reviews = '';
-        const bodyText = document.body.innerText.slice(0, 4000);
+        const bodyText = document.body.innerText.slice(0, 20000);
         const m = bodyText.match(/(\d[,.]\d)\s*[\n ]+([\d.]+)\s*avalia/);
         if (m) {
           rating = m[1];
           reviews = m[2];
         }
-        return { name, address, phone, website, rating, reviews };
+        // categoria: botão após o h1 (fallback: jsaction category)
+        let category = '';
+        const catBtn = document.querySelector('button.DkEaL') || document.querySelector('button[jsaction*="category"]');
+        if (catBtn) category = catBtn.innerText.trim();
+        // plus code: mesmo padrão do endereço
+        let plus_code = '';
+        const olocBtn = document.querySelector('button[data-item-id="oloc"]');
+        if (olocBtn) plus_code = (olocBtn.querySelector('.Io6YTe')?.innerText || olocBtn.innerText).trim();
+        // redes sociais: âncoras externas além do authority
+        let instagram = '';
+        let facebook = '';
+        document.querySelectorAll('a[data-item-id^="http"], a[href*="instagram.com"], a[href*="facebook.com"]').forEach((a) => {
+          const h = a.getAttribute('href') || '';
+          if (/instagram\.com\//.test(h) && !instagram) instagram = h;
+          if (/facebook\.com\//.test(h) && !facebook) facebook = h;
+        });
+        // texto do painel para sinais (não-reclamado primeiro: "claim this business" contém "claim")
+        // Perfis reclamados não exibem mais "Perfil reclamado" — sinais de dono (resposta/foto do
+        // proprietário) são o marcador atual de perfil reclamado; sem sinal algum → null (desconhecido)
+        const panel = bodyText;
+        let claimed = null;
+        if (/reivindicar este perfil|reivindique este perfil|claim this business/i.test(panel)) claimed = false;
+        else if (/perfil reclamado|perfil propriedade do titular|resposta do proprietário|do proprietário|\bclaimed\b/i.test(panel)) claimed = true;
+        const closed = /fechado (definitivamente|permanentemente)|encerrado/i.test(panel);
+        let hours = '';
+        const hm = panel.match(/aberto[^\n]{0,40}fecha[^\n\d]{0,10}(\d{1,2}:\d{2})/i);
+        if (hm) hours = 'Aberto ⋅ Fecha ' + hm[1];
+        let photos = null;
+        const gal = document.querySelector('button[aria-label*="Fotos"], button[aria-label*="photos" i]');
+        if (gal) { const pm = (gal.getAttribute('aria-label') || '').match(/(\d+)/); if (pm) photos = parseInt(pm[1], 10); }
+        // geo + place_id vêm da própria URL do painel
+        const mUrl = (location.href.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || []);
+        const pId = (location.href.match(/!1s(0x[0-9a-f]+:0x[0-9a-f]+)/) || [])[1] || '';
+        const lat = mUrl[1] || '';
+        const lng = mUrl[2] || '';
+        return { name, address, phone, website, rating, reviews, category, plus_code, instagram, facebook, claimed, closed, hours, photos, lat, lng, place_id: pId };
       });
       enriched.push(
         normalizeLead({
@@ -140,6 +175,17 @@ async function enrichWithDetails(page, leads, { maxDetails = 120, perLeadTimeout
           phone: detail.phone || base._phoneHint || '',
           website: detail.website || '',
           source: base.source,
+          category: detail.category || base.category || '',
+          plus_code: detail.plus_code || base.plus_code || '',
+          lat: detail.lat || base.lat || '',
+          lng: detail.lng || base.lng || '',
+          place_id: detail.place_id || base.place_id || '',
+          claimed: detail.claimed !== undefined && detail.claimed !== null ? detail.claimed : (base.claimed ?? null),
+          hours: detail.hours || base.hours || '',
+          closed: detail.closed || base.closed || false,
+          photos: detail.photos !== undefined && detail.photos !== null ? detail.photos : (base.photos ?? null),
+          instagram: detail.instagram || base.instagram || '',
+          facebook: detail.facebook || base.facebook || '',
         })
       );
       // volta p/ lista

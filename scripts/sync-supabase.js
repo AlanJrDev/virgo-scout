@@ -75,6 +75,17 @@ function toRow(l) {
     area: l.area || null,
     area_conf: num(l.area_conf),
     captured_at: l.captured_at || null,
+    category: l.category || null,
+    plus_code: l.plus_code || null,
+    lat: num(l.lat),
+    lng: num(l.lng),
+    place_id: l.place_id || null,
+    claimed: typeof l.claimed === 'boolean' ? l.claimed : null,
+    hours: l.hours || null,
+    photos: int(l.photos),
+    closed: l.closed === true,
+    instagram: l.instagram || null,
+    facebook: l.facebook || null,
   };
 }
 

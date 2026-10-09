@@ -22,6 +22,23 @@ test('normalizeLead limpa e padroniza lead do Maps', () => {
   assert.ok(lead.captured_at);
 });
 
+test('normalizeLead preserva novos campos do enriquecimento', () => {
+  const l = normalizeLead({ name: 'X', category: 'Advogado trabalhista', plus_code: 'Q5J3+WC Brasília',
+    lat: '-15.79', lng: '-47.88', place_id: '0x935a3b:0x1', claimed: false, hours: 'Aberto ⋅ Fecha 18:00',
+    closed: false, photos: 12, instagram: 'https://instagram.com/xadv', facebook: null, phone: '', website: '', source: 'q' });
+  assert.strictEqual(l.category, 'Advogado trabalhista');
+  assert.strictEqual(l.plus_code, 'Q5J3+WC Brasília');
+  assert.strictEqual(l.lat, -15.79);
+  assert.strictEqual(l.lng, -47.88);
+  assert.strictEqual(l.place_id, '0x935a3b:0x1');
+  assert.strictEqual(l.claimed, false);
+  assert.strictEqual(l.hours, 'Aberto ⋅ Fecha 18:00');
+  assert.strictEqual(l.closed, false);
+  assert.strictEqual(l.photos, 12);
+  assert.strictEqual(l.instagram, 'https://instagram.com/xadv');
+  assert.strictEqual(l.facebook, null);
+});
+
 test('normalizeLead descarta telefone sem digitos (glifo de icone)', () => {
   const lead = normalizeLead({ name: 'X', phone: ' ', address: '', source: 't' });
   assert.strictEqual(lead.phone, '');
