@@ -97,15 +97,24 @@ function cleanName(s) {
     .replace(/^-\s*|\s*-$/g, '');
 }
 
-// Score de CONTATABILIDADE (0–99): lead sem telefone é incontatável → 0.
-// Reputação conta até 40, prova social até ~15 e "sem site" SOMA (é a oferta).
+// Canal de contato: telefone válido, e-mail ou Instagram (qualquer um tira o lead da Incontatável)
+function hasChannel(l) { return /\d{8,}/.test(l.phone || '') || !!l.email || !!l.instagram; }
+
+// Score 0–99: sem canal → 0 (Incontatável); fechado → 0 (Fechado).
+// Base 20 com canal; fone +15, e-mail +8, Instagram +4; rating×6 (máx 30);
+// prova social log10(reviews+1)×4; sem site +15 (é a oferta); site antigo +4; não reclamado +4.
 function scoreOf(l) {
-  if (!/\d{8,}/.test(l.phone || '')) return 0;
-  const r = Math.max(0, l.rating || 0);
-  let s = 30; // base: contatável
-  s += r * 8;
-  s += Math.log10((l.reviews || 0) + 1) * 5;
+  if (l.closed) return 0;
+  if (!hasChannel(l)) return 0;
+  let s = 20;
+  if (/\d{8,}/.test(l.phone || '')) s += 15;
+  if (l.email) s += 8;
+  if (l.instagram) s += 4;
+  s += Math.max(0, l.rating || 0) * 6;
+  s += Math.log10((l.reviews || 0) + 1) * 4;
   if (!l.website) s += 15;
+  else if (l.since_year && new Date().getFullYear() - l.since_year >= 5) s += 4;
+  if (l.claimed === false) s += 4;
   return Math.max(0, Math.min(99, Math.round(s)));
 }
 
@@ -127,8 +136,17 @@ function buildStats(leads) {
   const comPhone = leads.filter((l) => /\d{8,}/.test(l.phone || '')).length;
   const alta = leads.filter((l) => (l.rating || 0) >= 4.5 && (l.reviews || 0) >= 20).length;
   const qualif = leads.filter((l) => /\d{8,}/.test(l.phone || '') && !l.website && (l.rating || 0) >= 4.5).length;
+  const comEmail = leads.filter((l) => l.email).length;
+  const comInstagram = leads.filter((l) => l.instagram).length;
+  const comZapSite = leads.filter((l) => l.whatsapp_hint === true).length;
+  const naoReclamados = leads.filter((l) => l.claimed === false).length;
+  const desdeAntigo = leads.filter((l) => l.since_year && new Date().getFullYear() - l.since_year >= 5).length;
   const pct = (n) => (total ? Math.round((100 * n) / total) : 0);
-  return { total, comSite, semSite: total - comSite, comPhone, alta, qualif, pctSite: pct(comSite), pctAlta: pct(alta), pctQualif: pct(qualif) };
+  return {
+    total, comSite, semSite: total - comSite, comPhone, alta, qualif,
+    comEmail, comInstagram, comZapSite, naoReclamados, desdeAntigo,
+    pctSite: pct(comSite), pctAlta: pct(alta), pctQualif: pct(qualif),
+  };
 }
 
 function regionOf(address) {
@@ -151,7 +169,7 @@ function buildTop(leads, n = 5) {
       status: l.status || 'novo',
       cat: `${l.area || 'Advocacia'} · ${regionOf(l.address)}/DF`,
       score: l.score,
-      badge: /\d{8,}/.test(l.phone || '') ? badgeOf(l.score) : 'Incontatável',
+      badge: l.closed ? 'Fechado' : (hasChannel(l) ? badgeOf(l.score) : 'Incontatável'),
       rating: l.rating,
       reviews: l.reviews,
       site: !!l.website,

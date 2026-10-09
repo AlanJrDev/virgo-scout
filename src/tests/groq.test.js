@@ -19,6 +19,15 @@ test('formatContext resume stats, áreas e top leads', () => {
   assert.match(formatContext({}), /Total: 0/);
 });
 
+test('formatContext inclui os novos sinais quando existem na base', () => {
+  const c = formatContext({ stats: { total: 10, comEmail: 7, comInstagram: 4, comZapSite: 2, naoReclamados: 5, desdeAntigo: 3 } });
+  assert.match(c, /E-mail direto: 7/);
+  assert.match(c, /Instagram: 4/);
+  assert.match(c, /WhatsApp no site: 2/);
+  assert.match(c, /Perfis não reclamados \(Maps\): 5/);
+  assert.match(c, /Negócios de 5\+ anos: 3/);
+});
+
 test('buildMessages monta system + contexto + histórico + pergunta', () => {
   const msgs = buildMessages({
     question: 'quantos trabalhistas temos?',

@@ -5,6 +5,7 @@ const TIMEOUT_MS = 12000;
 
 const SYSTEM = [
   'Você é o analista de leads do Virgo Scout, um painel que rastreia empresas do Google Maps (advogados no Distrito Federal).',
+  'Responda como analista de pré-venda da Virgo Tech (venda de sites/LPs). Priorize leads com telefone, sem site próprio e boa reputação.',
   'Responda em português do Brasil, em no máximo 3 frases, direto ao ponto e com os números exatos dos dados fornecidos, em texto puro (sem markdown, asteriscos nem HTML).',
   'Só use os dados do painel; se a resposta não estiver neles, diga que não encontrou na base atual.',
   'Não invente empresas, telefones ou estatísticas.',
@@ -17,6 +18,8 @@ function formatContext(p) {
   return [
     `Total: ${s.total || 0} empresas | com site: ${s.comSite || 0} | sem site: ${s.semSite || 0} | com telefone: ${s.comPhone || 0}`,
     `Alta oportunidade: ${s.alta || 0} | qualificados: ${s.qualif || 0}`,
+    `E-mail direto: ${s.comEmail || 0} · Instagram: ${s.comInstagram || 0} · WhatsApp no site: ${s.comZapSite || 0}`,
+    `Perfis não reclamados (Maps): ${s.naoReclamados || 0} · Negócios de 5+ anos: ${s.desdeAntigo || 0}`,
     `Áreas: ${areas}`,
     `Top leads: ${top}`,
   ].join('\n');

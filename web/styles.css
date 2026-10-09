@@ -457,6 +457,7 @@ button.chip:active{transform:scale(.97)}
 /* pipeline: badges de status da abordagem */
 .badge.Contatado{background:rgba(56,189,248,.12);color:var(--cyan);border:1px solid rgba(56,189,248,.3)}
 .badge.Incontatável{background:rgba(148,163,184,.1);color:var(--faint);border:1px solid rgba(148,163,184,.22)}
+.badge.Fechado{background:rgba(100,116,139,.12);color:#94a3b8;border:1px solid rgba(100,116,139,.25)}
 .cell-wa.wa-sent{opacity:.55}
 .wa-btn.wa-sent{opacity:.55}
 

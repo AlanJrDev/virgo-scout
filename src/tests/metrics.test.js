@@ -95,3 +95,22 @@ test('pool marca Incontatável e carrega id/status do pipeline', () => {
   // qualificado = telefone + sem site + nota 4,5 (a inversão da estratégia)
   assert.strictEqual(p.stats.qualif, 1);
 });
+
+test('lead sem canal algum é Incontatável mesmo com sinais', () => {
+  const { scoreOf } = require('../utils/metrics');
+  assert.strictEqual(scoreOf({ rating: 4.9, reviews: 300, instagram: null, email: null }), 0);
+  const p = buildPayload([{ name: 'Só IG', instagram: 'xadv', rating: 4.8, reviews: 20 }], { dataDir: TMP, category: 'advogados' });
+  assert.notStrictEqual(p.pool[0].badge, 'Incontatável');
+});
+
+test('lead fechado desqualifica', () => {
+  const p = buildPayload([{ name: 'Fechado ME', phone: '61999990000', closed: true }], { dataDir: TMP, category: 'advogados' });
+  assert.strictEqual(p.pool[0].badge, 'Fechado'); assert.strictEqual(p.pool[0].score, 0);
+});
+
+test('sinais novos somam: email + instagram + não reclamado', () => {
+  const { scoreOf } = require('../utils/metrics');
+  const base = { phone: '61999990000', rating: 4.0, reviews: 10, website: 'https://x.com' };
+  const com = scoreOf({ ...base, email: 'a@b.c', instagram: 'x', claimed: false });
+  assert.ok(com > scoreOf(base));
+});

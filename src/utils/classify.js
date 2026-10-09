@@ -49,9 +49,16 @@ function norm(s) {
   return stripAccents(s).toLowerCase();
 }
 
-// Retorna { area, confidence } — 0.9 nome, 0.7 origem, 0.3 geral/outros
+// Retorna { area, confidence } — 0.95 categoria oficial, 0.9 nome, 0.7 origem, 0.6 título do site, 0.3 geral/outros
 function classifyLead(lead = {}, category) {
   const { areas, rules, fallback } = rulesFor(category);
+  // categoria oficial do Maps é o sinal mais forte
+  const catText = norm(lead.category);
+  if (catText) {
+    for (const area of areas) {
+      if (rules[area].some((kw) => catText.includes(kw))) return { area, confidence: 0.95 };
+    }
+  }
   const nameText = norm(lead.name);
   // origin = query original da captura; source virou tag de categoria ('arquitetura'|'advogados')
   const sourceText = norm(lead.origin || lead.source);
@@ -60,6 +67,13 @@ function classifyLead(lead = {}, category) {
   }
   for (const area of areas) {
     if (rules[area].some((kw) => sourceText.includes(kw))) return { area, confidence: 0.7 };
+  }
+  // título do site: quarta camada, só quando as anteriores não casaram
+  const titleText = norm(lead.site_title);
+  if (titleText) {
+    for (const area of areas) {
+      if (rules[area].some((kw) => titleText.includes(kw))) return { area, confidence: 0.6 };
+    }
   }
   return { area: fallback, confidence: 0.3 };
 }

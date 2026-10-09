@@ -726,6 +726,10 @@
     if (n.indexOf('telefone') !== -1 || n.indexOf('whatsapp') !== -1 || n.indexOf('zap') !== -1) return '<strong>' + (S.comPhone || 0) + ' leads</strong> têm telefone válido — contato direto possível agora.';
     if (n.indexOf('alta') !== -1 || n.indexOf('prioridade') !== -1 || n.indexOf('oportunidade') !== -1) return '<strong>' + S.alta + ' leads</strong> estão em alta oportunidade (4,5★+ com 20+ avaliações). Recomendo contatar os 5 primeiros primeiro.';
     if (n.indexOf('qualificad') !== -1) return '<strong>' + S.qualif + ' leads</strong> são oportunidades ideais (telefone + sem site + nota 4,5★+): ' + (S.pctQualif || 0) + '% da base.';
+    if (n.indexOf('email') !== -1 || n.indexOf('e-mail') !== -1) return '<strong>' + (S.comEmail || 0) + ' leads</strong> têm e-mail direto capturado — contato com proposta personalizada.';
+    if (n.indexOf('instagram') !== -1 || n.indexOf('insta') !== -1) return '<strong>' + (S.comInstagram || 0) + ' leads</strong> têm Instagram no site — alternativa de contato por DM.';
+    if (n.indexOf('desde') !== -1 || n.indexOf('anos') !== -1 || n.indexOf('antigo') !== -1) return '<strong>' + (S.desdeAntigo || 0) + ' negócios</strong> estão no ar há 5 anos ou mais — senioridade que valoriza um site profissional.';
+    if (n.indexOf('reclam') !== -1) return '<strong>' + (S.naoReclamados || 0) + ' perfis</strong> não foram reclamados no Maps — dono ausente, sinal de oportunidade.';
     if (n.indexOf('top') !== -1 || n.indexOf('melhor') !== -1 || n.indexOf('ranking') !== -1 || n.indexOf('potencial') !== -1) {
       return 'Top 3 por potencial: ' + top.slice(0, 3).map(function (l, i) { return (i + 1) + '. ' + escapeHtml(l.name) + ' (' + l.score + ')'; }).join(' · ');
     }

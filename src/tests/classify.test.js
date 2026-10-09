@@ -104,3 +104,19 @@ test('sem origin (linha legada) o contexto continua vindo de source', () => {
   assert.strictEqual(r.area, 'Criminal');
   assert.strictEqual(r.confidence, 0.7);
 });
+
+test('categoria oficial do Maps ganha do nome', () => {
+  const r = classifyLead({ name: 'Melo & Irmãos', category: 'Advogado trabalhista' });
+  assert.deepStrictEqual(r, { area: 'Trabalhista', confidence: 0.95 });
+});
+
+test('título do site é a quarta camada', () => {
+  const r = classifyLead({ name: 'Studio A', origin: '', site_title: 'Topografia e Agrimensura no DF' }, 'arquitetura');
+  assert.strictEqual(r.area, 'Topografia');
+  assert.strictEqual(r.confidence, 0.6);
+});
+
+test('lead fechado não vira área especial', () => {
+  const r = classifyLead({ name: 'Advogado criminal X', closed: true });
+  assert.strictEqual(r.area, 'Criminal'); // classificação segue; score é quem desqualifica
+});
