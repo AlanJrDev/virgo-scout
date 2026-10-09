@@ -31,7 +31,7 @@
 
   /* ---------- saudação / relógio ---------- */
   var h = new Date().getHours();
-  $('#greeting').textContent = (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite') + ', Alan!';
+  $('#greeting').textContent = (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite') + ',';
   var now = new Date();
   var months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var days = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
@@ -83,11 +83,11 @@
       for (var i = 0; i < btns.length; i++) {
         var on = btns[i].getAttribute('data-cat') === category;
         btns[i].classList.toggle('active', on);
-        btns[i].setAttribute('aria-selected', on ? 'true' : 'false');
+        btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
       }
     }
     var t = document.getElementById('capTitle');
-    if (t) t.textContent = 'Captura ativa - ' + (category === 'arquitetura' ? 'Arquitetura' : 'Advocacia');
+    if (t) t.textContent = 'Captura — ' + (category === 'arquitetura' ? 'Arquitetura' : 'Advocacia');
   }
   function setCaptureUI(st) {
     var bar = $('#capBar'), pct = $('#capPct'), sub = $('#capSub'), btn = $('#capRun');
@@ -117,7 +117,7 @@
       btn.textContent = 'Nova captura'; btn.disabled = false; btn.classList.remove('busy');
       if (prog) prog.classList.remove('busy');
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      var dec = window.CaptureState.decide('done', { sawRunning: sawRunning, startedAt: st.started_at, storage: window.sessionStorage });
+      var dec = window.CaptureState ? window.CaptureState.decide('done', { sawRunning: sawRunning, startedAt: st.started_at, storage: window.sessionStorage }) : { toast: true, reload: false };
       if (dec.toast) toast('Captura concluída — atualizando dados…', 'ok');
       if (dec.reload) setTimeout(function () { location.reload(); }, 1400);
       return;
@@ -155,7 +155,7 @@
     var host = $('#leadMap');
     var regions = (D && D.regions) || [];
     if (!host) return;
-    if (!regions.length) { host.innerHTML = ''; return; }
+    if (!regions.length) { host.innerHTML = '<div class="empty-box"><strong>Sem região para plotar</strong><p>Execute uma captura.</p></div>'; return; }
     var maxCount = Math.max.apply(null, regions.map(function (r) { return r.count; }));
     function sizeOf(count) { return 28 + Math.round(20 * Math.sqrt(count / (maxCount || 1))); }
     // separa bolhas que colidem (aproximação geográfica continua válida)
@@ -193,7 +193,7 @@
     function popupHtml(r) {
       var altaPct = r.count ? Math.round((100 * r.alta) / r.count) : 0;
       return '<b>' + escapeHtml(r.label) + '</b><br><span>' + r.count + ' leads · ' + r.comSite + ' com site · ' +
-        r.alta + ' alta (' + altaPct + '%) · nota ' + r.avgScore + '</span>';
+        r.alta + ' alta (' + altaPct + '%) · potencial médio ' + r.avgScore + '</span>';
     }
     function bubbleEl(r) {
       // wrapper é posicionado pelo MapLibre (transform intocado); o botão interno recebe o motion
@@ -398,7 +398,7 @@
       areas: (D.areas || []).filter(function (a) { return a.label !== 'Geral'; })
         .map(function (a) { return { label: a.label, value: a.value }; }),
       regioes: (D.regions || []).map(function (r) {
-        return { label: r.label, value: r.count, sub: r.avgScore + ' nota' };
+        return { label: r.label, value: r.count, sub: r.avgScore + ' potencial' };
       }),
       notas: (D.ratingBuckets || []).map(function (b) { return { label: b.label, value: b.value }; })
     };
@@ -476,7 +476,7 @@
       spark: '<svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>'
     };
     var opps = [];
-    if (S.comPhone > 0) opps.push({ ico: 'mon', title: S.comPhone + ' leads com telefone', sub: 'Contato direto: telefone/WhatsApp validados' });
+    if (S.comPhone > 0) opps.push({ ico: 'mon', title: S.comPhone + ' leads com telefone', sub: 'Telefone presente na base (não validado como WhatsApp)' });
     if (S.alta > 0) opps.push({ ico: 'chk', title: S.alta + ' em alta oportunidade', sub: 'Notas 4,5★+ com 20+ avaliações — priorizar' });
     if (S.semSite > 0) opps.push({ ico: 'doc', title: S.semSite + ' leads sem site', sub: 'Landing page converte essa base fria' });
     if (D.areas && D.areas.length > 1) {
@@ -648,6 +648,9 @@
       if (on) n.setAttribute('aria-current', 'page');
       else n.removeAttribute('aria-current');
     });
+    document.querySelectorAll('.viewbar-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-view') === v);
+    });
     try { sessionStorage.setItem('vs_view', v); } catch (e) {}
   }
   document.addEventListener('click', function (e) {
@@ -705,10 +708,10 @@
     var top = P.top || [];
     var n = norm(q);
     var areaHit = null;
-    var areaKeys = { trabalhista: 'Trabalhista', criminal: 'Criminal', familia: 'Família', civil: 'Civil', previdenc: 'Previdenciário', tribut: 'Tributário', empresarial: 'Empresarial', imobili: 'Imobiliário', consumidor: 'Consumidor', geral: 'Geral' };
-    for (var k in areaKeys) {
-      if (n.indexOf(k) !== -1) { areaHit = areaKeys[k]; break; }
-    }
+    var nq = norm(q);
+    (areas || []).forEach(function (a) {
+      if (a.value && nq.indexOf(norm(a.label).split(' ')[0].slice(0, 7)) !== -1) areaHit = a.label;
+    });
     if (areaHit) {
       var a = areas.filter(function (x) { return x.label === areaHit; })[0];
       if (a && a.value) {
@@ -722,7 +725,7 @@
     if (n.indexOf('com site') !== -1 || (n.indexOf('site') !== -1 && n.indexOf('sem') === -1)) return '<strong>' + S.comSite + ' leads</strong> têm site (' + (S.pctSite || 0) + '% da base) e ' + S.semSite + ' não têm.';
     if (n.indexOf('telefone') !== -1 || n.indexOf('whatsapp') !== -1 || n.indexOf('zap') !== -1) return '<strong>' + (S.comPhone || 0) + ' leads</strong> têm telefone válido — contato direto possível agora.';
     if (n.indexOf('alta') !== -1 || n.indexOf('prioridade') !== -1 || n.indexOf('oportunidade') !== -1) return '<strong>' + S.alta + ' leads</strong> estão em alta oportunidade (4,5★+ com 20+ avaliações). Recomendo contatar os 5 primeiros primeiro.';
-    if (n.indexOf('qualificad') !== -1) return '<strong>' + S.qualif + ' leads</strong> são qualificados (site + telefone + nota 4,5★+): ' + (S.pctQualif || 0) + '% da base.';
+    if (n.indexOf('qualificad') !== -1) return '<strong>' + S.qualif + ' leads</strong> são oportunidades ideais (telefone + sem site + nota 4,5★+): ' + (S.pctQualif || 0) + '% da base.';
     if (n.indexOf('top') !== -1 || n.indexOf('melhor') !== -1 || n.indexOf('ranking') !== -1 || n.indexOf('potencial') !== -1) {
       return 'Top 3 por potencial: ' + top.slice(0, 3).map(function (l, i) { return (i + 1) + '. ' + escapeHtml(l.name) + ' (' + l.score + ')'; }).join(' · ');
     }
@@ -803,19 +806,39 @@
         var role = document.getElementById('uRole');
         var av = document.getElementById('uAvatar');
         if (name) name.textContent = me.user;
+        var g = document.getElementById('greeting');
+        if (g) g.textContent = g.textContent.replace(',', ', ' + String(me.user || '').split('@')[0].split(/[._-]/)[0] + '!');
         if (role) role.textContent = me.role === 'founder' ? 'Fundador' : 'Cofounder';
         if (av) av.textContent = emailInitials(me.user);
       })
       .catch(function () {});
   }
 
-  /* ---------- boot: API ao vivo com fallback estático ---------- */
-  var FALLBACK = window.VIRGO_DATA || { stats: {}, top: [], pool: [], regions: [], ratingBuckets: [], dots: [], series: { days: [], values: [0] }, donut: [], recent: [], areas: [] };
+  /* ---------- boot: API ao vivo com fallback estático sob demanda ---------- */
+  var EMPTY = { stats: {}, top: [], pool: [], regions: [], ratingBuckets: [], dots: [], series: { days: [], values: [0] }, donut: [], recent: [], areas: [] };
   function boot(payload) {
-    currentPayload = payload && payload.stats ? payload : FALLBACK;
+    currentPayload = payload && payload.stats ? payload : (window.VIRGO_DATA || EMPTY);
     render(currentPayload);
     loadMe();
     pollCapture();
+  }
+  function bootOfflineFallback(apiFailed) {
+    if (apiFailed) {
+      try {
+        if (!sessionStorage.getItem('vs_fallback_warn')) {
+          sessionStorage.setItem('vs_fallback_warn', '1');
+          toast('Sem conexão com a API — dados locais de fallback', 'warn');
+        }
+      } catch (e) {}
+      var cc = document.querySelector('.capture-card');
+      if (cc) cc.classList.add('stale');
+    }
+    if (window.VIRGO_DATA) { boot(null); return; }
+    var s = document.createElement('script');
+    s.src = 'data/leads.js';
+    s.onerror = function () { boot(null); };
+    s.onload = function () { boot(null); };
+    document.head.appendChild(s);
   }
   function loadLeads() {
     fetch('/api/leads?category=' + category, { cache: 'no-store' })
@@ -823,11 +846,15 @@
         if (r.status === 401) { location.href = '/login'; return false; }
         return r.ok ? r.json() : null;
       })
-      .then(function (d) { if (d !== false) boot(d); })
-      .catch(function () { boot(null); });
+      .then(function (d) {
+        if (d === false) return;
+        if (d) boot(d);
+        else bootOfflineFallback(true);
+      })
+      .catch(function () { bootOfflineFallback(true); });
   }
   if (window.fetch && location.protocol !== 'file:') loadLeads();
-  else boot(null);
+  else bootOfflineFallback(false);
 
   syncCatUI();
   var catBox = document.querySelector('.cat-switch');

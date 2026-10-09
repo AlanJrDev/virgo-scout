@@ -49,7 +49,8 @@
   }
   function fmtPhone(p) {
     var d = normPhone(String(p || '').replace(/\D/g, ''));
-    if (d.length === 10 || d.length === 11) return d.slice(0, 2) + ' ' + d.slice(2, 7) + '-' + d.slice(7);
+    if (d.length === 10) return d.slice(0, 2) + ' ' + d.slice(2, 6) + '-' + d.slice(6);
+    if (d.length === 11) return d.slice(0, 2) + ' ' + d.slice(2, 7) + '-' + d.slice(7);
     return String(p || '');
   }
   function siteLabel(url) {
@@ -302,7 +303,7 @@
     });
     var toItems = function (map) {
       return Object.keys(map).map(function (k) { return { value: k, label: k + ' · ' + map[k] }; })
-        .sort(function (a, b) { return b.value.length - a.value.length || (a.value < b.value ? -1 : 1); });
+        .sort(function (a, b) { return parseInt(b.label.split('·')[1], 10) - parseInt(a.label.split('·')[1], 10) || (a.value < b.value ? -1 : 1); });
     };
     var regItems = toItems(regions);
     if (state.region && !regItems.some(function (it) { return it.value === state.region; })) state.region = '';

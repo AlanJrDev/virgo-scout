@@ -42,9 +42,9 @@
       <kbd>Ctrl + K</kbd>
       <div class="search-results" id="searchResults" role="listbox" hidden></div>
     </label>
-    <div class="cat-switch" role="tablist" aria-label="Categoria de leads">
-      <button type="button" class="cat-btn active" data-cat="advogados" role="tab" aria-selected="true">Advogados</button>
-      <button type="button" class="cat-btn" data-cat="arquitetura" role="tab" aria-selected="false">Arquitetura</button>
+    <div class="cat-switch" role="group" aria-label="Categoria de leads">
+      <button type="button" class="cat-btn active" data-cat="advogados" aria-pressed="true">Advogados</button>
+      <button type="button" class="cat-btn" data-cat="arquitetura" aria-pressed="false">Arquitetura</button>
     </div>
     <div class="top-user">
       <button class="icon-btn bell" aria-label="Notificações"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="dot"></i></button>
@@ -72,7 +72,7 @@
       <div class="card capture-card">
         <span class="cap-ico"><svg viewBox="0 0 24 24"><path d="M12 3v10"/><path d="m8 9 4-4 4 4"/><path d="M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></span>
         <div class="cap-body">
-          <strong id="capTitle">Captura ativa - Advocacia</strong>
+          <strong id="capTitle">Captura — Advocacia</strong>
           <span id="capSub">Brasília/DF · — empresas</span>
           <div class="progress"><i id="capBar" style="width:0%"></i></div>
           <button class="cap-run" id="capRun" type="button">Nova captura</button>
@@ -99,8 +99,8 @@
     <section class="row-2">
       <div class="card map-card">
         <div class="card-head"><span class="head-ico"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span><h2>Distribuição dos Leads</h2><button class="chip">Regiões do DF <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>
-        <div class="map-wrap">
-          <div id="leadMap" role="img" aria-label="Mapa do Distrito Federal com leads por região"></div>
+        <div class="map-wrap" aria-label="Mapa do Distrito Federal com leads por região">
+          <div id="leadMap"></div>
           <ul class="map-legend" id="mapLegend"></ul>
           <div class="map-zoom"><button id="mapZoomIn" aria-label="Aproximar">+</button><button id="mapZoomOut" aria-label="Afastar">−</button><button id="mapRecenter" aria-label="Centralizar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button></div>
           <span class="map-badge"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/></svg> Dados: Google Maps</span>
@@ -206,6 +206,11 @@
     </section><!-- /viewLeads -->
   </main>
 
+  <nav class="viewbar" aria-label="Telas">
+    <button type="button" class="viewbar-btn active" data-view="dashboard"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>Visão Geral</span></button>
+    <button type="button" class="viewbar-btn" data-view="leads"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/></svg><span>Base de Leads</span></button>
+  </nav>
+
   <!-- ============ IA PANEL ============ -->
   <aside class="ia">
     <div class="card ia-head">
@@ -235,7 +240,6 @@
 
 <script src="vendor/gsap.min.js"></script>
 <script src="vendor/maplibre-gl.js"></script>
-<script src="data/leads.js"></script>
 <script src="table.js"></script>
 <script src="capture-state.js"></script>
 <script src="app.js"></script>

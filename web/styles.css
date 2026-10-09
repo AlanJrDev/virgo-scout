@@ -142,8 +142,8 @@ button.chip:active{transform:scale(.97)}
 .maplibregl-popup-content span{color:var(--muted);font-variant-numeric:tabular-nums}
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:#0a1322}
 .maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:#0a1322}
-.maplibregl-ctrl-attrib{font-size:10px;background:rgba(6,12,24,.72)!important}
-.maplibregl-ctrl-attrib a{color:var(--muted)!important}
+.maplibregl-ctrl-attrib{font-size:10px;color:var(--muted)!important;background:rgba(6,12,24,.72)!important}
+.maplibregl-ctrl-attrib a{color:var(--cyan)!important}
 .map-fallback{position:absolute;inset:0}
 .map-fallback .fb-dot{position:absolute;transform:translate(-50%,-50%);border-radius:50%;background:rgba(56,189,248,.2);border:2px solid var(--cyan);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--text)}
 .map-legend{position:absolute;top:10px;left:10px;list-style:none;background:rgba(6,12,24,.82);border:1px solid var(--border);border-radius:10px;padding:8px 11px;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:5px;backdrop-filter:blur(6px)}
@@ -459,3 +459,16 @@ button.chip:active{transform:scale(.97)}
 .badge.Incontatável{background:rgba(148,163,184,.1);color:var(--faint);border:1px solid rgba(148,163,184,.22)}
 .cell-wa.wa-sent{opacity:.55}
 .wa-btn.wa-sent{opacity:.55}
+
+/* captura com dados de fallback (API offline) */
+.capture-card.stale{border-color:var(--amber)}
+
+/* bottom bar de telas (só mobile) */
+.viewbar{display:none}
+@media(max-width:720px){
+  .viewbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(6,11,22,.92);backdrop-filter:blur(10px);border-top:1px solid var(--border-strong);padding:6px 10px calc(6px + env(safe-area-inset-bottom))}
+  .viewbar-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border:0;background:none;color:var(--muted);font-size:11px;font-weight:600;border-radius:10px}
+  .viewbar-btn svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .viewbar-btn.active{color:var(--cyan)}
+  .main{padding-bottom:76px}
+}
