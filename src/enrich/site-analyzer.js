@@ -12,7 +12,7 @@ function extractSignals(html) {
     if (!/^(p|reel|reels|explore|stories|accounts)$/i.test(m[1])) { instagram = m[1]; break; }
   }
   for (const m of text.matchAll(/facebook\.com\/([A-Za-z0-9.-]{2,60})/g)) {
-    if (!/^(sharer|share|tr|plugins|policies)$/i.test(m[1])) { facebook = m[1]; break; }
+    if (!/^(sharer|share|tr|plugins|policies)(\.php)?$/i.test(m[1])) { facebook = m[1]; break; }
   }
   const wa = text.match(/wa\.me\/(\+?\d{6,15})/) || text.match(/api\.whatsapp\.com[^"']*[?&]phone=(\d{6,15})/);
   if (wa) whatsapp = wa[1].replace('+', '');

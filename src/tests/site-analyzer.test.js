@@ -37,4 +37,10 @@ test('segmentos reservados só contam com igualdade exata (handles com p/tr sobr
   );
   assert.strictEqual(s.instagram, 'paulo.adv');
   assert.strictEqual(s.facebook, 'travel.adv');
+  const r = extractSignals(
+    '<a href="https://instagram.com/explore/tags/advocacia">explore</a>' +
+    '<a href="https://facebook.com/sharer.php?u=x">share</a>'
+  );
+  assert.strictEqual(r.instagram, null);
+  assert.strictEqual(r.facebook, null);
 });
