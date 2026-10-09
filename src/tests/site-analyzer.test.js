@@ -27,3 +27,14 @@ test('descarta emails falsos-positivos comuns', () => {
   const s = extractSignals('<a href="mailto:sentry@example.com">x</a> @fontes png@2x.png');
   assert.strictEqual(s.email, null);
 });
+
+test('segmentos reservados só contam com igualdade exata (handles com p/tr sobrevivem)', () => {
+  const s = extractSignals(
+    '<a href="https://instagram.com/paulo.adv">IG</a>' +
+    '<a href="https://facebook.com/travel.adv">FB</a>' +
+    '<a href="https://instagram.com/p/ABC123/">post</a>' +
+    '<a href="https://facebook.com/sharer.php?u=x">share</a>'
+  );
+  assert.strictEqual(s.instagram, 'paulo.adv');
+  assert.strictEqual(s.facebook, 'travel.adv');
+});

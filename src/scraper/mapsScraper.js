@@ -225,7 +225,7 @@ async function enrichOneByQuery(page, query, opts = {}) {
   // detecta e extrai do painel; senão, caminho normal de feed (scrapeQuery).
   const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.getByRole('button', { name: /aceitar|accept|concord/i }).click({ timeout: 3000 }).catch(() => {});
+  await page.getByRole('button', { name: /aceitar|accept|concord|agree/i }).click({ timeout: 3000 }).catch(() => {});
   await sleep(1500);
   const feed = await page.$('div[role="feed"]').catch(() => null);
   const cards = await page.$$('a.hfpxzc').then((els) => els.length).catch(() => 0);
