@@ -97,12 +97,15 @@ function cleanName(s) {
     .replace(/^-\s*|\s*-$/g, '');
 }
 
+// Score de CONTATABILIDADE (0–99): lead sem telefone é incontatável → 0.
+// Reputação conta até 40, prova social até ~15 e "sem site" SOMA (é a oferta).
 function scoreOf(l) {
-  const r = l.rating || 0;
-  const rev = l.reviews || 0;
-  let s = r * 18 + Math.log10(rev + 1) * 8;
-  if (l.website) s += 6;
-  if (/\d{8,}/.test(l.phone || '')) s += 6;
+  if (!/\d{8,}/.test(l.phone || '')) return 0;
+  const r = Math.max(0, l.rating || 0);
+  let s = 30; // base: contatável
+  s += r * 8;
+  s += Math.log10((l.reviews || 0) + 1) * 5;
+  if (!l.website) s += 15;
   return Math.max(0, Math.min(99, Math.round(s)));
 }
 
@@ -123,7 +126,7 @@ function buildStats(leads) {
   const comSite = leads.filter((l) => l.website).length;
   const comPhone = leads.filter((l) => /\d{8,}/.test(l.phone || '')).length;
   const alta = leads.filter((l) => (l.rating || 0) >= 4.5 && (l.reviews || 0) >= 20).length;
-  const qualif = leads.filter((l) => l.website && /\d{8,}/.test(l.phone || '') && (l.rating || 0) >= 4.5).length;
+  const qualif = leads.filter((l) => /\d{8,}/.test(l.phone || '') && !l.website && (l.rating || 0) >= 4.5).length;
   const pct = (n) => (total ? Math.round((100 * n) / total) : 0);
   return { total, comSite, semSite: total - comSite, comPhone, alta, qualif, pctSite: pct(comSite), pctAlta: pct(alta), pctQualif: pct(qualif) };
 }
@@ -142,17 +145,19 @@ function buildTop(leads, n = 5) {
     .sort((a, b) => b.score - a.score)
     .slice(0, n)
     .map((l) => ({
+      id: l.id || null,
       name: l.name,
       area: l.area || 'Geral',
+      status: l.status || 'novo',
       cat: `${l.area || 'Advocacia'} · ${regionOf(l.address)}/DF`,
       score: l.score,
-      badge: badgeOf(l.score),
+      badge: /\d{8,}/.test(l.phone || '') ? badgeOf(l.score) : 'Incontatável',
       rating: l.rating,
       reviews: l.reviews,
       site: !!l.website,
       phone: /\d{8,}/.test(l.phone || ''),
       phone_raw: l.phone || '',
-      wa: l.phone ? waLink(l.phone, waMessage(l.name)) : null,
+      wa: l.phone ? waLink(l.phone, waMessage(l)) : null,
       captured_at: l.captured_at || null,
     }));
 }

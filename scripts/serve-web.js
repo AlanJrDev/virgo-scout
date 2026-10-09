@@ -9,6 +9,8 @@ const { destroySession } = require('../src/utils/session-store');
 const { parseCookies, authCookie, clearAuthCookie } = require('../src/utils/cookies');
 const { json } = require('../src/utils/http-json');
 const { newestLeadsFile } = require('../src/utils/leads-io');
+const { markContacted } = require('../src/utils/contact');
+const { SbError } = require('../src/utils/sb');
 const { askGroq, formatContext } = require('./groq');
 
 const ROOT = path.join(__dirname, '..', 'web');
@@ -16,10 +18,10 @@ const DATA = path.join(__dirname, '..', 'data');
 const JOB_FILE = path.join(DATA, 'job.json');
 const JOB_LOG = path.join(DATA, 'capture-live.log');
 const JOB_ERR = path.join(DATA, 'capture-live.err.log');
-const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mp4': 'video/mp4' };
 
 // arquivos que a tela de login precisa sem sessão
-const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor/gsap.min.js', '/assets/LOGO.png']);
+const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor/gsap.min.js', '/assets/LOGO.png', '/assets/black-hole.jpg', '/assets/videos/black-hole-first-pulse.mp4']);
 
 function catOf(params) {
   return params.get('category') === 'arquitetura' ? 'arquitetura' : 'advogados';
@@ -206,6 +208,23 @@ async function handler(req, res) {
         const queries = category === 'arquitetura' ? require('./queries-arquitetura').QUERIES_ARQ : require('./queries').QUERIES;
         json(res, 200, { queries, category });
       } catch (e) { json(res, 500, { error: e.message }); }
+      return;
+    }
+    if (url === '/api/contact' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 1024) req.destroy(); });
+      req.on('end', async () => {
+        let id = '';
+        try { id = String(JSON.parse(body || '{}').id || ''); } catch {}
+        try {
+          await markContacted(id);
+          json(res, 200, { ok: true });
+        } catch (e) {
+          if (e && e.code === 'invalid_id') { json(res, 400, { error: 'invalid_id' }); return; }
+          if (e instanceof SbError) { json(res, e.status >= 500 ? 503 : e.status, { error: e.code }); return; }
+          json(res, 500, { error: 'internal' });
+        }
+      });
       return;
     }
     json(res, 404, { error: 'not_found' });

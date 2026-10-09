@@ -21,10 +21,20 @@
     t.addEventListener('click', close);
   }
 
+  /* céu: vídeo hero da LP — fade suave quando o stream responde */
+  var video = document.querySelector('.login-video');
+  if (video && !reduceMotion) {
+    var ready = function () { video.classList.add('ready'); };
+    if (video.readyState >= 3) ready();
+    else video.addEventListener('canplay', ready, { once: true });
+    video.play().catch(function () { /* poster permanece */ });
+  } else if (video) {
+    video.classList.add('ready');
+  }
+
   /* entrada: momento único */
   if (hasGsap) {
     window.gsap.timeline({ defaults: { ease: 'expo.out' } })
-      .from('.constellation', { autoAlpha: 0, duration: 0.6 })
       .from('.login-card', { y: 22, autoAlpha: 0, duration: 0.5 }, 0.1)
       .from('.login-brand', { y: 10, autoAlpha: 0, duration: 0.35 }, 0.28)
       .from('.field', { y: 12, autoAlpha: 0, duration: 0.32, stagger: 0.07 }, 0.38)

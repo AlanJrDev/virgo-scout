@@ -51,6 +51,16 @@ if (!QA_USER || !QA_PASS) { console.error('QA_USER/QA_PASS não definidos no .en
   const hits = await page.locator('.sr-item').count();
   console.log('search hits:', hits);
 
+  // tela Base de Leads (nav da sidebar)
+  await page.keyboard.press('Escape');
+  await page.locator('.nav-item[data-view="leads"]').click();
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: 'docs/qa/ui-leads.png' });
+  const rows = await page.locator('#tblBody tr').count();
+  console.log('tabela leads — linhas visíveis:', rows);
+  await page.locator('.nav-item[data-view="dashboard"]').click();
+  await page.waitForTimeout(400);
+
   // chat IA
   await page.keyboard.press('Escape');
   await page.fill('#aiInput', 'quantos trabalhistas temos?');

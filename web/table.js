@@ -146,7 +146,13 @@
 
   /* ---------- células ---------- */
   function nameCell(l) {
-    var badge = l.badge ? '<span class="badge ' + esc(l.badge) + '">' + esc(l.badge) + '</span>' : '';
+    var badge = '';
+    if (l.status && l.status !== 'novo') {
+      var st = esc(String(l.status).charAt(0).toUpperCase() + String(l.status).slice(1));
+      badge = '<span class="badge Contatado">' + st + '</span>';
+    } else if (l.badge) {
+      badge = '<span class="badge ' + esc(l.badge) + '">' + esc(l.badge) + '</span>';
+    }
     return '<div class="nm-in"><span class="nm" title="' + esc(l.name) + '">' + esc(l.name) + '</span>' + badge + '</div>';
   }
   function ratingCell(l) {
@@ -161,7 +167,8 @@
     var d = phoneDigits(l);
     if (!d) return '<span class="cell-none">—</span><span class="sr-only"> sem telefone</span>';
     if (l.wa) {
-      return '<a class="cell-wa" href="' + esc(l.wa) + '" target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' + esc(fmtPhone(d)) + '</a>';
+      var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
+      return '<a class="cell-wa" href="' + esc(l.wa) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' + esc(fmtPhone(d)) + '</a>';
     }
     if (d.length >= 8) {
       return '<a class="cell-tel" href="tel:+55' + esc(normPhone(d)) + '" title="Ligar" aria-label="Ligar para ' + esc(l.name) + '">' + esc(fmtPhone(d)) + '</a>';

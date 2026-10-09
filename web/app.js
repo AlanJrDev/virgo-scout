@@ -308,7 +308,7 @@
     $('#capSub').textContent = 'Brasília/DF · ' + fmtInt(S.total) + ' empresas';
     $('#kSiteSub').textContent = (S.pctSite || 0) + '% do total · ' + fmtInt(S.semSite) + ' sem site';
     $('#kAltaSub').textContent = (S.pctAlta || 0) + '% · nota 4,5★+ com 20+ resenhas';
-    $('#kQualSub').textContent = (S.pctQualif || 0) + '% · site + telefone + nota 4,5';
+    $('#kQualSub').textContent = (S.pctQualif || 0) + '% · telefone + sem site + nota 4,5';
     var dEl = $('#kDelta');
     if (dEl) {
       if (D.delta_pct == null) { dEl.textContent = '1ª captura'; dEl.className = 'flat'; }
@@ -321,7 +321,8 @@
     var activeArea = '';
     function waBtn(l) {
       if (l.wa) {
-        return '<a class="wa-btn" href="' + escapeHtml(l.wa) + '" target="_blank" rel="noopener noreferrer" aria-label="Conversar no WhatsApp com ' + escapeHtml(l.name) + '" title="Abrir WhatsApp">' + WA_SVG + '</a>';
+        var cid = l.id ? ' data-contact-id="' + escapeHtml(l.id) + '"' : '';
+        return '<a class="wa-btn" href="' + escapeHtml(l.wa) + '"' + cid + ' target="_blank" rel="noopener noreferrer" aria-label="Conversar no WhatsApp com ' + escapeHtml(l.name) + '" title="Abrir WhatsApp">' + WA_SVG + '</a>';
       }
       return '<span class="wa-btn disabled" role="img" aria-label="Sem telefone na base" title="Sem telefone na base">' + WA_SVG + '</span>';
     }
@@ -584,7 +585,10 @@
     results.innerHTML = hits.length
       ? hits.map(function (l, i) {
           var acts = '';
-          if (l.wa) acts += '<a class="sr-act wa" href="' + escapeHtml(l.wa) + '" target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" aria-label="WhatsApp de ' + escapeHtml(l.name) + '">' + WA_SVG + '</a>';
+          if (l.wa) {
+            var waCid = l.id ? ' data-contact-id="' + escapeHtml(l.id) + '"' : '';
+            acts += '<a class="sr-act wa" href="' + escapeHtml(l.wa) + '"' + waCid + ' target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" aria-label="WhatsApp de ' + escapeHtml(l.name) + '">' + WA_SVG + '</a>';
+          }
           if (l.website) {
             var url = /^https?:/i.test(l.website) ? l.website : 'https://' + l.website;
             acts += '<a class="sr-act" href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer" title="Abrir site" aria-label="Site de ' + escapeHtml(l.name) + '">' + SITE_SVG + '</a>';
@@ -631,9 +635,61 @@
     });
   }
 
+  /* ---------- telas: Visão Geral x Base de Leads ---------- */
+  function showView(v) {
+    var d = document.getElementById('viewDashboard');
+    var l = document.getElementById('viewLeads');
+    if (!d || !l) return;
+    d.hidden = v === 'leads';
+    l.hidden = v !== 'leads';
+    document.querySelectorAll('.nav-item[data-view]').forEach(function (n) {
+      var on = n.getAttribute('data-view') === v;
+      n.classList.toggle('active', on);
+      if (on) n.setAttribute('aria-current', 'page');
+      else n.removeAttribute('aria-current');
+    });
+    try { sessionStorage.setItem('vs_view', v); } catch (e) {}
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    var t = e.target.closest('[data-view]');
+    if (!t) return;
+    e.preventDefault();
+    showView(t.getAttribute('data-view'));
+  });
+  (function restoreView() {
+    var v = null;
+    try { v = sessionStorage.getItem('vs_view'); } catch (e) {}
+    showView(v === 'leads' ? 'leads' : 'dashboard');
+  })();
+
+  /* ---------- pipeline: marca "contatado" ao abrir o WhatsApp ---------- */
+  function markContact(id) {
+    fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
+      .then(function (r) {
+        if (r.ok) toast('Lead marcado como contatado', 'ok');
+        else toast('Contato não registrado no banco', 'warn');
+      })
+      .catch(function () { toast('Contato não registrado (offline?)', 'warn'); });
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    var a = e.target.closest('[data-contact-id]');
+    if (!a) return;
+    var id = a.getAttribute('data-contact-id');
+    if (!id || a._vsMarked) return;
+    a._vsMarked = true;
+    a.classList.add('wa-sent');
+    var ctx = a.closest('tr') || a.closest('li');
+    var badge = ctx && ctx.querySelector('.badge');
+    if (badge) { badge.className = 'badge Contatado'; badge.textContent = 'Contatado'; }
+    markContact(id);
+  });
+
   /* ---------- navegação: páginas restantes em breve ---------- */
   document.querySelectorAll('.nav-item').forEach(function (n) {
     n.addEventListener('click', function (e) {
+      if (n.hasAttribute('data-view')) return; // telas reais têm handler próprio
       if (n.classList.contains('active')) return;
       e.preventDefault();
       var label = (n.textContent || '').trim().split('\n')[0];

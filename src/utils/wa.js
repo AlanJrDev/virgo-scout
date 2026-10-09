@@ -26,11 +26,25 @@ function waLink(phone, message) {
   return `https://wa.me/${d}${text}`;
 }
 
-function waMessage(leadName) {
-  const name = String(leadName || '').trim();
-  return name
-    ? `Olá! Encontrei ${name} no Google Maps e gostaria de conversar.`
-    : 'Olá! Encontrei seu escritório no Google Maps e gostaria de conversar.';
+// Mensagem de primeira abordagem — personalizada com o que a base já sabe
+// (nota, área e a ausência de site, que é a oportunidade do produto).
+// Aceita string (compat) ou o objeto do lead.
+function waMessage(lead) {
+  const l = typeof lead === 'string' ? { name: lead } : lead || {};
+  const quem = String(l.name || '').trim() || 'seu escritório';
+  const area = String(l.area || '');
+  const arq = ['Arquitetura', 'Urbanismo', 'Topografia', 'Outros'].includes(area);
+  const segmento = arq ? 'arquitetura e topografia' : 'advocacia';
+  const nota = typeof l.rating === 'number' && isFinite(l.rating) ? String(l.rating).replace('.', ',') : '';
+  const parts = ['Olá! Sou Alan, da Virgo Tech.'];
+  if (nota) parts.push(`Vi ${quem} no Google Maps — nota ${nota}★, parabéns!`);
+  else parts.push(`Encontrei ${quem} no Google Maps.`);
+  if (!l.website) {
+    parts.push(`Notei que vocês ainda não têm site próprio — isso costuma custar clientes. Posso te mandar 2 exemplos rápidos de sites para ${segmento}?`);
+  } else {
+    parts.push(`Trabalho com presença digital para ${segmento} no DF. Posso te mandar 2 exemplos rápidos?`);
+  }
+  return parts.join(' ');
 }
 
 module.exports = { waDigits, waLink, waMessage };

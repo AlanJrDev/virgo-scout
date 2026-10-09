@@ -35,3 +35,15 @@ test('waMessage cita o nome do lead', () => {
   assert.ok(waMessage('Silva Advogados').includes('Silva Advogados'));
   assert.ok(waMessage('') .includes('seu escritório'));
 });
+
+test('waMessage personalizada usa o lead completo (objeto)', () => {
+  const sem = waMessage({ name: 'Silva Advogados', area: 'Criminal', rating: 4.8, reviews: 30, website: null });
+  assert.ok(sem.includes('Silva Advogados'));
+  assert.ok(sem.includes('Virgo Tech'));
+  assert.ok(sem.includes('4,8'));
+  assert.ok(sem.includes('não têm site'));
+  assert.ok(sem.includes('advocacia'));
+  const com = waMessage({ name: 'Studio X', area: 'Arquitetura', rating: 4.5, reviews: 2, website: 'https://x.com' });
+  assert.ok(!com.includes('não têm site'));
+  assert.ok(com.includes('arquitetura e topografia'));
+});

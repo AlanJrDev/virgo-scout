@@ -64,3 +64,34 @@ test('região da categoria usa origin quando source é tag', () => {
   const p = buildPayload([{ name: 'Esc Topo', address: 'Rua Sem DF', source: 'arquitetura', origin: 'topografia Gama' }], { dataDir: TMP, category: 'arquitetura' });
   assert.strictEqual(p.regions[0].label, 'Gama');
 });
+
+test('score reflete contatabilidade: sem telefone = 0, sem site soma', () => {
+  const { scoreOf } = require('../utils/metrics');
+  // incontatável zera, mesmo com reputação excelente
+  assert.strictEqual(scoreOf({ rating: 5, reviews: 500 }), 0);
+  // mesmo lead: sem site pontua acima (é a oportunidade do produto)
+  const sem = scoreOf({ phone: '61999990000', rating: 4.5, reviews: 30, website: null });
+  const com = scoreOf({ phone: '61999990000', rating: 4.5, reviews: 30, website: 'https://x.com' });
+  assert.ok(sem > com, `sem=${sem} com=${com}`);
+  // contatável com boa reputação chega ao topo
+  assert.ok(scoreOf({ phone: '61999990000', rating: 4.8, reviews: 200 }) >= 80);
+});
+
+test('pool marca Incontatável e carrega id/status do pipeline', () => {
+  const leads = [
+    { name: 'Contatavel SA', address: 'Asa Sul, Brasília - DF', phone: '61999990000', rating: 4.8, reviews: 30, website: null, id: 'abc123def456', status: 'contatado' },
+    { name: 'Fantasma MEI', address: '', phone: null, rating: 5, reviews: 900, website: null },
+  ];
+  const p = buildPayload(leads, { dataDir: TMP, category: 'advogados' });
+  const a = p.pool.find((l) => l.name === 'Contatavel SA');
+  const b = p.pool.find((l) => l.name === 'Fantasma MEI');
+  assert.strictEqual(a.id, 'abc123def456');
+  assert.strictEqual(a.status, 'contatado');
+  assert.ok(a.badge === 'Alta' || a.badge === 'Média', 'contatável não é Incontatável');
+  assert.ok(a.wa.includes('wa.me'));
+  assert.ok(a.wa.includes('Virgo%20Tech')); // mensagem personalizada no link
+  assert.strictEqual(b.badge, 'Incontatável');
+  assert.strictEqual(b.score, 0);
+  // qualificado = telefone + sem site + nota 4,5 (a inversão da estratégia)
+  assert.strictEqual(p.stats.qualif, 1);
+});
