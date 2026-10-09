@@ -661,6 +661,11 @@
   }
 
   /* ---------- telas: Visão Geral x Base de Leads ---------- */
+  function animateViewIn(viewEl) {
+    if (!hasGsap || !viewEl) return;
+    var kids = viewEl.children;
+    window.gsap.fromTo(kids, { y: 12, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.32, stagger: 0.05, ease: 'expo.out', overwrite: true });
+  }
   function showView(v) {
     var d = document.getElementById('viewDashboard');
     var l = document.getElementById('viewLeads');
@@ -675,7 +680,10 @@
       else n.removeAttribute('aria-current');
     });
     document.querySelectorAll('.viewbar-btn').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-view') === v);
+      var on = b.getAttribute('data-view') === v;
+      b.classList.toggle('active', on);
+      if (on) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
     });
     try { sessionStorage.setItem('vs_view', v); } catch (e) {}
   }
@@ -684,7 +692,11 @@
     var t = e.target.closest('[data-view]');
     if (!t) return;
     e.preventDefault();
-    showView(t.getAttribute('data-view'));
+    var v = t.getAttribute('data-view');
+    var viewEl = document.getElementById(v === 'leads' ? 'viewLeads' : 'viewDashboard');
+    var wasHidden = !viewEl || viewEl.hidden;
+    showView(v);
+    if (wasHidden) animateViewIn(viewEl); // só troca real de tela (via clique); boot/restore não anima
     var sel = t.getAttribute('data-scroll');
     if (sel) {
       var target = document.querySelector(sel);
@@ -756,9 +768,8 @@
     var top = P.top || [];
     var n = norm(q);
     var areaHit = null;
-    var nq = norm(q);
     (areas || []).forEach(function (a) {
-      if (a.value && nq.indexOf(norm(a.label).split(' ')[0].slice(0, 7)) !== -1) areaHit = a.label;
+      if (a.value && n.indexOf(norm(a.label).split(' ')[0].slice(0, 7)) !== -1) areaHit = a.label;
     });
     if (areaHit) {
       var a = areas.filter(function (x) { return x.label === areaHit; })[0];

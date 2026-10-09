@@ -4,6 +4,8 @@
 (function () {
   'use strict';
 
+  var hasGsap = typeof window.gsap !== 'undefined' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   var $ = function (id) { return document.getElementById(id); };
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -85,6 +87,7 @@
   };
   var withCaptured = false;
   var withSince = false;
+  var firstRender = true;
   var els = {};
 
   var COLS = [
@@ -306,6 +309,10 @@
         });
         return html + '</tr>';
       }).join('');
+      /* stagger só em re-render por interação (filtro/página/sort) — nunca no boot */
+      if (hasGsap && !firstRender) {
+        window.gsap.fromTo(els.body.children, { y: 12, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.18, stagger: 0.012, ease: 'expo.out', overwrite: true });
+      }
     }
 
     var from = list.length ? start + 1 : 0;
@@ -426,6 +433,7 @@
     renderHead();
     renderSummary();
     renderRows();
+    firstRender = false;
   }
 
   els = {
