@@ -382,6 +382,9 @@ button.chip:active{transform:scale(.97)}
 .tbl-check:hover{border-color:var(--border-strong);color:var(--text)}
 .tbl-check input{width:14px;height:14px;margin:0;accent-color:var(--blue);cursor:pointer}
 .tbl-check.on{border-color:rgba(46,124,246,.5);color:var(--text);background:rgba(46,124,246,.12)}
+.tbl-check.opp{border-color:rgba(52,211,153,.45);color:var(--green)}
+.tbl-check.opp input{accent-color:var(--green)}
+.tbl-check.opp.on{border-color:rgba(52,211,153,.6);color:var(--green);background:rgba(52,211,153,.12)}
 .tbl-clear{height:36px;padding:0 13px;background:transparent;border:1px dashed rgba(120,160,255,.4);border-radius:10px;color:var(--muted);font-family:inherit;font-size:12.5px;transition:color 160ms var(--ease-out),border-color 160ms var(--ease-out),transform 120ms var(--ease-out)}
 .tbl-clear[hidden]{display:none}
 .tbl-clear:active{transform:scale(.97)}
@@ -413,6 +416,15 @@ button.chip:active{transform:scale(.97)}
 .cell-wa:hover,.cell-tel:hover,.cell-site:hover{border-bottom-color:currentColor}
 .cell-none{color:var(--faint)}
 .cell-yes{color:var(--green);font-weight:600}
+.c-channels{display:flex;align-items:center;gap:8px}
+.ch-ico{width:17px;height:17px;flex:none;display:inline-flex;color:var(--muted)}
+.ch-ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:opacity 160ms var(--ease-out)}
+.ch-ico[data-ch="site"]{color:var(--cyan)}
+.ch-ico[data-ch="ig"]{color:#E1306C}
+.ch-ico[data-ch="email"]{color:var(--green)}
+.ch-ico[data-ch="wa"]{color:#25D366}
+@media(hover:hover) and (pointer:fine){.ch-ico:hover svg{opacity:.7}}
+.c-since{font-variant-numeric:tabular-nums;color:var(--muted)}
 .c-date{color:var(--muted);font-variant-numeric:tabular-nums}
 
 .tbl-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:11px}

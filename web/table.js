@@ -41,6 +41,15 @@
     return '';
   }
   function hasSite(l) { return !!siteUrl(l) || l.site === true || !!l.website; }
+  function hasChannel(l) { return hasPhone(l) || !!l.email || !!l.instagram; }
+  function channelCount(l) {
+    var n = 0;
+    if (hasSite(l)) n++;
+    if (l.instagram) n++;
+    if (l.email) n++;
+    if (l.wa) n++;
+    return n;
+  }
   function capturedTs(l) { var t = Date.parse(l.captured_at); return isFinite(t) ? t : 0; }
   function normPhone(d) {
     if (d.length > 11 && d.slice(0, 2) === '55') d = d.slice(2);
@@ -70,41 +79,41 @@
   /* ---------- estado ---------- */
   var state = {
     rows: [], total: 0, updated: '',
-    q: '', region: '', area: '', minRating: 0, phone: false, site: false,
+    q: '', region: '', area: '', minRating: 0, phone: false, noSite: false, status: '',
     sortKey: '', sortDir: 'asc',
     page: 1, pageSize: 25
   };
   var withCaptured = false;
+  var withSince = false;
   var els = {};
 
   var COLS = [
-    { key: 'name', label: 'Empresa', w: 24 },
-    { key: 'rating', label: 'Nota / Reviews', w: 12 },
-    { key: 'region', label: 'Cidade / Região', w: 15 },
-    { key: 'area', label: 'Área', w: 14 },
-    { key: 'phone', label: 'Telefone', w: 17 },
-    { key: 'site', label: 'Site', w: 8 },
+    { key: 'name', label: 'Empresa', w: 22 },
+    { key: 'rating', label: 'Nota / Reviews', w: 11 },
+    { key: 'region', label: 'Cidade / Região', w: 13 },
+    { key: 'area', label: 'Área', w: 12 },
+    { key: 'phone', label: 'Telefone', w: 16 },
+    { key: 'channels', label: 'Canais', w: 13 },
+    { key: 'since', label: 'Desde', w: 7, optional: true },
     { key: 'captured', label: 'Capturado em', w: 10, optional: true }
   ];
-  var COLS_NO_DATE = [
-    { key: 'name', label: 'Empresa', w: 27 },
-    { key: 'rating', label: 'Nota / Reviews', w: 14 },
-    { key: 'region', label: 'Cidade / Região', w: 18 },
-    { key: 'area', label: 'Área', w: 16 },
-    { key: 'phone', label: 'Telefone', w: 18 },
-    { key: 'site', label: 'Site', w: 7 }
-  ];
-  function activeCols() { return withCaptured ? COLS : COLS_NO_DATE; }
+  function activeCols() {
+    return COLS.filter(function (c) {
+      if (c.optional) return c.key === 'captured' ? withCaptured : withSince;
+      return true;
+    });
+  }
 
   /* ---------- filtro / ordenação ---------- */
   function matches(l) {
     if (state.region && regionOf(l) !== state.region) return false;
     if (state.area && (l.area || 'Geral') !== state.area) return false;
-    if (state.phone && !hasPhone(l)) return false;
-    if (state.site && !hasSite(l)) return false;
+    if (state.phone && !hasChannel(l)) return false;
+    if (state.noSite && hasSite(l)) return false;
+    if (state.status && (l.status || 'novo') !== state.status) return false;
     if (state.minRating > 0 && !(typeof l.rating === 'number' && isFinite(l.rating) && l.rating >= state.minRating)) return false;
     if (state.q) {
-      var hay = norm([l.name, l.area, regionOf(l), l.cat, phoneOf(l), siteUrl(l)].join(' '));
+      var hay = norm([l.name, l.area, regionOf(l), l.cat, phoneOf(l), siteUrl(l), l.email, l.instagram].join(' '));
       if (hay.indexOf(state.q) === -1) return false;
     }
     return true;
@@ -115,7 +124,8 @@
     if (key === 'region') return norm(regionOf(l));
     if (key === 'area') return norm(l.area || 'Geral');
     if (key === 'phone') return phoneDigits(l) || '0';
-    if (key === 'site') return hasSite(l) ? 1 : 0;
+    if (key === 'channels') return channelCount(l);
+    if (key === 'since') return l.since_year || 0;
     if (key === 'captured') return capturedTs(l);
     return 0;
   }
@@ -123,7 +133,8 @@
     if (key === 'rating') return !(typeof l.rating === 'number' && isFinite(l.rating));
     if (key === 'captured') return !capturedTs(l);
     if (key === 'phone') return !hasPhone(l);
-    if (key === 'site') return !hasSite(l);
+    if (key === 'channels') return channelCount(l) === 0;
+    if (key === 'since') return !l.since_year;
     if (key === 'region') return !regionOf(l);
     if (key === 'area') return !(l.area);
     return !norm(l.name);
@@ -142,10 +153,16 @@
   }
   function filtered() { return state.rows.filter(matches); }
   function hasFilters() {
-    return !!(state.q || state.region || state.area || state.minRating || state.phone || state.site);
+    return !!(state.q || state.region || state.area || state.minRating || state.phone || state.noSite || state.status);
   }
 
   /* ---------- células ---------- */
+  var CH_SVG = {
+    site: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+    ig: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="12" cy="12" r="3.8"/><circle cx="16.8" cy="7.2" r="1.1" fill="currentColor" stroke="none"/></svg>',
+    email: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7.5 8.5 5.5 8.5-5.5"/></svg>',
+    wa: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16.5v2.6a1.9 1.9 0 0 1-2.1 1.9 18.8 18.8 0 0 1-8.2-2.9 18.5 18.5 0 0 1-5.7-5.7A18.8 18.8 0 0 1 2.1 4.1 1.9 1.9 0 0 1 4 2h2.6a1.9 1.9 0 0 1 1.9 1.6c.1.9.3 1.8.7 2.7a1.9 1.9 0 0 1-.4 2L7.7 9.4a15 15 0 0 0 6.9 6.9l1.1-1.1a1.9 1.9 0 0 1 2-.4c.9.4 1.8.6 2.7.7a1.9 1.9 0 0 1 1.6 1.9z"/></svg>'
+  };
   function nameCell(l) {
     var badge = '';
     if (l.status && l.status !== 'novo') {
@@ -176,14 +193,33 @@
     }
     return '<span class="cell-none">' + esc(fmtPhone(d)) + '</span>';
   }
-  function siteCell(l) {
+  function channelsCell(l) {
+    var out = [];
     var url = siteUrl(l);
     if (url) {
       var href = /^https?:\/\//i.test(url) ? url : 'https://' + url;
-      return '<a class="cell-site" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" title="' + esc(url) + '">' + esc(siteLabel(url)) + '</a>';
+      out.push('<a class="ch-ico" data-ch="site" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" title="' + esc(siteLabel(url)) + '" aria-label="Abrir site de ' + esc(l.name) + '">' + CH_SVG.site + '</a>');
+    } else if (hasSite(l)) {
+      out.push('<span class="ch-ico" data-ch="site" role="img" title="Site informado na base; a URL não veio no payload" aria-label="' + esc(l.name) + ' tem site">' + CH_SVG.site + '</span>');
     }
-    if (hasSite(l)) return '<span class="cell-yes" title="Site informado na base; a URL não veio no payload">Sim</span>';
-    return '<span class="cell-none">—</span><span class="sr-only"> sem site</span>';
+    if (l.instagram) {
+      var ig = String(l.instagram).trim().replace(/^@/, '');
+      var igHref = /^https?:\/\//i.test(ig) ? ig : 'https://instagram.com/' + ig;
+      out.push('<a class="ch-ico" data-ch="ig" href="' + esc(igHref) + '" target="_blank" rel="noopener noreferrer" title="Instagram" aria-label="Abrir Instagram de ' + esc(l.name) + '">' + CH_SVG.ig + '</a>');
+    }
+    if (l.email) {
+      out.push('<a class="ch-ico" data-ch="email" href="mailto:' + esc(l.email) + '" title="' + esc(l.email) + '" aria-label="Enviar e-mail para ' + esc(l.name) + '">' + CH_SVG.email + '</a>');
+    }
+    if (l.wa) {
+      var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
+      out.push('<a class="ch-ico" data-ch="wa" href="' + esc(l.wa) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' + CH_SVG.wa + '</a>');
+    }
+    if (!out.length) return '<span class="cell-none">—</span><span class="sr-only"> sem canal</span>';
+    return out.join('');
+  }
+  function sinceCell(l) {
+    if (!l.since_year) return '<span class="cell-none">—</span><span class="sr-only"> sem ano</span>';
+    return '<span title="Atuando desde ' + esc(l.since_year) + '">' + esc(String(l.since_year)) + '</span>';
   }
   function capturedCell(l) {
     var ts = capturedTs(l);
@@ -199,7 +235,7 @@
       var a = l.area || 'Geral';
       return '<span title="' + esc(a) + '">' + esc(a) + '</span>';
     },
-    phone: phoneCell, site: siteCell, captured: capturedCell
+    phone: phoneCell, channels: channelsCell, since: sinceCell, captured: capturedCell
   };
 
   /* ---------- render ---------- */
@@ -314,14 +350,15 @@
 
   function syncChecks() {
     els.phone.checked = state.phone;
-    els.site.checked = state.site;
+    els.noSite.checked = state.noSite;
+    els.status.value = state.status;
     document.getElementById('tblPhoneBox').classList.toggle('on', state.phone);
-    document.getElementById('tblSiteBox').classList.toggle('on', state.site);
+    document.getElementById('tblNoSiteBox').classList.toggle('on', state.noSite);
   }
 
   function clearFilters() {
     state.q = ''; state.region = ''; state.area = ''; state.minRating = 0;
-    state.phone = false; state.site = false; state.page = 1;
+    state.phone = false; state.noSite = false; state.status = ''; state.page = 1;
     els.search.value = '';
     els.minRating.value = '0';
     fillFilters();
@@ -335,7 +372,7 @@
       state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
     } else {
       state.sortKey = key;
-      state.sortDir = (key === 'rating' || key === 'captured' || key === 'phone') ? 'desc' : 'asc';
+      state.sortDir = (key === 'rating' || key === 'captured' || key === 'phone' || key === 'channels') ? 'desc' : 'asc';
     }
     state.page = 1;
     renderHead();
@@ -356,7 +393,8 @@
     els.area.addEventListener('change', function () { state.area = els.area.value; state.page = 1; renderRows(); });
     els.minRating.addEventListener('change', function () { state.minRating = parseFloat(els.minRating.value) || 0; state.page = 1; renderRows(); });
     els.phone.addEventListener('change', function () { state.phone = els.phone.checked; state.page = 1; syncChecks(); renderRows(); });
-    els.site.addEventListener('change', function () { state.site = els.site.checked; state.page = 1; syncChecks(); renderRows(); });
+    els.noSite.addEventListener('change', function () { state.noSite = els.noSite.checked; state.page = 1; syncChecks(); renderRows(); });
+    els.status.addEventListener('change', function () { state.status = els.status.value; state.page = 1; renderRows(); });
     els.pageSize.addEventListener('change', function () {
       state.pageSize = parseInt(els.pageSize.value, 10) || 25;
       state.page = 1;
@@ -382,6 +420,7 @@
     state.updated = P && P.generated_at ? fmtUpdated(P.generated_at) : '';
     state.page = 1;
     withCaptured = state.rows.some(function (l) { return !!l.captured_at; });
+    withSince = state.rows.some(function (l) { return !!l.since_year; });
     fillFilters();
     syncChecks();
     renderHead();
@@ -393,7 +432,7 @@
     root: $('leadsSection'), table: $('leadTable'), cols: $('tblCols'), head: $('tblHead'), body: $('tblBody'),
     empty: $('tblEmpty'), count: $('tblCount'), page: $('tblPage'), prev: $('tblPrev'), next: $('tblNext'),
     search: $('tblSearch'), region: $('tblRegion'), area: $('tblArea'), minRating: $('tblMinRating'),
-    phone: $('tblHasPhone'), site: $('tblHasSite'), clear: $('tblClear'), pageSize: $('tblPageSize'),
+    phone: $('tblHasPhone'), noSite: $('tblNoSite'), status: $('tblStatus'), clear: $('tblClear'), pageSize: $('tblPageSize'),
     summary: $('tblSummary'), scroll: $('tblScroll')
   };
   if (els.root && els.head && els.search) bind();

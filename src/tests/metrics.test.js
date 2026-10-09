@@ -108,6 +108,36 @@ test('lead fechado desqualifica', () => {
   assert.strictEqual(p.pool[0].badge, 'Fechado'); assert.strictEqual(p.pool[0].score, 0);
 });
 
+test('pool expõe canais e sinais enriquecidos do lead', () => {
+  const leads = [
+    { name: 'Rico Adv', address: 'Asa Sul, Brasília - DF', phone: '61999990000', rating: 4.7, reviews: 40,
+      website: 'https://rico.adv.br', email: 'contato@rico.adv.br', instagram: 'ricoadv',
+      whatsapp_hint: true, since_year: 2009, category: 'Cível', closed: false, claimed: false },
+  ];
+  const p = buildPayload(leads, { dataDir: TMP, category: 'advogados' });
+  const l = p.pool[0];
+  assert.strictEqual(l.site_url, 'https://rico.adv.br'); // coluna Canais precisa da URL real
+  assert.strictEqual(l.email, 'contato@rico.adv.br');
+  assert.strictEqual(l.instagram, 'ricoadv');
+  assert.strictEqual(l.whatsapp_hint, true);
+  assert.strictEqual(l.since_year, 2009);
+  assert.strictEqual(l.category, 'Cível');
+  assert.strictEqual(l.closed, false);
+  assert.strictEqual(l.claimed, false);
+  // lead sem enriquecimento: defaults neutros, sem quebrar os campos existentes
+  const bare = buildPayload([{ name: 'Puro Adv', address: 'Gama', phone: '61988887777' }], { dataDir: TMP, category: 'advogados' });
+  const b = bare.pool[0];
+  assert.strictEqual(b.site_url, null);
+  assert.strictEqual(b.email, null);
+  assert.strictEqual(b.instagram, null);
+  assert.strictEqual(b.whatsapp_hint, false);
+  assert.strictEqual(b.since_year, null);
+  assert.strictEqual(b.category, null);
+  assert.strictEqual(b.closed, false);
+  assert.strictEqual(b.claimed, false);
+  assert.ok(b.site === false && b.phone === true); // campos antigos intactos
+});
+
 test('sinais novos somam: email + instagram + não reclamado', () => {
   const { scoreOf } = require('../utils/metrics');
   const base = { phone: '61999990000', rating: 4.0, reviews: 10, website: 'https://x.com' };

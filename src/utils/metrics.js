@@ -173,9 +173,17 @@ function buildTop(leads, n = 5) {
       rating: l.rating,
       reviews: l.reviews,
       site: !!l.website,
+      site_url: (typeof l.website === 'string' && l.website) ? l.website : null,
       phone: /\d{8,}/.test(l.phone || ''),
       phone_raw: l.phone || '',
       wa: l.phone ? waLink(l.phone, waMessage(l)) : null,
+      email: l.email || null,
+      instagram: l.instagram || null,
+      whatsapp_hint: l.whatsapp_hint === true,
+      since_year: l.since_year || null,
+      category: l.category || null,
+      closed: l.closed === true,
+      claimed: l.claimed === null ? null : l.claimed === true,
       captured_at: l.captured_at || null,
     }));
 }

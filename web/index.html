@@ -167,14 +167,17 @@
               <option value="4">Nota ≥ 4,0</option>
               <option value="4.5">Nota ≥ 4,5</option>
             </select>
-            <label class="tbl-check" id="tblPhoneBox"><input type="checkbox" id="tblHasPhone"><span>Com telefone</span></label>
-            <label class="tbl-check" id="tblSiteBox"><input type="checkbox" id="tblHasSite"><span>Com site</span></label>
+            <label class="tbl-check opp" id="tblNoSiteBox"><input type="checkbox" id="tblNoSite"><span>Sem site · oportunidade</span></label>
+            <label class="tbl-check" id="tblPhoneBox"><input type="checkbox" id="tblHasPhone"><span>Contatáveis</span></label>
+            <select class="tbl-select" id="tblStatus" aria-label="Status de contato">
+              <option value="">Todos os status</option><option value="novo">Novos</option><option value="contatado">Contatados</option>
+            </select>
             <button type="button" class="tbl-clear" id="tblClear" hidden>Limpar filtros</button>
           </div>
 
           <div class="tbl-scroll" id="tblScroll">
             <table class="lead-table" id="leadTable">
-              <caption class="sr-only">Leads da categoria ativa: empresa, nota e avaliações, cidade ou região, área de atuação, telefone, site e data de captura</caption>
+              <caption class="sr-only">Leads da categoria ativa: empresa, nota e avaliações, cidade ou região, área de atuação, telefone, canais de contato e data de captura</caption>
               <colgroup id="tblCols"></colgroup>
               <thead id="tblHead"></thead>
               <tbody id="tblBody"></tbody>
