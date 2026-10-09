@@ -45,6 +45,7 @@ test('enrichLeads consulta leads sem enriched_at e PATCHa sinais de cada um', as
   assert.ok(getCalls[0].url.includes('website=not.is.null'), 'filtra leads sem site');
   assert.ok(getCalls[0].url.includes('enriched_at=is.null'), 'é resumível: pula leads já enriquecidos');
   assert.ok(getCalls[0].url.includes('limit=2'), 'limite vem do argv');
+  assert.strictEqual((getCalls[0].url.match(/limit=/g) || []).length, 1); // um único limit na URL
   const patches = calls.filter((c) => c.opts.method === 'PATCH');
   assert.strictEqual(patches.length, 2);
   assert.ok(patches[0].url.includes('leads?id=eq.a1'));

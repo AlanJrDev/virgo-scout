@@ -1,13 +1,13 @@
 /* Enriquece leads COM site: analisa o site e grava sinais no Supabase.
    npm run enrich [limite]  — resumível (pula leads com enriched_at). */
 require('dotenv').config();
-const { sbFetchAll, sbFetch } = require('../src/utils/sb');
+const { sbFetch } = require('../src/utils/sb');
 const { analyzeSite } = require('../src/enrich/site-analyzer');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   const limit = parseInt(process.argv[2] || '50', 10);
-  const rows = await sbFetchAll(`leads?select=id,website&website=not.is.null&enriched_at=is.null&order=id&limit=${limit}`);
+  const rows = (await sbFetch(`leads?select=id,website&website=not.is.null&enriched_at=is.null&order=id&limit=${limit}`)) || [];
   console.log(`[enrich] ${rows.length} leads com site a analisar`);
   let ok = 0, fail = 0;
   for (const r of rows) {
