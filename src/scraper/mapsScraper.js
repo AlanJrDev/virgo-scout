@@ -214,6 +214,12 @@ async function scrapeQuery(page, query, opts = {}) {
   return { query, foundCards: found, leads: enriched };
 }
 
+/* Refill nominal: busca um lead pelo nome e devolve o detalhe do primeiro card */
+async function enrichOneByQuery(page, query, opts = {}) {
+  const r = await scrapeQuery(page, query, { ...opts, maxDetails: 1 });
+  return r.leads[0] || null;
+}
+
 async function scrapeMany(queries, opts = {}) {
   const { browser, page } = await launchBrowser(opts);
   const all = [];
@@ -235,4 +241,4 @@ async function scrapeMany(queries, opts = {}) {
   return all;
 }
 
-module.exports = { launchBrowser, scrapeQuery, scrapeMany, scrollFeedToEnd };
+module.exports = { launchBrowser, scrapeQuery, scrapeMany, scrollFeedToEnd, enrichOneByQuery };
