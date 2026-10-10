@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Tags de banco (sem acento, em tudo que é código/chave/URL): `advogados`, `arquitetura`, `tapestaria`, `estofado`. Labels UI: Advogado, Arquitetura, Tapeçaria, Estofado.
+- Tags de banco (sem acento, em tudo que é código/chave/URL): `advogados`, `arquitetura`, `tapecaria`, `estofado`. Labels UI: Advogado, Arquitetura, Tapeçaria, Estofado.
 - Migration `0005_types_placeid.sql` **já aplicada** — coluna `types` viva; ids com place_id já reescritos.
 - Servidor local em http://localhost:8901 **já rodando — não derrubar**. QA_USER/QA_PASS no `.env`.
 - Testes: `npm test` (base 114 verdes). TDD obrigatório onde há lógica pura.
@@ -46,30 +46,30 @@ const { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType } = requi
 const { matchFile } = require('../utils/leads-io');
 
 test('registro cobre as 4 categorias com tags sem acento', () => {
-  assert.deepStrictEqual(CAT_KEYS, ['advogados', 'arquitetura', 'tapestaria', 'estofado']);
-  assert.strictEqual(tagOf('tapestaria'), 'tapestaria');
+  assert.deepStrictEqual(CAT_KEYS, ['advogados', 'arquitetura', 'tapecaria', 'estofado']);
+  assert.strictEqual(tagOf('tapecaria'), 'tapecaria');
   assert.strictEqual(tagOf('inexistente'), 'advogados');
-  assert.strictEqual(CATEGORIES.tapestaria.label, 'Tapeçaria');
+  assert.strictEqual(CATEGORIES.tapecaria.label, 'Tapeçaria');
 });
 
 test('typeList faz split de types com fallback para source', () => {
-  assert.deepStrictEqual(typeList({ types: 'tapestaria,estofado' }), ['tapestaria', 'estofado']);
+  assert.deepStrictEqual(typeList({ types: 'tapecaria,estofado' }), ['tapecaria', 'estofado']);
   assert.deepStrictEqual(typeList({ source: 'arquitetura' }), ['arquitetura']);
   assert.deepStrictEqual(typeList({}), ['advogados']);
-  assert.strictEqual(typeOfLead({ types: 'estofado,tapestaria' }), 'estofado');
+  assert.strictEqual(typeOfLead({ types: 'estofado,tapecaria' }), 'estofado');
   assert.strictEqual(typeOfLead({}), 'advogados');
 });
 
 test('matchesType: all casa tudo; tag exata casa; tag ausente não casa', () => {
-  const l = { types: 'tapestaria,estofado' };
+  const l = { types: 'tapecaria,estofado' };
   assert.strictEqual(matchesType(l, 'all'), true);
-  assert.strictEqual(matchesType(l, 'tapestaria'), true);
+  assert.strictEqual(matchesType(l, 'tapecaria'), true);
   assert.strictEqual(matchesType(l, 'advogados'), false);
 });
 
 test('matchFile separa prefixos de arquivo por categoria', () => {
-  assert.strictEqual(matchFile('tapestaria-df-max.json', 'tapestaria'), true);
-  assert.strictEqual(matchFile('tapestaria-df-max.json', 'advogados'), false);
+  assert.strictEqual(matchFile('tapecaria-df-max.json', 'tapecaria'), true);
+  assert.strictEqual(matchFile('tapecaria-df-max.json', 'advogados'), false);
   assert.strictEqual(matchFile('advogados-df-max.json', 'advogados'), true);
   assert.strictEqual(matchFile('arquitetura-df-max.json', 'advogados'), false);
   assert.strictEqual(matchFile('estofado-df-max.json', 'estofado'), true);
@@ -87,7 +87,7 @@ Expected: FAIL — Cannot find module `../utils/categories`
 const CATEGORIES = {
   advogados: { tag: 'advogados', label: 'Advogado', script: 'capture-advogados-df.js', queriesModule: './queries', queriesExport: 'QUERIES', basename: null },
   arquitetura: { tag: 'arquitetura', label: 'Arquitetura', script: 'capture-arquitetura.js', queriesModule: './queries-arquitetura', queriesExport: 'QUERIES_ARQ', basename: 'arquitetura-df-max' },
-  tapestaria: { tag: 'tapestaria', label: 'Tapeçaria', script: 'capture-tapestaria.js', queriesModule: './queries-tapestaria', queriesExport: 'QUERIES_TAP', basename: 'tapestaria-df-max' },
+  tapecaria: { tag: 'tapecaria', label: 'Tapeçaria', script: 'capture-tapecaria.js', queriesModule: './queries-tapecaria', queriesExport: 'QUERIES_TAP', basename: 'tapecaria-df-max' },
   estofado: { tag: 'estofado', label: 'Estofado', script: 'capture-estofado.js', queriesModule: './queries-estofado', queriesExport: 'QUERIES_EST', basename: 'estofado-df-max' },
 };
 const CAT_KEYS = Object.keys(CATEGORIES);
@@ -171,8 +171,8 @@ git commit -m "feat: registro de categorias (4 tags) + typeList/matchesType + ma
 - Test: `src/tests/classify.test.js`
 
 **Interfaces:**
-- Consumes: `tagOf` não necessário — classificador recebe a **chave** da categoria (`'tapestaria'`, `'estofado'`).
-- Produces: `classifyLead(lead, 'tapestaria'|'estofado')` → `{area, confidence}` com mesmas camadas (0.95 categoria, 0.9 nome, 0.7 origem, 0.6 título, 0.3 fallback `'Geral'`).
+- Consumes: `tagOf` não necessário — classificador recebe a **chave** da categoria (`'tapecaria'`, `'estofado'`).
+- Produces: `classifyLead(lead, 'tapecaria'|'estofado')` → `{area, confidence}` com mesmas camadas (0.95 categoria, 0.9 nome, 0.7 origem, 0.6 título, 0.3 fallback `'Geral'`).
 
 - [ ] **Step 1: Testes falhando**
 
@@ -180,13 +180,13 @@ Adicionar ao final de `src/tests/classify.test.js`:
 
 ```js
 test('tapeçaria: área pela categoria oficial do Maps (camada 0.95)', () => {
-  const r = classifyLead({ name: 'Loja X', category: 'Loja de cortinas e tapeçaria' }, 'tapestaria');
+  const r = classifyLead({ name: 'Loja X', category: 'Loja de cortinas e tapeçaria' }, 'tapecaria');
   assert.strictEqual(r.area, 'Cortinas');
   assert.strictEqual(r.confidence, 0.95);
 });
 
 test('tapeçaria: área pela origem da query (camada 0.7)', () => {
-  const r = classifyLead({ name: 'Decoração Y', origin: 'tapeçaria Lago Sul Brasília DF' }, 'tapestaria');
+  const r = classifyLead({ name: 'Decoração Y', origin: 'tapeçaria Lago Sul Brasília DF' }, 'tapecaria');
   assert.strictEqual(r.area, 'Tapeçaria');
   assert.ok(r.confidence <= 0.8);
 });
@@ -198,7 +198,7 @@ test('estofado: área pelo nome', () => {
 });
 ```
 
-Obs.: `norm()` remove acentos (`tapeçaria`→`tapestaria`), então as keywords vão SEM acento.
+Obs.: `norm()` remove acentos (`tapeçaria`→`tapecaria`, ç→c — NÃO `tapecaria`), então as keywords vão SEM acento e `tapecaria` é keyword obrigatória da regra Tapeçaria.
 
 - [ ] **Step 2: Rodar e ver falhar**
 
@@ -213,7 +213,7 @@ Após `RULES_ARQ` (linha 36):
 const AREAS_TAP = ['Tapeçaria', 'Cortinas', 'Persianas'];
 
 const RULES_TAP = {
-  Tapeçaria: ['tapestaria', 'tapercaria', 'tapete'],
+  Tapeçaria: ['tapecaria', 'tapercaria', 'tapete'],
   Cortinas: ['cortina', 'cortineiro', 'voil'],
   Persianas: ['persiana'],
 };
@@ -231,7 +231,7 @@ const RULES_EST = {
 ```js
 function rulesFor(category) {
   if (category === 'arquitetura') return { areas: AREAS_ARQ, rules: RULES_ARQ, fallback: 'Outros' };
-  if (category === 'tapestaria') return { areas: AREAS_TAP, rules: RULES_TAP, fallback: 'Geral' };
+  if (category === 'tapecaria') return { areas: AREAS_TAP, rules: RULES_TAP, fallback: 'Geral' };
   if (category === 'estofado') return { areas: AREAS_EST, rules: RULES_EST, fallback: 'Geral' };
   return { areas: AREAS, rules: RULES, fallback: 'Geral' };
 }
@@ -280,8 +280,8 @@ test('placeIdOrHash prefere place_id e cai para sha1', () => {
 
 test('planUpsert: negócio novo vira insert', () => {
   const { planUpsert, toRow } = require('../../scripts/sync-supabase');
-  const nr = toRow({ name: 'Nova', address: 'Rua B', source: 'tapestaria' });
-  nr.types = 'tapestaria';
+  const nr = toRow({ name: 'Nova', address: 'Rua B', source: 'tapecaria' });
+  nr.types = 'tapecaria';
   const plan = planUpsert([nr], []);
   assert.strictEqual(plan.inserts.length, 1);
   assert.strictEqual(plan.patches.length, 0);
@@ -293,12 +293,12 @@ test('planUpsert: existente com mesmo place_id ganha patch não-degradante + typ
   const novo = toRow({ name: 'Loja Y', address: 'QI 1', source: 'estofado', phone: '', rating: '4,8', reviews: '12' });
   novo.place_id = '0x2:0x9';
   novo.types = 'estofado';
-  const existente = { id: '0x2:0x9', place_id: '0x2:0x9', types: 'tapestaria', source: 'tapestaria' };
+  const existente = { id: '0x2:0x9', place_id: '0x2:0x9', types: 'tapecaria', source: 'tapecaria' };
   const plan = planUpsert([novo], [existente]);
   assert.strictEqual(plan.inserts.length, 0);
   const p = plan.patches[0];
   assert.strictEqual(p.id, '0x2:0x9');
-  assert.strictEqual(p.set.types, 'estofado,tapestaria');
+  assert.strictEqual(p.set.types, 'estofado,tapecaria');
   assert.strictEqual(p.set.phone, undefined);          // null não degrada
   assert.strictEqual(p.set.rating, 4.8);               // valor novo entra
   assert.strictEqual(p.set.source, 'estofado');        // proveniência atualiza
@@ -308,14 +308,14 @@ test('planUpsert: existente com mesmo place_id ganha patch não-degradante + typ
 
 test('planUpsert: row sha1 antigo do mesmo lugar migra o id para place_id e órfão é deletado', () => {
   const { planUpsert, toRow, leadId } = require('../../scripts/sync-supabase');
-  const novo = toRow({ name: 'Loja Z', address: 'SAAN', source: 'tapestaria' });
+  const novo = toRow({ name: 'Loja Z', address: 'SAAN', source: 'tapecaria' });
   novo.place_id = '0x3:0x9';
-  novo.types = 'tapestaria';
+  novo.types = 'tapecaria';
   const antigo = { id: leadId({ name: 'Loja Z', address: 'SAAN' }), place_id: null, types: 'advogados', source: 'advogados' };
   const plan = planUpsert([novo], [antigo]);
   assert.strictEqual(plan.patches[0].id, antigo.id);
   assert.strictEqual(plan.patches[0].set.id, '0x3:0x9');
-  assert.strictEqual(plan.patches[0].set.types, 'advogados,tapestaria');
+  assert.strictEqual(plan.patches[0].set.types, 'advogados,tapecaria');
   assert.deepStrictEqual(plan.deletes, []);
 });
 ```
@@ -507,9 +507,9 @@ git commit -m "feat: repair itera as 4 categorias; refill cobre todos os tipos p
 ### Task 5: Queries e runners Tapeçaria/Estofado + registro no servidor
 
 **Files:**
-- Create: `scripts/queries-tapestaria.js`
+- Create: `scripts/queries-tapecaria.js`
 - Create: `scripts/queries-estofado.js`
-- Create: `scripts/capture-tapestaria.js`
+- Create: `scripts/capture-tapecaria.js`
 - Create: `scripts/capture-estofado.js`
 - Modify: `package.json` (scripts)
 - Modify: `scripts/serve-web.js:90-109,196-212` (startCapture + catOf via registro)
@@ -518,7 +518,7 @@ git commit -m "feat: repair itera as 4 categorias; refill cobre todos os tipos p
 **Interfaces:**
 - Produces: `QUERIES_TAP` (string[]), `QUERIES_EST` (string[]); runners no padrão de `capture-arquitetura.js`; npm scripts `capture:tap`, `capture:est`.
 
-- [ ] **Step 1: `scripts/queries-tapestaria.js`**
+- [ ] **Step 1: `scripts/queries-tapecaria.js`**
 
 ```js
 /* Queries da categoria tapeçaria — DF inteiro, priorizando alto poder aquisitivo */
@@ -546,14 +546,14 @@ Mesma estrutura: `TERM_EST = 'estofado'`, `QUERIES_EST = [...RAS_TIER1, ...RAS_T
 
 - [ ] **Step 3: runners (padrão `capture-arquitetura.js`)**
 
-`scripts/capture-tapestaria.js`:
+`scripts/capture-tapecaria.js`:
 
 ```js
 /* Runner da categoria tapeçaria — mesmo pipeline da captura principal.
    Uso: npm run capture:tap */
-process.env.BASENAME = 'tapestaria-df-max';
-process.env.CAPTURE_CATEGORY = 'tapestaria';
-process.env.QUERIES = process.env.QUERIES || require('./queries-tapestaria').QUERIES_TAP.join('|');
+process.env.BASENAME = 'tapecaria-df-max';
+process.env.CAPTURE_CATEGORY = 'tapecaria';
+process.env.QUERIES = process.env.QUERIES || require('./queries-tapecaria').QUERIES_TAP.join('|');
 
 const { main } = require('./capture-advogados-df');
 
@@ -568,7 +568,7 @@ main().catch((e) => {
 - [ ] **Step 4: `package.json` — scripts**
 
 ```json
-"capture:tap": "node scripts/capture-tapestaria.js",
+"capture:tap": "node scripts/capture-tapecaria.js",
 "capture:est": "node scripts/capture-estofado.js"
 ```
 
@@ -632,17 +632,17 @@ json(res, 200, { queries, category: cfg.tag });
 
 Run:
 ```powershell
-node -e "const a=require('./scripts/queries-tapestaria').QUERIES_TAP; const b=require('./scripts/queries-estofado').QUERIES_EST; console.log(a.length, b.length, a[0], b[0], a[a.length-1])"
+node -e "const a=require('./scripts/queries-tapecaria').QUERIES_TAP; const b=require('./scripts/queries-estofado').QUERIES_EST; console.log(a.length, b.length, a[0], b[0], a[a.length-1])"
 ```
 Expected: mesmo número (≈23), `a[0]` = `tapeçaria Lago Sul Brasília DF`, último = `... Sol Nascente Brasília DF`.
 
 Run: `npm test` → verde.
-Extra: subir servidor temporário na 8902 (`$env:PORT=8902; node scripts/serve-web.js`) e bater em `GET /api/queries?category=tapestaria` (com cookie de sessão — ou apenas checar 401 vs 500 para provar que o require do módulo não estoura) — depois matar o servidor.
+Extra: subir servidor temporário na 8902 (`$env:PORT=8902; node scripts/serve-web.js`) e bater em `GET /api/queries?category=tapecaria` (com cookie de sessão — ou apenas checar 401 vs 500 para provar que o require do módulo não estoura) — depois matar o servidor.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add scripts/queries-tapestaria.js scripts/queries-estofado.js scripts/capture-tapestaria.js scripts/capture-estofado.js package.json scripts/serve-web.js api/queries.js
+git add scripts/queries-tapecaria.js scripts/queries-estofado.js scripts/capture-tapecaria.js scripts/capture-estofado.js package.json scripts/serve-web.js api/queries.js
 git commit -m "feat: captura tapeçaria/estofado (RAs priorizados) + registro de categorias no servidor"
 ```
 
@@ -657,7 +657,7 @@ git commit -m "feat: captura tapeçaria/estofado (RAs priorizados) + registro de
 
 **Interfaces:**
 - Consumes: `matchesType`, `typeOfLead`, `typeList` de `src/utils/categories.js`; `sbFetchAll` de `src/utils/sb.js`.
-- Produces: `GET /api/leads[?type=all|advogados|arquitetura|tapestaria|estofado]` → payload com todos os campos atuais + `pool[].types: string[]`; `buildPayload(leads, { category: 'all' })` classifica `area` por tipo do próprio lead e varre todos os arquivos em `buildRecent`/`buildDelta`.
+- Produces: `GET /api/leads[?type=all|advogados|arquitetura|tapecaria|estofado]` → payload com todos os campos atuais + `pool[].types: string[]`; `buildPayload(leads, { category: 'all' })` classifica `area` por tipo do próprio lead e varre todos os arquivos em `buildRecent`/`buildDelta`.
 - Fallback offline do cliente (`bootOfflineFallback`) não muda.
 
 - [ ] **Step 1: Teste falhando — buildTop expõe types e buildPayload 'all'**
@@ -668,13 +668,13 @@ Adicionar a `src/tests/metrics.test.js`:
 test('buildTop expõe types (array) com fallback para source', () => {
   const { buildTop } = require('../utils/metrics');
   const rows = [
-    { id: 'a', name: 'Loja A', address: 'Q 1', types: 'tapestaria,estofado', phone: '61999998888', rating: 5, reviews: 10 },
+    { id: 'a', name: 'Loja A', address: 'Q 1', types: 'tapecaria,estofado', phone: '61999998888', rating: 5, reviews: 10 },
     { id: 'b', name: 'Escritório B', address: 'Q 2', source: 'advogados', phone: '61999997777', rating: 5, reviews: 9 },
     { id: 'c', name: 'Ateliê C', address: 'Q 3', source: 'estofado', phone: '61999996666', rating: 5, reviews: 8 },
   ];
   const top = buildTop(rows, 3);
   const byId = Object.fromEntries(top.map((t) => [t.id, t]));
-  assert.deepStrictEqual(byId.a.types, ['tapestaria', 'estofado']);
+  assert.deepStrictEqual(byId.a.types, ['tapecaria', 'estofado']);
   assert.deepStrictEqual(byId.b.types, ['advogados']);
   assert.deepStrictEqual(byId.c.types, ['estofado']);
 });
@@ -778,11 +778,15 @@ Pontos de chamada:
 - `/api/leads` (linha 191-193): `json(res, 200, await livePayload(qs.get('type') || 'all'))` com catch: `if (e instanceof SbError) json(res, 503, { error: 'supabase_down' }) else json(res, 500, { error: e.message })`.
 - `/api/insight` (linha 183): `formatContext(await livePayload('all'))` — remover o bloco `if (j.category === 'arquitetura')` (linha 179) e a variável `cat`.
 
+- [ ] **Step 5b: delta em modo 'all' pareia a mesma categoria (ruling pós-review Task 6)**
+
+`buildDelta(dataDir,'all')` não pode comparar arquivos de categorias diferentes (ex.: tapecaria 40 vs arquitetura 1233 → −97% sem sentido). Regra: em `'all'`, achar o arquivo mais recente, derivar o prefixo de categoria dele (`tapecaria-`/`estofado-`/`arquitetura-`, senão `advogados`) e aplicar a lógica das duas capturas mais recentes **dentro dessa categoria** (feed `recent` continua varrendo tudo — é cronológico). TDD: teste novo RED→GREEN.
+
 - [ ] **Step 6: Testes**
 
 Run: `node --test src/tests/metrics.test.js` → PASS
 Run: `npm test` → verde
-Smoke manual: `Invoke-WebRequest http://localhost:8901/api/leads?type=tapestaria` (servidor 8901 existente recarrega código? **não** — é processo antigo; validar via servidor temporário na 8902: `$env:PORT=8902; node scripts/serve-web.js`, login com QA_USER/QA_PASS, `?type=all` vs `?type=arquitetura` — contagens diferentes — e depois matar). Registrar contagens no report.
+Smoke manual: `Invoke-WebRequest http://localhost:8901/api/leads?type=tapecaria` (servidor 8901 existente recarrega código? **não** — é processo antigo; validar via servidor temporário na 8902: `$env:PORT=8902; node scripts/serve-web.js`, login com QA_USER/QA_PASS, `?type=all` vs `?type=arquitetura` — contagens diferentes — e depois matar). Registrar contagens no report.
 
 - [ ] **Step 7: Commit**
 
@@ -799,10 +803,15 @@ git commit -m "feat: /api/leads unificado via Supabase com filtro ?type= + build
 - Modify: `web/index.html:45-47` (cat-switch → type-switch), `:75` (card de captura ganha `#capCat`)
 - Modify: `web/app.js:77-91,144,841,906-936` (estado/refetch)
 - Modify: `web/styles.css:277-278,355-359` (seletores + badges de opção)
+- Modify: `api/insight.js` (divergência descoberta na Task 6 — insight da prod ainda filtra `source=eq/neq.arquitetura` e faz o mapping binário da linha 15; unificar: remover o filtro de source e o ternário da linha 18, `buildPayload(rows, { dataDir: '/tmp', category: 'all' })`, ignorar `b.category` — idem ao insight local pós-Task 6)
 
 **Interfaces:**
 - Consumes: `GET /api/leads?type=` da Task 6; `CATEGORIES` labels duplicados como constante no cliente.
 - Produces: estado `typeFilter` (sessionStorage `vs_type`, default `'all'`), `captureCat` (sessionStorage `vs_capture_cat`, default `'advogados'`); `syncTypeUI()`; comportamento: clicar em Tipo → `loadLeads()` refaz o payload inteiro (KPIs/fila/tabela re-renderizam via `boot(d)`).
+
+- [ ] **Step 0: `api/insight.js` unificado (1 arquivo, escopo Task 6 descoberto)**
+
+Trocar linhas 15 e 18-19 por: sem mapping binário de `b.category` (remover linha 15 e o `category` do ternário); `const rows = await sbFetchAll('leads?select=*&order=id');` e `buildPayload(rows || [], { dataDir: '/tmp', category: 'all' })`. `history`/`askGroq`/eros permanecem. `npm test` verde (há teste de insight em `src/tests/api.test.js` — atualizar expectativa do filtro removido se necessário, preservando as asserções de resposta).
 
 - [ ] **Step 1: `web/index.html` — trocar o toggle (linhas 45-47)**
 
@@ -811,7 +820,7 @@ git commit -m "feat: /api/leads unificado via Supabase com filtro ?type= + build
   <button type="button" class="type-btn active" data-type="all" aria-pressed="true" title="Todos os tipos">Todos</button>
   <button type="button" class="type-btn" data-type="advogados" aria-pressed="false" title="Advogados">Adv</button>
   <button type="button" class="type-btn" data-type="arquitetura" aria-pressed="false" title="Arquitetura">Arq</button>
-  <button type="button" class="type-btn" data-type="tapestaria" aria-pressed="false" title="Tapeçaria">Tap</button>
+  <button type="button" class="type-btn" data-type="tapecaria" aria-pressed="false" title="Tapeçaria">Tap</button>
   <button type="button" class="type-btn" data-type="estofado" aria-pressed="false" title="Estofado">Est</button>
 </div>
 ```
@@ -823,7 +832,7 @@ Card de captura (após o `<strong id="capTitle">`, linha 75):
   <select id="capCat">
     <option value="advogados">Advogados</option>
     <option value="arquitetura">Arquitetura</option>
-    <option value="tapestaria">Tapeçaria</option>
+    <option value="tapecaria">Tapeçaria</option>
     <option value="estofado">Estofado</option>
   </select>
 </label>
@@ -851,7 +860,7 @@ function syncTypeUI() {
   var sel = document.getElementById('capCat');
   if (sel) sel.value = captureCat;
   var t = document.getElementById('capTitle');
-  var labels = { advogados: 'Advocacia', arquitetura: 'Arquitetura', tapestaria: 'Tapeçaria', estofado: 'Estofado' };
+  var labels = { advogados: 'Advocacia', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado' };
   if (t) t.textContent = 'Captura — ' + (labels[captureCat] || 'Advocacia');
 }
 ```
@@ -924,8 +933,8 @@ git commit -m "feat: type-switch global no topbar (?type= em tudo) + select de c
 Perto do `COLS`/`CELLS` (padrão existente do arquivo):
 
 ```js
-var TIPO_LABEL = { advogados: 'Advogado', arquitetura: 'Arquitetura', tapestaria: 'Tapeçaria', estofado: 'Estofado' };
-var TIPO_ORDER = ['advogados', 'arquitetura', 'tapestaria', 'estofado'];
+var TIPO_LABEL = { advogados: 'Advogado', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado' };
+var TIPO_ORDER = ['advogados', 'arquitetura', 'tapecaria', 'estofado'];
 ```
 
 - `COLS`: inserir `{ k: 'tipo', label: 'Tipo', w: 10 }` logo após a coluna `area` (e a remoção correspondente em `COLS_NO_DATE`/lista de colunas sem data — seguir o padrão `optional` existente se aplicável; Tipo NÃO é optional: sempre renderiza, com fallback para `l.status`... não — fallback: se `types` ausente, usar `['advogados']`).
@@ -951,7 +960,7 @@ tipo: function (l) {
 .tipo{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.02em;border:1px solid transparent;white-space:nowrap}
 .tipo.t-advogados{background:rgba(56,132,255,.14);color:#7aa7ff;border-color:rgba(56,132,255,.32)}
 .tipo.t-arquitetura{background:rgba(56,189,248,.12);color:var(--cyan);border-color:rgba(56,189,248,.3)}
-.tipo.t-tapestaria{background:rgba(244,114,182,.13);color:#f472b6;border-color:rgba(244,114,182,.32)}
+.tipo.t-tapecaria{background:rgba(244,114,182,.13);color:#f472b6;border-color:rgba(244,114,182,.32)}
 .tipo.t-estofado{background:rgba(52,211,153,.12);color:var(--green);border-color:rgba(52,211,153,.3)}
 ```
 
@@ -983,15 +992,15 @@ Run: `npm test` → 100% verde (base 114 + novos).
 - [ ] **Step 2: Smoke de captura real Tapeçaria (1 query)**
 
 ```powershell
-$env:QUERIES='tapeçaria Lago Sul Brasília DF'; node scripts/capture-tapestaria.js
+$env:QUERIES='tapeçaria Lago Sul Brasília DF'; node scripts/capture-tapecaria.js
 ```
-(Env reseta por sessão — rodar em processo próprio. Esperado: pelo menos 1 lead salvo em `data/tapestaria-df-max*.json` e sync para o Supabase com `types='tapestaria'`.)
+(Env reseta por sessão — rodar em processo próprio. Esperado: pelo menos 1 lead salvo em `data/tapecaria-df-max*.json` e sync para o Supabase com `types='tapecaria'`.)
 
 Validação no banco:
 ```js
-sbFetch("leads?select=id,name,types,source&types=like.*tapestaria*&limit=5")
+sbFetch("leads?select=id,name,types,source&types=like.*tapecaria*&limit=5")
 ```
-→ linhas novas com `types` contendo `tapestaria`; business recapturado do mesmo lugar **não** duplicou (conferir contagem total antes/depois).
+→ linhas novas com `types` contendo `tapecaria`; business recapturado do mesmo lugar **não** duplicou (conferir contagem total antes/depois).
 
 - [ ] **Step 3: Smoke Estofado (1 query)**
 
@@ -999,7 +1008,7 @@ Idem com `$env:QUERIES='estofado Lago Sul Brasília DF'; node scripts/capture-es
 
 - [ ] **Step 4: Probe de ponta a ponta (8902)**
 
-(1) payload `?type=tapestaria` contém os leads do smoke; (2) type-switch filtra KPIs+fila+conferir com contagens do payload; (3) coluna Tipo mostra "Tapeçaria"; (4) fila "Contatar hoje" some/aparece coerente com o filtro; (5) capture select dispara script certo (spy); (6) sem regressão: chips sem-site/contatáveis, status, IA (`/api/insight` com payload unificado).
+(1) payload `?type=tapecaria` contém os leads do smoke; (2) type-switch filtra KPIs+fila+conferir com contagens do payload; (3) coluna Tipo mostra "Tapeçaria"; (4) fila "Contatar hoje" some/aparece coerente com o filtro; (5) capture select dispara script certo (spy); (6) sem regressão: chips sem-site/contatáveis, status, IA (`/api/insight` com payload unificado).
 
 - [ ] **Step 5: Deploy + verificação produção**
 

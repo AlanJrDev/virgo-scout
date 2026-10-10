@@ -18,20 +18,20 @@ Ter **todos os leads numa tabela só**, diferenciados por **Tipo**, com filtros 
 
 ## 2. Categorias novas (pipeline)
 
-- **Tags no banco (sem acento, seguro em URL):** `tapestaria`, `estofado`. Labels de UI: "Tapeçaria", "Estofado".
-- **Scripts** no padrão existente (`scripts/capture-tapestaria.js`, `scripts/capture-estofado.js`) com lista de queries priorizada:
+- **Tags no banco (sem acento, seguro em URL):** `tapecaria`, `estofado`. Labels de UI: "Tapeçaria", "Estofado".
+- **Scripts** no padrão existente (`scripts/capture-tapecaria.js`, `scripts/capture-estofado.js`) com lista de queries priorizada:
   1. **Tier alto poder aquisitivo:** Lago Sul, Lago Norte, Asa Sul, Asa Norte, Plano Piloto, Águas Claras, Cruzeiro, Park Way, Jardim Botânico.
   2. **Demais RAs do DF** (todas as registradas): Guará, Sobradinho, Sobradinho II, Paranoá, Núcleo Bandeirante, Santa Maria, Samambaia, Taguatinga, Ceilândia, Gama, Brazlândia, Itapoã, Estrutural, Sol Nascente/Tororó.
   - Formato de query: `tapeçaria <RA> Brasília DF` / `estofado <RA> Brasília DF` (termo principal × RA, na ordem de prioridade). "Cortinas"/"persianas" entram só no classificador (sem captura dedicada — YAGNI).
   - Volume estimado ≈ 25-30 RAs × 1 termo × 2 categorias — rodada local longa, resumível.
 - **Classificador** (`src/utils/classify.js`): palavras-chave novas — tapeçaria: tapeçaria, tapeçarias, cortina(s), persiana(s), decoração têxtil; estofado: estofado(s), sofá(s), sofa(s), reforma de sofá, impermeabilizadora de estofado. Camada de origem (0.7) já lê `origin || source`.
 - **Score de contatabilidade:** genérico (canais/fechado/senioridade) — sem mudança.
-- **syncLeads:** tag derivada do argumento `category` (hoje binário advogados/arquitetura) vira mapa de tags: `advogados|arquitetura|tapestaria|estofado`.
+- **syncLeads:** tag derivada do argumento `category` (hoje binário advogados/arquitetura) vira mapa de tags: `advogados|arquitetura|tapecaria|estofado`.
 
 ## 3. Dedupe multi-categoria (4 pontos aprovados)
 
 1. **Identidade por `place_id`:** `id` = `place_id` do Maps (estável para o mesmo lugar físico) quando existir; fallback `sha1(norm(name)|norm(address))` como hoje. Mata linhas quase-duplicadas entre capturas de categorias diferentes (problema B).
-2. **Multi-tipo (`types`):** coluna nova `types` (texto, tags separadas por vírgula, ex.: `"tapestaria,estofado"`). No sync, linha existente recebe **união** (tipos já gravados ∪ tag da captura atual). `source` permanece como "última captura" (proveniência). UI de Tipo lê `types` (com fallback para `source` quando `types` for nulo — leads antigos até o backfill).
+2. **Multi-tipo (`types`):** coluna nova `types` (texto, tags separadas por vírgula, ex.: `"tapecaria,estofado"`). No sync, linha existente recebe **união** (tipos já gravados ∪ tag da captura atual). `source` permanece como "última captura" (proveniência). UI de Tipo lê `types` (com fallback para `source` quando `types` for nulo — leads antigos até o backfill).
 3. **Upsert não-degradante:** linha **nova** → insert completo (POST merge-duplicates). Linha **existente** → PATCH com apenas os campos não-vazios da captura + união de `types` — nunca sobrescrever phone/website/rating/instagram/facebook/enriquecimento com null. (Hoje o upsert envia todos os campos e degrada.)
 4. **Backfill (migration 0005 + passo em `repair`):**
    - `types` inicial: `source` de cada linha existente.
