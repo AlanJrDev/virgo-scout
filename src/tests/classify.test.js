@@ -120,3 +120,21 @@ test('lead fechado não vira área especial', () => {
   const r = classifyLead({ name: 'Advogado criminal X', closed: true });
   assert.strictEqual(r.area, 'Criminal'); // classificação segue; score é quem desqualifica
 });
+
+test('tapeçaria: área pela categoria oficial do Maps (camada 0.95)', () => {
+  const r = classifyLead({ name: 'Loja X', category: 'Loja de cortinas e tapeçaria' }, 'tapestaria');
+  assert.strictEqual(r.area, 'Cortinas');
+  assert.strictEqual(r.confidence, 0.95);
+});
+
+test('tapeçaria: área pela origem da query (camada 0.7)', () => {
+  const r = classifyLead({ name: 'Decoração Y', origin: 'tapeçaria Lago Sul Brasília DF' }, 'tapestaria');
+  assert.strictEqual(r.area, 'Tapeçaria');
+  assert.ok(r.confidence <= 0.8);
+});
+
+test('estofado: área pelo nome', () => {
+  const r = classifyLead({ name: 'Estofados São Marcos' }, 'estofado');
+  assert.strictEqual(r.area, 'Estofado');
+  assert.ok(r.confidence <= 0.95);
+});

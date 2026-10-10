@@ -35,8 +35,26 @@ const RULES_ARQ = {
   Topografia: ['topograf', 'geodes', 'cartograf', 'agrimens'],
 };
 
+const AREAS_TAP = ['Cortinas', 'Tapeçaria', 'Persianas'];
+
+const RULES_TAP = {
+  Tapeçaria: ['tapecaria', 'tapestaria', 'tapercaria', 'tapete'],
+  Cortinas: ['cortina', 'cortineiro', 'voil'],
+  Persianas: ['persiana'],
+};
+
+const AREAS_EST = ['Estofado', 'Sofás'];
+
+const RULES_EST = {
+  Estofado: ['estofado', 'impermeabiliz', 'reforma de sofa'],
+  Sofás: ['sofa', 'poltron'],
+};
+
 function rulesFor(category) {
-  return category === 'arquitetura' ? { areas: AREAS_ARQ, rules: RULES_ARQ, fallback: 'Outros' } : { areas: AREAS, rules: RULES, fallback: 'Geral' };
+  if (category === 'arquitetura') return { areas: AREAS_ARQ, rules: RULES_ARQ, fallback: 'Outros' };
+  if (category === 'tapestaria') return { areas: AREAS_TAP, rules: RULES_TAP, fallback: 'Geral' };
+  if (category === 'estofado') return { areas: AREAS_EST, rules: RULES_EST, fallback: 'Geral' };
+  return { areas: AREAS, rules: RULES, fallback: 'Geral' };
 }
 
 function stripAccents(s) {
