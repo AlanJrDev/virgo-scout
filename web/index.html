@@ -42,9 +42,12 @@
       <kbd>Ctrl + K</kbd>
       <div class="search-results" id="searchResults" role="listbox" hidden></div>
     </label>
-    <div class="cat-switch" role="group" aria-label="Categoria de leads">
-      <button type="button" class="cat-btn active" data-cat="advogados" aria-pressed="true">Advogados</button>
-      <button type="button" class="cat-btn" data-cat="arquitetura" aria-pressed="false">Arquitetura</button>
+    <div class="type-switch" id="typeSwitch" role="group" aria-label="Tipo de lead">
+      <button type="button" class="type-btn active" data-type="all" aria-pressed="true" title="Todos os tipos">Todos</button>
+      <button type="button" class="type-btn" data-type="advogados" aria-pressed="false" title="Advogados">Adv</button>
+      <button type="button" class="type-btn" data-type="arquitetura" aria-pressed="false" title="Arquitetura">Arq</button>
+      <button type="button" class="type-btn" data-type="tapecaria" aria-pressed="false" title="Tapeçaria">Tap</button>
+      <button type="button" class="type-btn" data-type="estofado" aria-pressed="false" title="Estofado">Est</button>
     </div>
     <div class="top-user">
       <button class="icon-btn bell" aria-label="Notificações"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></button>
@@ -73,6 +76,14 @@
         <span class="cap-ico"><svg viewBox="0 0 24 24"><path d="M12 3v10"/><path d="m8 9 4-4 4 4"/><path d="M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></span>
         <div class="cap-body">
           <strong id="capTitle">Captura — Advocacia</strong>
+          <label class="cap-cat" for="capCat"><span class="sr-only">Categoria da captura</span>
+            <select id="capCat">
+              <option value="advogados">Advogados</option>
+              <option value="arquitetura">Arquitetura</option>
+              <option value="tapecaria">Tapeçaria</option>
+              <option value="estofado">Estofado</option>
+            </select>
+          </label>
           <span id="capSub">Brasília/DF · — empresas</span>
           <div class="progress"><i id="capBar" style="width:0%"></i></div>
           <button class="cap-run" id="capRun" type="button">Nova captura</button>

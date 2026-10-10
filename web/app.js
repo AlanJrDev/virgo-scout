@@ -74,20 +74,25 @@
   var currentPayload = null;
   var pollTimer = null;
   var sawRunning = false;
-  var category = 'advogados';
-  try { if (sessionStorage.getItem('vs_category') === 'arquitetura') category = 'arquitetura'; } catch (e) {}
-  function syncCatUI() {
-    var box = document.querySelector('.cat-switch');
+  var typeFilter = 'all';
+  try { var vt = sessionStorage.getItem('vs_type'); if (vt) typeFilter = vt; } catch (e) {}
+  var captureCat = 'advogados';
+  try { var vc = sessionStorage.getItem('vs_capture_cat'); if (vc) captureCat = vc; } catch (e) {}
+  function syncTypeUI() {
+    var box = document.getElementById('typeSwitch');
     if (box) {
-      var btns = box.querySelectorAll('.cat-btn');
+      var btns = box.querySelectorAll('.type-btn');
       for (var i = 0; i < btns.length; i++) {
-        var on = btns[i].getAttribute('data-cat') === category;
+        var on = btns[i].getAttribute('data-type') === typeFilter;
         btns[i].classList.toggle('active', on);
         btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
       }
     }
+    var sel = document.getElementById('capCat');
+    if (sel) sel.value = captureCat;
     var t = document.getElementById('capTitle');
-    if (t) t.textContent = 'Captura — ' + (category === 'arquitetura' ? 'Arquitetura' : 'Advocacia');
+    var labels = { advogados: 'Advocacia', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado' };
+    if (t) t.textContent = 'Captura — ' + (labels[captureCat] || 'Advocacia');
   }
   function setCaptureUI(st) {
     var bar = $('#capBar'), pct = $('#capPct'), sub = $('#capSub'), btn = $('#capRun');
@@ -141,7 +146,7 @@
   function startCapture() {
     var btn = $('#capRun');
     btn.disabled = true; btn.textContent = 'Iniciando…';
-    fetch('/api/capture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: category }) })
+    fetch('/api/capture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: captureCat }) })
       .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
       .then(function (res) {
         if (res.ok) setCaptureUI(res.b.job || { status: 'running', done: 0, total: res.b.job && res.b.job.queries });
@@ -838,7 +843,7 @@
     fetch('/api/insight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: q, history: chatHistory.slice(0, -1).slice(-6), category: category })
+      body: JSON.stringify({ q: q, history: chatHistory.slice(0, -1).slice(-6) })
     })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
@@ -904,7 +909,7 @@
     document.head.appendChild(s);
   }
   function loadLeads() {
-    fetch('/api/leads?category=' + category, { cache: 'no-store' })
+    fetch('/api/leads?type=' + typeFilter, { cache: 'no-store' })
       .then(function (r) {
         if (r.status === 401) { location.href = '/login'; return false; }
         return r.ok ? r.json() : null;
@@ -919,19 +924,26 @@
   if (window.fetch && location.protocol !== 'file:') loadLeads();
   else bootOfflineFallback(false);
 
-  syncCatUI();
-  var catBox = document.querySelector('.cat-switch');
-  if (catBox) {
-    catBox.addEventListener('click', function (e) {
-      var b = e.target && e.target.closest ? e.target.closest('.cat-btn') : null;
+  syncTypeUI();
+  var typeBox = document.getElementById('typeSwitch');
+  if (typeBox) {
+    typeBox.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('.type-btn') : null;
       if (!b) return;
-      var cat = b.getAttribute('data-cat');
-      if (cat !== 'advogados' && cat !== 'arquitetura') return;
-      if (cat === category) return;
-      category = cat;
-      try { sessionStorage.setItem('vs_category', cat); } catch (err) {}
-      syncCatUI();
+      var t = b.getAttribute('data-type');
+      if (t === typeFilter) return;
+      typeFilter = t;
+      try { sessionStorage.setItem('vs_type', t); } catch (err) {}
+      syncTypeUI();
       loadLeads();
+    });
+  }
+  var capSel = document.getElementById('capCat');
+  if (capSel) {
+    capSel.addEventListener('change', function () {
+      captureCat = capSel.value;
+      try { sessionStorage.setItem('vs_capture_cat', captureCat); } catch (err) {}
+      syncTypeUI();
     });
   }
 

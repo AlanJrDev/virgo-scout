@@ -12,11 +12,10 @@ module.exports = async (req, res) => {
   const b = req.body || {};
   const q = String(b.q || '').slice(0, 1000);
   const history = Array.isArray(b.history) ? b.history.slice(-6) : [];
-  const category = b.category === 'arquitetura' ? 'arquitetura' : 'advogados';
   if (!q) { json(res, 400, { error: 'empty_q' }); return; }
   try {
-    const rows = await sbFetchAll(`leads?select=*&source=${category === 'arquitetura' ? 'eq.arquitetura' : 'neq.arquitetura'}&order=id`);
-    const payload = buildPayload(rows || [], { dataDir: '/tmp', category });
+    const rows = await sbFetchAll('leads?select=*&order=id');
+    const payload = buildPayload(rows || [], { dataDir: '/tmp', category: 'all' });
     const r = await askGroq({ question: q, context: formatContext(payload), history });
     json(res, 200, { answer: r.answer, source: 'groq' });
   } catch (e) {

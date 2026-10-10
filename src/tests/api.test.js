@@ -168,7 +168,7 @@ test('insight: 400 em q vazia; queries devolve a lista de 26', async () => {
   assert.strictEqual(r2.body.queries.length, 26);
 });
 
-test('leads busca tudo no banco e filtra por ?type= (insight segue por source)', async () => {
+test('leads busca tudo no banco e filtra por ?type= (insight unificado sem filtro de source)', async () => {
   const r0 = fakeRes();
   await loginH(fakeReq({ method: 'POST', body: { user: 'landevbrasil.ia@gmail.com', pass: 'iloveTI@26' }, ip: 'api-g' }), r0);
   const ck = cookieDe(r0);
@@ -213,8 +213,11 @@ test('leads busca tudo no banco e filtra por ?type= (insight segue por source)',
     const r3 = fakeRes();
     await insightH(fakeReq({ method: 'POST', cookie: ck, body: { q: 'topo', category: 'arquitetura' } }), r3);
     assert.strictEqual(r3.statusCode, 200);
+    assert.strictEqual(r3.body.answer, 'ok');
+    assert.strictEqual(r3.body.source, 'groq');
     const insightLeadUrl = urls.find((u) => u.includes('/leads'));
-    assert.ok(insightLeadUrl.includes('source=eq.arquitetura'), `url: ${insightLeadUrl}`);
+    assert.ok(!insightLeadUrl.includes('source='), `url: ${insightLeadUrl}`);
+    assert.ok(insightLeadUrl.includes('order=id'), `url: ${insightLeadUrl}`);
   } finally {
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SECRET_KEY;
