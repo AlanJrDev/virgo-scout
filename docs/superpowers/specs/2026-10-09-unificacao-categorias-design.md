@@ -9,16 +9,17 @@ Ter **todos os leads numa tabela só**, diferenciados por **Tipo**, com filtros 
 ## 1. UI unificada
 
 - **Some o toggle de categoria.** `/api/leads` deixa de filtrar por `source` — um payload com todos os leads.
+- **Fonte única = Supabase, local e produção:** o `/api/leads` local passa a ler do Supabase (mesmo caminho de `api/leads.js`), eliminando a divergência arquivo-local × banco (enriquecimento, `types` e status visíveis em todo ambiente). Arquivos `data/*.json` viram apenas artefato de captura/export.
 - **Nova coluna Tipo** na tabela (badge colorido; um lead pode exibir mais de um badge quando tiver vários tipos).
-- **Filtro de Tipo** (select: Todos · Advogado · Arquitetura · Tapeçaria · Estofado) na toolbar da tabela, mesmo padrão dos filtros atuais (id `tblTipo`).
-- **O filtro de Tipo afeta tudo**: tabela, KPIs, mapa, gráficos e fila "Contatar hoje" — mesmo mecanismo de escopo dos filtros atuais (state global).
+- Filtro de Tipo global no topbar (substitui os botões de categoria: segmented control `Todos · Advogados · Arquitetura · Tapeçaria · Estofado`, id `typeSwitch`). Ele muda o parâmetro `?type=` do `/api/leads`, então **afeta tudo**: tabela, KPIs, mapa, gráficos e fila "Contatar hoje" (recálculo no servidor). Os demais filtros da tabela permanecem locais como hoje.
+- **Card de captura** ganha seu próprio `select` de categoria (Advogados · Arquitetura · Tapeçaria · Estofado, `#capCat`) — define qual script roda, independente do filtro de visualização.
 - Formato da tabela, chips, busca, status, fila, dashboard e a11y permanecem como estão (rodada 2026-10-09).
 - Labels/Tipo vêm de `types` (ver §3); cores por tipo definidas em CSS (Advogado=azul, Arquitetura=ciano, Tapeçaria=rosa, Estofado=verde).
 
 ## 2. Categorias novas (pipeline)
 
 - **Tags no banco (sem acento, seguro em URL):** `tapestaria`, `estofado`. Labels de UI: "Tapeçaria", "Estofado".
-- **Scripts** no padrão existente (`scripts/capture-tapecharia.js`, `scripts/capture-estofado.js`) com lista de queries priorizada:
+- **Scripts** no padrão existente (`scripts/capture-tapestaria.js`, `scripts/capture-estofado.js`) com lista de queries priorizada:
   1. **Tier alto poder aquisitivo:** Lago Sul, Lago Norte, Asa Sul, Asa Norte, Plano Piloto, Águas Claras, Cruzeiro, Park Way, Jardim Botânico.
   2. **Demais RAs do DF** (todas as registradas): Guará, Sobradinho, Sobradinho II, Paranoá, Núcleo Bandeirante, Santa Maria, Samambaia, Taguatinga, Ceilândia, Gama, Brazlândia, Itapoã, Estrutural, Sol Nascente/Tororó.
   - Formato de query: `tapeçaria <RA> Brasília DF` / `estofado <RA> Brasília DF` (termo principal × RA, na ordem de prioridade). "Cortinas"/"persianas" entram só no classificador (sem captura dedicada — YAGNI).
