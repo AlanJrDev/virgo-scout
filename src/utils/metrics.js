@@ -5,6 +5,7 @@ const path = require('node:path');
 const { areaDistribution, classifyLead } = require('./classify');
 const { parseRating, parseReviews } = require('./leads');
 const { waLink, waMessage } = require('./wa');
+const { matchFile } = require('./leads-io');
 
 // Regiões do DF com coordenadas (aproximação por região — a base não tem geocoding)
 const REGIONS = [
@@ -32,9 +33,10 @@ function normTxt(s) {
     .toLowerCase();
 }
 
-// arquivos de uma categoria: arquitetura* p/ arquitetura, o resto p/ advogados
+// arquivos de uma categoria (registro em utils/categories): 'all' varre tudo
 function matchCategory(file, category) {
-  return category === 'arquitetura' ? file.startsWith('arquitetura') : !file.startsWith('arquitetura');
+  if (category === 'all') return true;
+  return matchFile(file, category);
 }
 
 // região a partir de endereço + query de origem; fallback = Brasília

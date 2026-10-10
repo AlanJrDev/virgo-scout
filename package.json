@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test src/tests/backend.test.js src/tests/classify.test.js src/tests/wa.test.js src/tests/contact.test.js src/tests/user-store.test.js src/tests/login.test.js src/tests/groq.test.js src/tests/sb.test.js src/tests/session-store.test.js src/tests/sync.test.js src/tests/api.test.js src/tests/queries.test.js src/tests/metrics.test.js src/tests/capture-state.test.js src/tests/site-analyzer.test.js src/tests/enrich-leads.test.js src/tests/capture-refill.test.js",
+    "test": "node --test src/tests/backend.test.js src/tests/classify.test.js src/tests/wa.test.js src/tests/contact.test.js src/tests/user-store.test.js src/tests/login.test.js src/tests/groq.test.js src/tests/sb.test.js src/tests/session-store.test.js src/tests/sync.test.js src/tests/api.test.js src/tests/queries.test.js src/tests/metrics.test.js src/tests/capture-state.test.js src/tests/site-analyzer.test.js src/tests/enrich-leads.test.js src/tests/capture-refill.test.js src/tests/categories.test.js",
     "capture": "node scripts/capture-advogados-df.js",
     "capture:quick": "cross-env QUERIES=\"advogados Distrito Federal\" MAX_DETAILS=40 MAX_SCROLLS=25 node scripts/capture-advogados-df.js",
     "classify": "node scripts/classify-leads.js",

@@ -1,0 +1,15 @@
+const CATEGORIES = {
+  advogados: { tag: 'advogados', label: 'Advogado', script: 'capture-advogados-df.js', queriesModule: './queries', queriesExport: 'QUERIES', basename: null },
+  arquitetura: { tag: 'arquitetura', label: 'Arquitetura', script: 'capture-arquitetura.js', queriesModule: './queries-arquitetura', queriesExport: 'QUERIES_ARQ', basename: 'arquitetura-df-max' },
+  tapestaria: { tag: 'tapestaria', label: 'Tapeçaria', script: 'capture-tapestaria.js', queriesModule: './queries-tapestaria', queriesExport: 'QUERIES_TAP', basename: 'tapestaria-df-max' },
+  estofado: { tag: 'estofado', label: 'Estofado', script: 'capture-estofado.js', queriesModule: './queries-estofado', queriesExport: 'QUERIES_EST', basename: 'estofado-df-max' },
+};
+const CAT_KEYS = Object.keys(CATEGORIES);
+function tagOf(category) { return (CATEGORIES[category] || CATEGORIES.advogados).tag; }
+function typeList(lead) {
+  const raw = (lead && (lead.types || lead.source)) || 'advogados';
+  return String(raw).split(',').map((s) => s.trim()).filter(Boolean);
+}
+function typeOfLead(lead) { return typeList(lead)[0] || 'advogados'; }
+function matchesType(lead, type) { return type === 'all' || typeList(lead).includes(type); }
+module.exports = { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType };
