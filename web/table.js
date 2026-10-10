@@ -30,6 +30,7 @@
     }
     return '';
   }
+  function typesOf(l) { return (l.types && l.types.length ? l.types : ['advogados']).slice().sort(function (a, b) { return TIPO_ORDER.indexOf(a) - TIPO_ORDER.indexOf(b); }); }
   function phoneOf(l) {
     if (l.phone_raw) return String(l.phone_raw);
     if (typeof l.phone === 'string') return l.phone;
@@ -90,11 +91,15 @@
   var firstRender = true;
   var els = {};
 
+  var TIPO_LABEL = { advogados: 'Advogado', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado' };
+  var TIPO_ORDER = ['advogados', 'arquitetura', 'tapecaria', 'estofado'];
+
   var COLS = [
     { key: 'name', label: 'Empresa', w: 22 },
     { key: 'rating', label: 'Nota / Reviews', w: 11 },
     { key: 'region', label: 'Cidade / Região', w: 13 },
     { key: 'area', label: 'Área', w: 12 },
+    { key: 'tipo', label: 'Tipo', w: 10 },
     { key: 'phone', label: 'Telefone', w: 16 },
     { key: 'channels', label: 'Canais', w: 13 },
     { key: 'since', label: 'Desde', w: 7, optional: true },
@@ -116,7 +121,8 @@
     if (state.status && (l.status || 'novo') !== state.status) return false;
     if (state.minRating > 0 && !(typeof l.rating === 'number' && isFinite(l.rating) && l.rating >= state.minRating)) return false;
     if (state.q) {
-      var hay = norm([l.name, l.area, regionOf(l), l.cat, phoneOf(l), siteUrl(l), l.email, l.instagram].join(' '));
+      var tipoLabels = typesOf(l).map(function (t) { return TIPO_LABEL[t] || t; }).join(' ');
+      var hay = norm([l.name, l.area, regionOf(l), l.cat, phoneOf(l), siteUrl(l), l.email, l.instagram, tipoLabels].join(' '));
       if (hay.indexOf(state.q) === -1) return false;
     }
     return true;
@@ -126,6 +132,7 @@
     if (key === 'rating') return ((typeof l.rating === 'number' && isFinite(l.rating)) ? l.rating : -1) * 100000 + (l.reviews || 0);
     if (key === 'region') return norm(regionOf(l));
     if (key === 'area') return norm(l.area || 'Geral');
+    if (key === 'tipo') return norm(TIPO_LABEL[typesOf(l)[0]] || typesOf(l)[0]);
     if (key === 'phone') return phoneDigits(l) || '0';
     if (key === 'channels') return channelCount(l);
     if (key === 'since') return l.since_year || 0;
@@ -140,6 +147,7 @@
     if (key === 'since') return !l.since_year;
     if (key === 'region') return !regionOf(l);
     if (key === 'area') return !(l.area);
+    if (key === 'tipo') return false;
     return !norm(l.name);
   }
   function sortList(list) {
@@ -237,6 +245,12 @@
     area: function (l) {
       var a = l.area || 'Geral';
       return '<span title="' + esc(a) + '">' + esc(a) + '</span>';
+    },
+    tipo: function (l) {
+      return typesOf(l).map(function (t) {
+        var label = TIPO_LABEL[t] || t;
+        return '<span class="tipo t-' + esc(t) + '">' + esc(label) + '</span>';
+      }).join(' ');
     },
     phone: phoneCell, channels: channelsCell, since: sinceCell, captured: capturedCell
   };

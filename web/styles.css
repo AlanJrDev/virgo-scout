@@ -494,3 +494,9 @@ button.chip:active{transform:scale(.97)}
   .viewbar-btn.active{color:var(--cyan)}
   .main{padding-bottom:76px}
 }
+
+.tipo{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.02em;border:1px solid transparent;white-space:nowrap}
+.tipo.t-advogados{background:rgba(56,132,255,.14);color:#7aa7ff;border-color:rgba(56,132,255,.32)}
+.tipo.t-arquitetura{background:rgba(56,189,248,.12);color:var(--cyan);border-color:rgba(56,189,248,.3)}
+.tipo.t-tapecaria{background:rgba(244,114,182,.13);color:#f472b6;border-color:rgba(244,114,182,.32)}
+.tipo.t-estofado{background:rgba(52,211,153,.12);color:var(--green);border-color:rgba(52,211,153,.3)}
