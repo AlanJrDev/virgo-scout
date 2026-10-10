@@ -54,6 +54,7 @@ test('enrichLeads consulta leads sem enriched_at e PATCHa sinais de cada um', as
   assert.strictEqual(p1.email, 'contato@souzadv.com.br');
   assert.strictEqual(p1.instagram, 'souzadv');
   assert.strictEqual(p1.whatsapp_hint, true);
+  assert.strictEqual(p1.whatsapp, '5561999990000');
   assert.strictEqual(p1.since_year, 2013);
   assert.ok(p1.site_title.includes('Trabalhista'));
   assert.ok(typeof p1.enriched_at === 'string');

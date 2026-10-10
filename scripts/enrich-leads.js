@@ -16,7 +16,7 @@ async function main() {
     if (s.email) patch.email = s.email;
     if (s.instagram) patch.instagram = s.instagram;
     if (s.facebook) patch.facebook = s.facebook;
-    if (s.whatsapp) { patch.whatsapp_hint = true; }
+    if (s.whatsapp) { patch.whatsapp_hint = true; patch.whatsapp = s.whatsapp; }
     if (s.since_year) patch.since_year = s.since_year;
     if (s.title) patch.site_title = s.title;
     try {
