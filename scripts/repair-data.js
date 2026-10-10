@@ -9,16 +9,17 @@ const { sbEnabled } = require('../src/utils/sb');
 const { newestLeadsFile } = require('../src/utils/leads-io');
 const { toRow, dedupeRows, upsertRows, isLead } = require('./sync-supabase');
 const { classifyLead } = require('../src/utils/classify');
+const { CAT_KEYS, tagOf } = require('../src/utils/categories');
 
 async function repair({ dataDir } = {}) {
   if (!sbEnabled()) throw new Error('SUPABASE_URL/SUPABASE_SECRET_KEY não configurados');
   const dir = dataDir || path.join(__dirname, '..', 'data');
   const out = {};
-  for (const category of ['advogados', 'arquitetura']) {
+  for (const category of CAT_KEYS) {
     const file = newestLeadsFile(dir, category);
     if (!file) { console.warn(`[repair] sem JSON de leads p/ ${category} em ${dir}`); continue; }
     const leads = JSON.parse(fs.readFileSync(file, 'utf8')).filter(isLead);
-    const tag = category === 'arquitetura' ? 'arquitetura' : 'advogados';
+    const tag = tagOf(category);
     const rows0 = leads.map((l) => {
       const row = toRow(l);
       row.source = tag;

@@ -10,7 +10,7 @@ async function main({ fetchImpl = sbFetch, enrichImpl = enrichOneByQuery, launch
   const lim = limit ?? parseInt(process.argv[2] || '40', 10);
   // sbFetch DIRETO (não sbFetchAll): limit já está na URL — duplicar o param quebra o PostgREST
   const rows = (await fetchImpl(
-    `leads?select=id,name,address,website,source&and=(phone.is.null,email.is.null,instagram.is.null)&order=id&limit=${lim}`
+    `leads?select=id,name,address,website,types,source&and=(phone.is.null,email.is.null,instagram.is.null)&order=id&limit=${lim}`
   )) || [];
   if (!rows.length) { console.log('[refill] nenhum lead pendente'); return { saved: 0, total: 0 }; }
   const { browser, page } = await launchImpl({ headless: true });

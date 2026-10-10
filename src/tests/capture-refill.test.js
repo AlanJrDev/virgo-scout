@@ -53,7 +53,7 @@ test('refill consulta pendentes, busca por nome+cidade e upserta só quem ganha 
   // consulta de pendentes: filtros resumíveis + limit único na URL (lesson Batch C)
   assert.strictEqual(calls.length, 2, '1 GET + 1 POST');
   const getUrl = calls[0].path;
-  assert.strictEqual(getUrl, 'leads?select=id,name,address,website,source&and=(phone.is.null,email.is.null,instagram.is.null)&order=id&limit=3');
+  assert.strictEqual(getUrl, 'leads?select=id,name,address,website,types,source&and=(phone.is.null,email.is.null,instagram.is.null)&order=id&limit=3');
   assert.strictEqual((getUrl.match(/limit=/g) || []).length, 1, 'um único limit na URL');
 
   // query gerada por lead: nome + última parte do address, ou 'Brasília DF' sem address
