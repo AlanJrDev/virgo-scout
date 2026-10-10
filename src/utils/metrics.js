@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { areaDistribution, classifyLead } = require('./classify');
 const { parseRating, parseReviews } = require('./leads');
-const { waLink, waMessage } = require('./wa');
+const { waLink, waMessage, waDigits } = require('./wa');
 const { matchFile } = require('./leads-io');
 const { typeList, typeOfLead, CAT_KEYS } = require('./categories');
 
@@ -113,6 +113,7 @@ function scoreOf(l) {
   if (/\d{8,}/.test(l.phone || '')) s += 15;
   if (l.email) s += 8;
   if (l.instagram) s += 4;
+  if (l.whatsapp) s += 15;
   s += Math.max(0, l.rating || 0) * 6;
   s += Math.log10((l.reviews || 0) + 1) * 4;
   if (!l.website) s += 15;
@@ -142,12 +143,18 @@ function buildStats(leads) {
   const comEmail = leads.filter((l) => l.email).length;
   const comInstagram = leads.filter((l) => l.instagram).length;
   const comZapSite = leads.filter((l) => l.whatsapp_hint === true).length;
+  const zapReal = leads.filter((l) => l.whatsapp).length;
+  const tierA = leads.filter((l) => tierOf(l) === 'a').length;
+  const tierB = leads.filter((l) => tierOf(l) === 'b').length;
+  const tierC = leads.filter((l) => tierOf(l) === 'c').length;
+  const tierD = leads.filter((l) => tierOf(l) === 'd').length;
   const naoReclamados = leads.filter((l) => l.claimed === false).length;
   const desdeAntigo = leads.filter((l) => l.since_year && new Date().getFullYear() - l.since_year >= 5).length;
   const pct = (n) => (total ? Math.round((100 * n) / total) : 0);
   return {
     total, comSite, semSite: total - comSite, comPhone, alta, qualif,
     comEmail, comInstagram, comZapSite, naoReclamados, desdeAntigo,
+    zapReal, tierA, tierB, tierC, tierD,
     pctSite: pct(comSite), pctAlta: pct(alta), pctQualif: pct(qualif),
   };
 }
@@ -160,6 +167,20 @@ function regionOf(address) {
   return 'Brasília';
 }
 
+function tierOf(l) {
+  if (l.whatsapp && !l.website) return 'a';
+  if (l.website) return 'b';
+  if (l.instagram) return 'c';
+  return 'd';
+}
+
+function phoneLink(l) {
+  if (l.whatsapp) return null;
+  const d = waDigits(l.phone);
+  if (!d) return null;
+  return d.length === 12 ? 'tel:+' + d : 'https://wa.me/' + d;
+}
+
 function buildTop(leads, n = 5) {
   return leads
     .map((l) => ({ ...l, score: scoreOf(l) }))
@@ -170,6 +191,7 @@ function buildTop(leads, n = 5) {
       name: l.name,
       area: l.area || 'Geral',
       types: typeList(l),
+      tier: tierOf(l),
       status: l.status || 'novo',
       cat: `${l.area || 'Advocacia'} · ${regionOf(l.address)}/DF`,
       score: l.score,
@@ -180,7 +202,8 @@ function buildTop(leads, n = 5) {
       site_url: (typeof l.website === 'string' && l.website) ? l.website : null,
       phone: /\d{8,}/.test(l.phone || ''),
       phone_raw: l.phone || '',
-      wa: l.phone ? waLink(l.phone, waMessage(l)) : null,
+      wa: l.whatsapp ? waLink(l.whatsapp, waMessage(l)) : null,
+      phone_link: phoneLink(l),
       email: l.email || null,
       instagram: l.instagram || null,
       whatsapp_hint: l.whatsapp_hint === true,

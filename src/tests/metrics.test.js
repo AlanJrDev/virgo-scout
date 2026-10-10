@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { buildPayload } = require('../utils/metrics');
+const { buildPayload, scoreOf, buildTop, buildStats } = require('../utils/metrics');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-metrics-'));
 fs.writeFileSync(path.join(TMP, 'advogados-df-max.json'), JSON.stringify([
@@ -79,7 +79,7 @@ test('score reflete contatabilidade: sem telefone = 0, sem site soma', () => {
 
 test('pool marca Incontatável e carrega id/status do pipeline', () => {
   const leads = [
-    { name: 'Contatavel SA', address: 'Asa Sul, Brasília - DF', phone: '61999990000', rating: 4.8, reviews: 30, website: null, id: 'abc123def456', status: 'contatado' },
+    { name: 'Contatavel SA', address: 'Asa Sul, Brasília - DF', phone: '61999990000', whatsapp: '5561999990000', rating: 4.8, reviews: 30, website: null, id: 'abc123def456', status: 'contatado' },
     { name: 'Fantasma MEI', address: '', phone: null, rating: 5, reviews: 900, website: null },
   ];
   const p = buildPayload(leads, { dataDir: TMP, category: 'advogados' });
@@ -193,4 +193,60 @@ test("delta 'all' pareia as duas capturas mais recentes da MESMA categoria", () 
   } finally {
     fs.rmSync(DIR, { recursive: true, force: true });
   }
+});
+
+test('scoreOf: zap real vale +15', () => {
+  const base = { phone: '61999998888', rating: 4, reviews: 10 };
+  const comZap = { ...base, whatsapp: '5561999998888' };
+  assert.strictEqual(scoreOf(comZap) - scoreOf(base), 15);
+});
+
+test('tier ladder: primeiro-match a > b > c > d', () => {
+  const rows = [
+    { id: '1', name: 'A', phone: '61999998888', whatsapp: '5561999998888' },                    // a: zap real sem site
+    { id: '2', name: 'B', phone: '61999998888', whatsapp: '5561999998888', website: 'https://x.com' }, // b: site rebaixa
+    { id: '3', name: 'C', phone: '61999998888', instagram: '@x' },                              // c: IG
+    { id: '4', name: 'D', phone: '61999998888' },                                               // d: resto
+  ];
+  const out = buildTop(rows, 4);
+  const byId = Object.fromEntries(out.map((l) => [l.id, l]));
+  assert.strictEqual(byId['1'].tier, 'a');
+  assert.strictEqual(byId['2'].tier, 'b');
+  assert.strictEqual(byId['3'].tier, 'c');
+  assert.strictEqual(byId['4'].tier, 'd');
+});
+
+test('wa: botão só com zap declarado (phone do Maps não gera mais wa)', () => {
+  const out = buildTop([
+    { id: '1', name: 'X', phone: '61999998888', whatsapp: '5561999998888' },
+    { id: '2', name: 'Y', phone: '61999998888' },
+  ], 2);
+  const byId = Object.fromEntries(out.map((l) => [l.id, l]));
+  assert.ok(byId['1'].wa.includes('wa.me/5561999998888'));
+  assert.strictEqual(byId['2'].wa, null);
+});
+
+test('phone_link: fixo vira tel:, celular vira wa.me, zap real vira null', () => {
+  const out = buildTop([
+    { id: '1', name: 'F', phone: '(61) 3222-1234' },
+    { id: '2', name: 'M', phone: '(61) 99999-8888' },
+    { id: '3', name: 'Z', phone: '61999998888', whatsapp: '5561999998888' },
+  ], 3);
+  const byId = Object.fromEntries(out.map((l) => [l.id, l]));
+  assert.strictEqual(byId['1'].phone_link, 'tel:+556132221234');
+  assert.strictEqual(byId['2'].phone_link, 'https://wa.me/5561999998888');
+  assert.strictEqual(byId['3'].phone_link, null);
+});
+
+test('buildStats: contagens zapReal e tiers', () => {
+  const stats = buildStats([
+    { phone: '61999998888', whatsapp: '5561999998888' },
+    { phone: '61999998888', website: 'https://x.com' },
+    { phone: '61999998888', instagram: '@x' },
+  ]);
+  assert.strictEqual(stats.zapReal, 1);
+  assert.strictEqual(stats.tierA, 1);
+  assert.strictEqual(stats.tierB, 1);
+  assert.strictEqual(stats.tierC, 1);
+  assert.strictEqual(stats.tierD, 0);
 });
