@@ -6,7 +6,7 @@ const { areaDistribution, classifyLead } = require('./classify');
 const { parseRating, parseReviews } = require('./leads');
 const { waLink, waMessage } = require('./wa');
 const { matchFile } = require('./leads-io');
-const { typeList, typeOfLead } = require('./categories');
+const { typeList, typeOfLead, CAT_KEYS } = require('./categories');
 
 // Regiões do DF com coordenadas (aproximação por região — a base não tem geocoding)
 const REGIONS = [
@@ -299,7 +299,7 @@ function buildDelta(dataDir, category = 'advogados') {
       .filter((f) => f.count > 0)
       .sort((a, b) => b.m - a.m);
     if (category === 'all' && files.length) {
-      const tag = ['tapecaria', 'estofado', 'arquitetura'].find((t) => files[0].f.startsWith(t)) || 'advogados';
+      const tag = CAT_KEYS.filter((k) => k !== 'advogados').find((t) => files[0].f.startsWith(t)) || 'advogados';
       files = files.filter((x) => matchCategory(x.f, tag));
     }
     if (files.length < 2 || !files[1].count) return null;
