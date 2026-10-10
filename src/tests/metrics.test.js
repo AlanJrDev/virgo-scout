@@ -170,3 +170,27 @@ test("buildPayload category 'all': area vem do tipo do próprio lead", () => {
   assert.strictEqual(est.value, 1);
   assert.ok(p.top[0].types.includes('estofado'));
 });
+
+test("delta 'all' pareia as duas capturas mais recentes da MESMA categoria", () => {
+  const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-delta-'));
+  try {
+    const older = new Date('2026-10-01T12:00:00Z');
+    const mid = new Date('2026-10-02T12:00:00Z');
+    const newer = new Date('2026-10-03T12:00:00Z');
+    const mk = (file, n, t) => {
+      const p = path.join(DIR, file);
+      fs.writeFileSync(p, JSON.stringify(Array.from({ length: n }, (_, i) => ({ name: `L ${i}` }))));
+      fs.utimesSync(p, t, t);
+    };
+    mk('arquitetura-df-2026-09-20.json', 4, older);
+    mk('advogados-df-max.json', 3, mid);
+    mk('arquitetura-df-max.json', 2, newer);
+    const p = buildPayload([], { dataDir: DIR, category: 'all' });
+    assert.strictEqual(p.delta_pct, -50, `esperado arquitetura 2×4=-50, veio ${p.delta_pct}`);
+    const adv = buildPayload([], { dataDir: DIR, category: 'advogados' });
+    assert.strictEqual(adv.delta_pct, null);
+    assert.strictEqual(p.recent.length, 3);
+  } finally {
+    fs.rmSync(DIR, { recursive: true, force: true });
+  }
+});

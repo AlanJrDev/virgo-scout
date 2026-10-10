@@ -285,7 +285,7 @@ function buildRecent(dataDir, category = 'advogados') {
 // variação % entre as duas capturas mais recentes de data/ (null se só há uma)
 function buildDelta(dataDir, category = 'advogados') {
   try {
-    const files = fs
+    let files = fs
       .readdirSync(dataDir)
       .filter((f) => f.endsWith('.json') && !f.includes('.v2') && !f.includes('validacao') && !f.includes('job') && matchCategory(f, category))
       .map((f) => {
@@ -294,10 +294,14 @@ function buildDelta(dataDir, category = 'advogados') {
         try {
           count = JSON.parse(fs.readFileSync(p, 'utf8')).length;
         } catch {}
-        return { m: fs.statSync(p).mtimeMs, count };
+        return { f, m: fs.statSync(p).mtimeMs, count };
       })
       .filter((f) => f.count > 0)
       .sort((a, b) => b.m - a.m);
+    if (category === 'all' && files.length) {
+      const tag = ['tapestaria', 'estofado', 'arquitetura'].find((t) => files[0].f.startsWith(t)) || 'advogados';
+      files = files.filter((x) => matchCategory(x.f, tag));
+    }
     if (files.length < 2 || !files[1].count) return null;
     return Math.round(((files[0].count - files[1].count) / files[1].count) * 100);
   } catch {
