@@ -12,6 +12,7 @@ const { newestLeadsFile } = require('../src/utils/leads-io');
 const { markContacted } = require('../src/utils/contact');
 const { SbError } = require('../src/utils/sb');
 const { askGroq, formatContext } = require('./groq');
+const { CATEGORIES } = require('../src/utils/categories');
 
 const ROOT = path.join(__dirname, '..', 'web');
 const DATA = path.join(__dirname, '..', 'data');
@@ -24,7 +25,8 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript
 const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor/gsap.min.js', '/assets/LOGO.png', '/assets/black-hole.jpg', '/assets/videos/black-hole-first-pulse.mp4']);
 
 function catOf(params) {
-  return params.get('category') === 'arquitetura' ? 'arquitetura' : 'advogados';
+  const c = params.get('category');
+  return CATEGORIES[c] ? c : 'advogados';
 }
 
 function readLeads(category) {
@@ -90,19 +92,18 @@ function jobStatus() {
 function startCapture(category = 'advogados') {
   const st = jobStatus();
   if (st.status === 'running') return { code: 409, body: { error: 'already_running', job: st } };
-  const isArq = category === 'arquitetura';
-  const queries = isArq ? require('./queries-arquitetura').QUERIES_ARQ : require('./queries').QUERIES;
+  const cfg = CATEGORIES[category] || CATEGORIES.advogados;
+  const queries = require(cfg.queriesModule)[cfg.queriesExport];
   const effective = process.env.QUERIES ? process.env.QUERIES.split('|').filter(Boolean) : queries;
-  const script = isArq ? 'capture-arquitetura.js' : 'capture-advogados-df.js';
   const out = fs.openSync(JOB_LOG, 'w');
   const err = fs.openSync(JOB_ERR, 'w');
-  const child = spawn(process.execPath, [path.join(__dirname, script)], {
+  const child = spawn(process.execPath, [path.join(__dirname, cfg.script)], {
     detached: true,
     stdio: ['ignore', out, err],
     cwd: path.join(__dirname, '..'),
     env: process.env,
   });
-  const job = { pid: child.pid, started_at: new Date().toISOString(), queries: effective.length, category, log: path.basename(JOB_LOG) };
+  const job = { pid: child.pid, started_at: new Date().toISOString(), queries: effective.length, category: cfg.tag, log: path.basename(JOB_LOG) };
   fs.writeFileSync(JOB_FILE, JSON.stringify(job, null, 2));
   child.unref();
   return { code: 202, body: { ok: true, job: { ...job, status: 'running', done: 0, total: job.queries } } };
@@ -198,15 +199,16 @@ async function handler(req, res) {
       req.on('data', (c) => { body += c; if (body.length > 1024) req.destroy(); });
       req.on('end', () => {
         let cat = category;
-        try { const j = JSON.parse(body || '{}'); if (j.category === 'arquitetura') cat = 'arquitetura'; } catch {}
+        try { const j = JSON.parse(body || '{}'); if (CATEGORIES[j.category]) cat = j.category; } catch {}
         try { const r = startCapture(cat); json(res, r.code, r.body); } catch (e) { json(res, 500, { error: e.message }); }
       });
       return;
     }
     if (url === '/api/queries' && req.method === 'GET') {
       try {
-        const queries = category === 'arquitetura' ? require('./queries-arquitetura').QUERIES_ARQ : require('./queries').QUERIES;
-        json(res, 200, { queries, category });
+        const cfg = CATEGORIES[category] || CATEGORIES.advogados;
+        const queries = require(cfg.queriesModule)[cfg.queriesExport];
+        json(res, 200, { queries, category: cfg.tag });
       } catch (e) { json(res, 500, { error: e.message }); }
       return;
     }

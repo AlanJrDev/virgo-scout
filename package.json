@@ -10,6 +10,8 @@
     "classify": "node scripts/classify-leads.js",
     "build:web": "node scripts/build-web-data.js",
     "capture:arq": "node scripts/capture-arquitetura.js",
+    "capture:tap": "node scripts/capture-tapestaria.js",
+    "capture:est": "node scripts/capture-estofado.js",
     "sync": "node scripts/sync-supabase.js",
     "enrich": "node scripts/enrich-leads.js",
     "capture:refill": "node scripts/capture-refill.js",
