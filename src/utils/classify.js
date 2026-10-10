@@ -40,7 +40,7 @@ const RULES_ARQ = {
 const AREAS_TAP = ['Cortinas', 'Tapeçaria', 'Persianas'];
 
 const RULES_TAP = {
-  Tapeçaria: ['tapecaria', 'tapestaria', 'tapercaria', 'tapete'],
+  Tapeçaria: ['tapecaria', 'tapercaria', 'tapete'],
   Cortinas: ['cortina', 'cortineiro', 'voil'],
   Persianas: ['persiana'],
 };
@@ -54,7 +54,7 @@ const RULES_EST = {
 
 function rulesFor(category) {
   if (category === 'arquitetura') return { areas: AREAS_ARQ, rules: RULES_ARQ, fallback: 'Outros' };
-  if (category === 'tapestaria') return { areas: AREAS_TAP, rules: RULES_TAP, fallback: 'Geral' };
+  if (category === 'tapecaria') return { areas: AREAS_TAP, rules: RULES_TAP, fallback: 'Geral' };
   if (category === 'estofado') return { areas: AREAS_EST, rules: RULES_EST, fallback: 'Geral' };
   return { areas: AREAS, rules: RULES, fallback: 'Geral' };
 }

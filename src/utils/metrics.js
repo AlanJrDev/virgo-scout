@@ -299,7 +299,7 @@ function buildDelta(dataDir, category = 'advogados') {
       .filter((f) => f.count > 0)
       .sort((a, b) => b.m - a.m);
     if (category === 'all' && files.length) {
-      const tag = ['tapestaria', 'estofado', 'arquitetura'].find((t) => files[0].f.startsWith(t)) || 'advogados';
+      const tag = ['tapecaria', 'estofado', 'arquitetura'].find((t) => files[0].f.startsWith(t)) || 'advogados';
       files = files.filter((x) => matchCategory(x.f, tag));
     }
     if (files.length < 2 || !files[1].count) return null;

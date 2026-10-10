@@ -122,13 +122,13 @@ test('lead fechado não vira área especial', () => {
 });
 
 test('tapeçaria: área pela categoria oficial do Maps (camada 0.95)', () => {
-  const r = classifyLead({ name: 'Loja X', category: 'Loja de cortinas e tapeçaria' }, 'tapestaria');
+  const r = classifyLead({ name: 'Loja X', category: 'Loja de cortinas e tapeçaria' }, 'tapecaria');
   assert.strictEqual(r.area, 'Cortinas');
   assert.strictEqual(r.confidence, 0.95);
 });
 
 test('tapeçaria: área pela origem da query (camada 0.7)', () => {
-  const r = classifyLead({ name: 'Decoração Y', origin: 'tapeçaria Lago Sul Brasília DF' }, 'tapestaria');
+  const r = classifyLead({ name: 'Decoração Y', origin: 'tapeçaria Lago Sul Brasília DF' }, 'tapecaria');
   assert.strictEqual(r.area, 'Tapeçaria');
   assert.ok(r.confidence <= 0.8);
 });

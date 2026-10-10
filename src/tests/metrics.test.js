@@ -148,13 +148,13 @@ test('sinais novos somam: email + instagram + não reclamado', () => {
 test('buildTop expõe types (array) com fallback para source', () => {
   const { buildTop } = require('../utils/metrics');
   const rows = [
-    { id: 'a', name: 'Loja A', address: 'Q 1', types: 'tapestaria,estofado', phone: '61999998888', rating: 5, reviews: 10 },
+    { id: 'a', name: 'Loja A', address: 'Q 1', types: 'tapecaria,estofado', phone: '61999998888', rating: 5, reviews: 10 },
     { id: 'b', name: 'Escritório B', address: 'Q 2', source: 'advogados', phone: '61999997777', rating: 5, reviews: 9 },
     { id: 'c', name: 'Ateliê C', address: 'Q 3', source: 'estofado', phone: '61999996666', rating: 5, reviews: 8 },
   ];
   const top = buildTop(rows, 3);
   const byId = Object.fromEntries(top.map((t) => [t.id, t]));
-  assert.deepStrictEqual(byId.a.types, ['tapestaria', 'estofado']);
+  assert.deepStrictEqual(byId.a.types, ['tapecaria', 'estofado']);
   assert.deepStrictEqual(byId.b.types, ['advogados']);
   assert.deepStrictEqual(byId.c.types, ['estofado']);
 });

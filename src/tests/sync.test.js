@@ -213,8 +213,8 @@ test('placeIdOrHash prefere place_id e cai para sha1', () => {
 
 test('planUpsert: negócio novo vira insert', () => {
   const { planUpsert, toRow } = require('../../scripts/sync-supabase');
-  const nr = toRow({ name: 'Nova', address: 'Rua B', source: 'tapestaria' });
-  nr.types = 'tapestaria';
+  const nr = toRow({ name: 'Nova', address: 'Rua B', source: 'tapecaria' });
+  nr.types = 'tapecaria';
   const plan = planUpsert([nr], []);
   assert.strictEqual(plan.inserts.length, 1);
   assert.strictEqual(plan.patches.length, 0);
@@ -226,12 +226,12 @@ test('planUpsert: existente com mesmo place_id ganha patch não-degradante + typ
   const novo = toRow({ name: 'Loja Y', address: 'QI 1', source: 'estofado', phone: '', rating: '4,8', reviews: '12' });
   novo.place_id = '0x2:0x9';
   novo.types = 'estofado';
-  const existente = { id: '0x2:0x9', place_id: '0x2:0x9', types: 'tapestaria', source: 'tapestaria' };
+  const existente = { id: '0x2:0x9', place_id: '0x2:0x9', types: 'tapecaria', source: 'tapecaria' };
   const plan = planUpsert([novo], [existente]);
   assert.strictEqual(plan.inserts.length, 0);
   const p = plan.patches[0];
   assert.strictEqual(p.id, '0x2:0x9');
-  assert.strictEqual(p.set.types, 'estofado,tapestaria');
+  assert.strictEqual(p.set.types, 'estofado,tapecaria');
   assert.strictEqual(p.set.phone, undefined);          // null não degrada
   assert.strictEqual(p.set.rating, 4.8);               // valor novo entra
   assert.strictEqual(p.set.source, 'estofado');        // proveniência atualiza
@@ -241,13 +241,13 @@ test('planUpsert: existente com mesmo place_id ganha patch não-degradante + typ
 
 test('planUpsert: row sha1 antigo do mesmo lugar migra o id para place_id e órfão é deletado', () => {
   const { planUpsert, toRow, leadId } = require('../../scripts/sync-supabase');
-  const novo = toRow({ name: 'Loja Z', address: 'SAAN', source: 'tapestaria' });
+  const novo = toRow({ name: 'Loja Z', address: 'SAAN', source: 'tapecaria' });
   novo.place_id = '0x3:0x9';
-  novo.types = 'tapestaria';
+  novo.types = 'tapecaria';
   const antigo = { id: leadId({ name: 'Loja Z', address: 'SAAN' }), place_id: null, types: 'advogados', source: 'advogados' };
   const plan = planUpsert([novo], [antigo]);
   assert.strictEqual(plan.patches[0].id, antigo.id);
   assert.strictEqual(plan.patches[0].set.id, '0x3:0x9');
-  assert.strictEqual(plan.patches[0].set.types, 'advogados,tapestaria');
+  assert.strictEqual(plan.patches[0].set.types, 'advogados,tapecaria');
   assert.deepStrictEqual(plan.deletes, []);
 });
