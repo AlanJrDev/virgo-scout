@@ -8,11 +8,10 @@ const { attemptLogin, sessionUser } = require('./serve-web-auth');
 const { destroySession } = require('../src/utils/session-store');
 const { parseCookies, authCookie, clearAuthCookie } = require('../src/utils/cookies');
 const { json } = require('../src/utils/http-json');
-const { newestLeadsFile } = require('../src/utils/leads-io');
 const { markContacted } = require('../src/utils/contact');
-const { SbError } = require('../src/utils/sb');
+const { sbFetchAll, SbError } = require('../src/utils/sb');
 const { askGroq, formatContext } = require('./groq');
-const { CATEGORIES } = require('../src/utils/categories');
+const { CATEGORIES, matchesType } = require('../src/utils/categories');
 
 const ROOT = path.join(__dirname, '..', 'web');
 const DATA = path.join(__dirname, '..', 'data');
@@ -27,20 +26,6 @@ const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor
 function catOf(params) {
   const c = params.get('category');
   return CATEGORIES[c] ? c : 'advogados';
-}
-
-function readLeads(category) {
-  const file = newestLeadsFile(DATA, category);
-  if (!file) return { leads: [], file: null, mtime: 0, fallbackTs: Date.now() };
-  // data da captura real = mtime do JSON bruto (o .v2 é gerado depois)
-  const raw = file.replace(/\.v2\.json$/, '.json');
-  const rawPath = fs.existsSync(raw) ? raw : file;
-  return {
-    leads: JSON.parse(fs.readFileSync(file, 'utf8')),
-    file: path.basename(file),
-    mtime: fs.statSync(file).mtimeMs,
-    fallbackTs: fs.statSync(rawPath).mtimeMs,
-  };
 }
 
 function readJob() {
@@ -109,14 +94,16 @@ function startCapture(category = 'advogados') {
   return { code: 202, body: { ok: true, job: { ...job, status: 'running', done: 0, total: job.queries } } };
 }
 
-let payloadCache = { mtime: 0, payload: null };
+let payloadCache = { at: 0, type: null, payload: null };
 
-function livePayload(category) {
-  const { leads, file, mtime, fallbackTs } = readLeads(category);
-  if (payloadCache.mtime === mtime && payloadCache.payload && payloadCache.source === file) return payloadCache.payload;
-  const payload = buildPayload(leads, { dataDir: DATA, fallbackTs, category });
-  payload.source = file;
-  payloadCache = { mtime, payload, source: file };
+async function livePayload(type = 'all') {
+  const now = Date.now();
+  if (payloadCache.payload && payloadCache.type === type && now - payloadCache.at < 5000) return payloadCache.payload;
+  const rows = await sbFetchAll('leads?select=*&order=id');
+  const filtered = (rows || []).filter((r) => matchesType(r, type));
+  const payload = buildPayload(filtered, { dataDir: DATA, category: 'all' });
+  payload.source = 'supabase';
+  payloadCache = { at: now, type, payload };
   return payload;
 }
 
@@ -172,16 +159,14 @@ async function handler(req, res) {
       req.on('end', async () => {
         let q = '';
         let history = [];
-        let cat = category;
         try {
           const j = JSON.parse(body || '{}');
           q = String(j.q || '').slice(0, 1000);
           history = Array.isArray(j.history) ? j.history.slice(-6) : [];
-          if (j.category === 'arquitetura') cat = 'arquitetura';
         } catch {}
         if (!q) { json(res, 400, { error: 'empty_q' }); return; }
         try {
-          const r = await askGroq({ question: q, context: formatContext(livePayload(cat)), history });
+          const r = await askGroq({ question: q, context: formatContext(await livePayload('all')), history });
           json(res, 200, { answer: r.answer, source: 'groq' });
         } catch (e) {
           json(res, 503, { error: e.code || 'groq_error' });
@@ -190,7 +175,12 @@ async function handler(req, res) {
       return;
     }
     if (url === '/api/leads') {
-      try { json(res, 200, livePayload(category)); } catch (e) { json(res, 500, { error: e.message }); }
+      try {
+        json(res, 200, await livePayload(qs.get('type') || 'all'));
+      } catch (e) {
+        if (e instanceof SbError) json(res, 503, { error: 'supabase_down' });
+        else json(res, 500, { error: e.message });
+      }
       return;
     }
     if (url === '/api/capture' && req.method === 'GET') { json(res, 200, jobStatus()); return; }

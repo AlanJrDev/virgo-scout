@@ -6,6 +6,7 @@ const { areaDistribution, classifyLead } = require('./classify');
 const { parseRating, parseReviews } = require('./leads');
 const { waLink, waMessage } = require('./wa');
 const { matchFile } = require('./leads-io');
+const { typeList, typeOfLead } = require('./categories');
 
 // Regiões do DF com coordenadas (aproximação por região — a base não tem geocoding)
 const REGIONS = [
@@ -168,6 +169,7 @@ function buildTop(leads, n = 5) {
       id: l.id || null,
       name: l.name,
       area: l.area || 'Geral',
+      types: typeList(l),
       status: l.status || 'novo',
       cat: `${l.area || 'Advocacia'} · ${regionOf(l.address)}/DF`,
       score: l.score,
@@ -306,8 +308,13 @@ function buildDelta(dataDir, category = 'advogados') {
 function buildPayload(leads, opts = {}) {
   const dataDir = opts.dataDir || path.join(__dirname, '..', '..', 'data');
   const category = opts.category || 'advogados';
+  const fallbackTs = opts.fallbackTs;
   let prepared = prepare(leads);
-  if (category === 'arquitetura') prepared = prepared.map((l) => ({ ...l, area: l.area || classifyLead(l, category).area }));
+  if (category === 'all') {
+    prepared = prepared.map((l) => ({ ...l, area: l.area || classifyLead(l, typeOfLead(l)).area }));
+  } else if (category === 'arquitetura') {
+    prepared = prepared.map((l) => ({ ...l, area: l.area || classifyLead(l, category).area }));
+  }
   const scored = prepared.map((l) => ({ ...l, score: scoreOf(l) })).sort((a, b) => b.score - a.score);
   const stats = buildStats(prepared);
   return {
@@ -321,7 +328,7 @@ function buildPayload(leads, opts = {}) {
     pool: buildTop(prepared, prepared.length), // base completa (antes cap de 30)
     quality: buildQuality(prepared),
     dots: buildDots(scored),
-    series: buildSeries(prepared, opts.fallbackTs),
+    series: buildSeries(prepared, fallbackTs),
     donut: [
       { label: 'Com site', value: stats.comSite, color: '#2E7CF6' },
       { label: 'Sem site', value: stats.semSite, color: '#38BDF8' },

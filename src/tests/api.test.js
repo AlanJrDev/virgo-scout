@@ -168,7 +168,7 @@ test('insight: 400 em q vazia; queries devolve a lista de 26', async () => {
   assert.strictEqual(r2.body.queries.length, 26);
 });
 
-test('leads filtra por categoria no banco (eq/neq arquitetura) e no payload', async () => {
+test('leads busca tudo no banco e filtra por ?type= (insight segue por source)', async () => {
   const r0 = fakeRes();
   await loginH(fakeReq({ method: 'POST', body: { user: 'landevbrasil.ia@gmail.com', pass: 'iloveTI@26' }, ip: 'api-g' }), r0);
   const ck = cookieDe(r0);
@@ -176,6 +176,10 @@ test('leads filtra por categoria no banco (eq/neq arquitetura) e no payload', as
   process.env.SUPABASE_URL = 'https://x.supabase.co';
   process.env.SUPABASE_SECRET_KEY = 'sb_secret_t';
   process.env.GROQ_API_KEY = 'gsk_test';
+  const rows = [
+    { id: '1', name: 'Esc Topografia', types: 'arquitetura', source: 'arquitetura', origin: 'topografia Gama', address: 'Gama, Brasília - DF' },
+    { id: '2', name: 'Souza Advocacia', types: 'advogados', source: 'advogados', address: 'Asa Sul, Brasília - DF' },
+  ];
   const urls = [];
   global.fetch = async (url, opts) => {
     urls.push(String(url));
@@ -185,21 +189,25 @@ test('leads filtra por categoria no banco (eq/neq arquitetura) e no payload', as
     if (String(url).includes('api.groq.com')) {
       return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
     }
-    return { ok: true, status: 200, text: async () => JSON.stringify([{ name: 'X', source: 'topografia Gama', address: 'Gama' }]) };
+    return { ok: true, status: 200, text: async () => JSON.stringify(rows) };
   };
   try {
     const r1 = fakeRes();
-    await leadsH(fakeReq({ cookie: ck, url: '/api/leads?category=arquitetura' }), r1);
+    await leadsH(fakeReq({ cookie: ck, url: '/api/leads?type=arquitetura' }), r1);
     assert.strictEqual(r1.statusCode, 200);
     const leadUrl = urls.find((u) => u.includes('/leads'));
-    assert.ok(leadUrl.includes('source=eq.arquitetura'), `url: ${leadUrl}`);
+    assert.ok(!leadUrl.includes('source='), `url: ${leadUrl}`);
+    assert.strictEqual(r1.body.source, 'supabase');
+    assert.strictEqual(r1.body.pool.length, 1);
+    assert.deepStrictEqual(r1.body.pool[0].types, ['arquitetura']);
     assert.strictEqual(r1.body.areas[0].label, 'Topografia');
 
     urls.length = 0;
     const r2 = fakeRes();
     await leadsH(fakeReq({ cookie: ck, url: '/api/leads' }), r2);
     const leadUrl2 = urls.find((u) => u.includes('/leads'));
-    assert.ok(leadUrl2.includes('source=neq.arquitetura'), `url: ${leadUrl2}`);
+    assert.ok(!leadUrl2.includes('source='), `url: ${leadUrl2}`);
+    assert.strictEqual(r2.body.pool.length, 2);
 
     urls.length = 0;
     const r3 = fakeRes();

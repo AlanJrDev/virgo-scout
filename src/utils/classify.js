@@ -1,6 +1,8 @@
 // Classificador de área de atuação do lead — regras determinísticas (offline, sem custo).
 // Normaliza acentos/caixa dos dois lados antes de casar palavras-chave.
 
+const { typeOfLead } = require('./categories');
+
 const AREAS = [
   'Trabalhista',
   'Criminal',
@@ -102,7 +104,7 @@ const AREA_COLORS = ['#38BDF8', '#2E7CF6', '#34D399', '#FBBF24', '#F87171', '#A7
 function areaDistribution(leads = [], category) {
   const counts = new Map();
   for (const l of leads) {
-    const { area } = classifyLead(l, category);
+    const { area } = classifyLead(l, category === 'all' ? typeOfLead(l) : category);
     counts.set(area, (counts.get(area) || 0) + 1);
   }
   return [...counts.entries()]
