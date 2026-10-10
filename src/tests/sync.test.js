@@ -41,7 +41,7 @@ test('syncLeads faz upsert em batch e registra captures', async () => {
   };
   const r = await syncLeads({ dataDir: TMP, runBuild: false });
   assert.strictEqual(r.synced, 2);
-  const leadsCall = calls.find((c) => c.url.includes('/rest/v1/leads'));
+  const leadsCall = calls.find((c) => c.url.includes('/rest/v1/leads') && c.opts.method === 'POST');
   assert.ok(leadsCall.url.includes('on_conflict=id'));
   assert.strictEqual(leadsCall.opts.method, 'POST');
   assert.strictEqual(leadsCall.opts.headers.Prefer, 'resolution=merge-duplicates');
@@ -110,7 +110,7 @@ test('batching: 1346 leads → 3 requisições (500+500+346)', async () => {
   global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
   const r = await syncLeads({ dataDir: TMP, runBuild: false });
   assert.strictEqual(r.synced, 1346);
-  const leadCalls = calls.filter((c) => c.url.includes('/rest/v1/leads'));
+  const leadCalls = calls.filter((c) => c.url.includes('/rest/v1/leads') && c.opts.method === 'POST');
   assert.strictEqual(leadCalls.length, 3);
   assert.strictEqual(JSON.parse(leadCalls[0].opts.body).length, 500);
   assert.strictEqual(JSON.parse(leadCalls[2].opts.body).length, 346);
@@ -134,7 +134,7 @@ test('syncLeads categoria arquitetura: tag em source, query em origin', async ()
   global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
   const r = await syncLeads({ dataDir: TMP, category: 'arquitetura', runBuild: false });
   assert.strictEqual(r.synced, 1);
-  const leadCall = calls.find((c) => c.url.includes('/rest/v1/leads'));
+  const leadCall = calls.find((c) => c.url.includes('/rest/v1/leads') && c.opts.method === 'POST');
   const rows = JSON.parse(leadCall.opts.body);
   assert.strictEqual(rows[0].name, 'Esc Arq');
   assert.strictEqual(rows[0].source, 'arquitetura');
@@ -147,7 +147,7 @@ test('syncLeads categoria advogados: tag em source, query em origin', async () =
   const calls = [];
   global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
   await syncLeads({ dataDir: TMP, category: 'advogados', runBuild: false });
-  const leadCalls = calls.filter((c) => c.url.includes('/rest/v1/leads'));
+  const leadCalls = calls.filter((c) => c.url.includes('/rest/v1/leads') && c.opts.method === 'POST');
   const firstRow = JSON.parse(leadCalls[0].opts.body)[0];
   assert.strictEqual(firstRow.source, 'advogados');
   assert.strictEqual(firstRow.origin, 'advogados Distrito Federal');
@@ -178,7 +178,7 @@ test('dedupe por id (nome+endereço) mantém a linha mais rica', async () => {
   const r = await syncLeads({ dataDir: TMP, runBuild: false });
   assert.strictEqual(r.synced, 2);
   assert.strictEqual(r.deduped, 1);
-  const rows = JSON.parse(calls.find((c) => c.url.includes('/rest/v1/leads')).opts.body);
+  const rows = JSON.parse(calls.find((c) => c.url.includes('/rest/v1/leads') && c.opts.method === 'POST').opts.body);
   assert.strictEqual(rows.length, 2);
   const keeper = rows.find((x) => /mesmo/i.test(x.name));
   assert.strictEqual(keeper.reviews, 100);
@@ -198,7 +198,56 @@ test('descarta artefato de paginação do Maps (nome vazio ou Resultados)', asyn
   global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
   const r = await syncLeads({ dataDir: TMP, runBuild: false });
   assert.strictEqual(r.synced, 1);
-  const rows = JSON.parse(calls.find((c) => c.url.includes('/rest/v1/leads')).opts.body);
+  const rows = JSON.parse(calls.find((c) => c.url.includes('/rest/v1/leads') && c.opts.method === 'POST').opts.body);
   assert.strictEqual(rows.length, 1);
   assert.strictEqual(rows[0].name, 'Advogado Real');
+});
+
+test('placeIdOrHash prefere place_id e cai para sha1', () => {
+  const { placeIdOrHash, leadId } = require('../../scripts/sync-supabase');
+  const a = { name: 'Loja', address: 'Rua A', place_id: '0x1:0x9' };
+  const b = { name: 'Loja', address: 'Rua A' };
+  assert.strictEqual(placeIdOrHash(a), '0x1:0x9');
+  assert.strictEqual(placeIdOrHash(b), leadId(b));
+});
+
+test('planUpsert: negócio novo vira insert', () => {
+  const { planUpsert, toRow } = require('../../scripts/sync-supabase');
+  const nr = toRow({ name: 'Nova', address: 'Rua B', source: 'tapestaria' });
+  nr.types = 'tapestaria';
+  const plan = planUpsert([nr], []);
+  assert.strictEqual(plan.inserts.length, 1);
+  assert.strictEqual(plan.patches.length, 0);
+  assert.strictEqual(plan.deletes.length, 0);
+});
+
+test('planUpsert: existente com mesmo place_id ganha patch não-degradante + types unidos', () => {
+  const { planUpsert, toRow } = require('../../scripts/sync-supabase');
+  const novo = toRow({ name: 'Loja Y', address: 'QI 1', source: 'estofado', phone: '', rating: '4,8', reviews: '12' });
+  novo.place_id = '0x2:0x9';
+  novo.types = 'estofado';
+  const existente = { id: '0x2:0x9', place_id: '0x2:0x9', types: 'tapestaria', source: 'tapestaria' };
+  const plan = planUpsert([novo], [existente]);
+  assert.strictEqual(plan.inserts.length, 0);
+  const p = plan.patches[0];
+  assert.strictEqual(p.id, '0x2:0x9');
+  assert.strictEqual(p.set.types, 'estofado,tapestaria');
+  assert.strictEqual(p.set.phone, undefined);          // null não degrada
+  assert.strictEqual(p.set.rating, 4.8);               // valor novo entra
+  assert.strictEqual(p.set.source, 'estofado');        // proveniência atualiza
+  assert.ok(!('status' in p.set));                     // status intocado
+  assert.deepStrictEqual(plan.deletes, []);
+});
+
+test('planUpsert: row sha1 antigo do mesmo lugar migra o id para place_id e órfão é deletado', () => {
+  const { planUpsert, toRow, leadId } = require('../../scripts/sync-supabase');
+  const novo = toRow({ name: 'Loja Z', address: 'SAAN', source: 'tapestaria' });
+  novo.place_id = '0x3:0x9';
+  novo.types = 'tapestaria';
+  const antigo = { id: leadId({ name: 'Loja Z', address: 'SAAN' }), place_id: null, types: 'advogados', source: 'advogados' };
+  const plan = planUpsert([novo], [antigo]);
+  assert.strictEqual(plan.patches[0].id, antigo.id);
+  assert.strictEqual(plan.patches[0].set.id, '0x3:0x9');
+  assert.strictEqual(plan.patches[0].set.types, 'advogados,tapestaria');
+  assert.deepStrictEqual(plan.deletes, []);
 });

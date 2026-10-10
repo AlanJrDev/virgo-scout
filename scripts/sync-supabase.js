@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { sbEnabled, sbFetch } = require('../src/utils/sb');
 const { newestLeadsFile } = require('../src/utils/leads-io');
+const { tagOf } = require('../src/utils/categories');
 
 const CHUNK = 500;
 
@@ -61,9 +62,14 @@ function isLead(l) {
   return !!name && !/^resultados?$/i.test(name);
 }
 
+function placeIdOrHash(l) {
+  const pid = l.place_id && String(l.place_id).trim();
+  return pid || leadId(l);
+}
+
 function toRow(l) {
   return {
-    id: leadId(l),
+    id: placeIdOrHash(l),
     name: l.name || null,
     rating: num(l.rating),
     reviews: int(l.reviews),
@@ -111,6 +117,60 @@ function dedupeRows(rows) {
   return { rows: [...byId.values()], dropped };
 }
 
+function planUpsert(newRows, existing) {
+  const inserts = [], patches = [], deletes = [];
+  for (const nr of newRows) {
+    const hash = leadId(nr);
+    const pid = nr.place_id || null;
+    const cands = existing.filter((e) =>
+      e.id === nr.id || e.id === hash || (pid && e.place_id === pid)
+    );
+    if (!cands.length) { inserts.push(nr); continue; }
+    const target =
+      cands.find((e) => pid && e.id === pid) ||
+      cands.find((e) => pid && e.place_id === pid) ||
+      cands[0];
+    const set = {};
+    for (const [k, v] of Object.entries(nr)) {
+      if (k === 'id' || k === 'types') continue;
+      if (v === null || v === undefined || v === '') continue;
+      set[k] = v;
+    }
+    set.source = nr.source;
+    const candTypes = cands.flatMap((e) => String(e.types || e.source || '').split(','));
+    set.types = [...new Set([...candTypes, ...(nr.types || '').split(',')].filter(Boolean))].sort().join(',');
+    if (pid && target.id !== pid) set.id = pid;
+    patches.push({ id: target.id, set });
+    for (const e of cands) if (e.id !== target.id) deletes.push(e.id);
+  }
+  return { inserts, patches, deletes };
+}
+
+function chunk(arr, n) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+}
+
+function inList(values) {
+  return values.map((v) => `"${String(v).replace(/"/g, '\\"')}"`).join(',');
+}
+
+async function fetchExisting(rows) {
+  const pids = [...new Set(rows.map((r) => r.place_id).filter(Boolean))];
+  const ids = [...new Set(rows.map((r) => r.id))];
+  const out = new Map();
+  for (const c of chunk(pids, 60)) {
+    const rs = await sbFetch(`leads?select=id,place_id,types,source&place_id=in.(${inList(c)})`);
+    for (const r of rs || []) out.set(r.id, r);
+  }
+  for (const c of chunk(ids, 80)) {
+    const rs = await sbFetch(`leads?select=id,place_id,types,source&id=in.(${inList(c)})`);
+    for (const r of rs || []) out.set(r.id, r);
+  }
+  return [...out.values()];
+}
+
 async function upsertRows(rows) {
   for (let i = 0; i < rows.length; i += CHUNK) {
     await sbFetch('leads?on_conflict=id', {
@@ -127,14 +187,25 @@ async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = 
   const file = newestLeadsFile(dir, category);
   if (!file) throw new Error(`nenhum JSON de leads (${category}) em ${dir}`);
   const leads = JSON.parse(fs.readFileSync(file, 'utf8')).filter(isLead);
-  const tag = category === 'arquitetura' ? 'arquitetura' : 'advogados';
+  const tag = tagOf(category);
   const rows0 = leads.map((l) => {
     const row = toRow(l);
     row.source = tag;
+    row.types = tag;
     return row;
   });
   const { rows, dropped } = dedupeRows(rows0);
-  await upsertRows(rows);
+  const existing = await fetchExisting(rows);
+  const plan = planUpsert(rows, existing);
+  for (const p of plan.patches) {
+    await sbFetch(`leads?id=eq.${encodeURIComponent(p.id)}`, {
+      method: 'PATCH', body: p.set, headers: { Prefer: 'return=minimal' },
+    });
+  }
+  for (const c of chunk(plan.deletes, 80)) {
+    await sbFetch(`leads?id=in.(${inList(c)})`, { method: 'DELETE' });
+  }
+  await upsertRows(plan.inserts);
   await sbFetch('captures', {
     method: 'POST',
     body: [{ status: 'done', finished_at: new Date().toISOString(), leads_count: rows.length }],
@@ -150,4 +221,4 @@ if (require.main === module) {
     .catch((e) => { console.error('[sync]', e.message); process.exit(1); });
 }
 
-module.exports = { norm, leadId, toRow, normPhone, cleanAddr, isLead, dedupeRows, upsertRows, syncLeads };
+module.exports = { norm, leadId, placeIdOrHash, planUpsert, toRow, normPhone, cleanAddr, isLead, dedupeRows, upsertRows, syncLeads };
