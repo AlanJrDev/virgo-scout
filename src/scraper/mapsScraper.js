@@ -85,7 +85,7 @@ async function extractCards(page, source) {
 
 // Extrai o painel de detalhe do lugar (página place ou card aberto)
 async function readPlaceDetail(page) {
-  return page.evaluate(() => {
+  const d = await page.evaluate(() => {
     const txt = (sel) => document.querySelector(sel)?.innerText?.trim() || '';
     const name = txt('h1.DUwDvf') || txt('h1');
     // endereço: botão data-item-id=address
@@ -148,8 +148,12 @@ async function readPlaceDetail(page) {
     const pId = (location.href.match(/!1s(0x[0-9a-f]+:0x[0-9a-f]+)/) || [])[1] || '';
     const lat = mUrl[1] || '';
     const lng = mUrl[2] || '';
-    return { name, address, phone, website, rating, reviews, category, plus_code, instagram, facebook, claimed, closed, hours, photos, lat, lng, place_id: pId };
+    const action_hrefs = [...document.querySelectorAll('a[data-item-id^="action:"], a[href*="wa.me"], a[href*="api.whatsapp"]')].map((a) => a.getAttribute('href') || '');
+    return { name, address, phone, website, rating, reviews, category, plus_code, instagram, facebook, claimed, closed, hours, photos, lat, lng, place_id: pId, action_hrefs };
   });
+  d.whatsapp = (d.action_hrefs || []).map(waFromHref).find(Boolean) || '';
+  delete d.action_hrefs;
+  return d;
 }
 
 // Abre cada card p/ detalhe e extrai telefone/site/endereço — otimizado p/ máximo com timeout curto
@@ -191,6 +195,7 @@ async function enrichWithDetails(page, leads, { maxDetails = 120, perLeadTimeout
           photos: detail.photos !== undefined && detail.photos !== null ? detail.photos : (base.photos ?? null),
           instagram: detail.instagram || base.instagram || '',
           facebook: detail.facebook || base.facebook || '',
+          whatsapp: detail.whatsapp || '',
         })
       );
       // volta p/ lista
@@ -252,6 +257,7 @@ async function enrichOneByQuery(page, query, opts = {}) {
         photos: d.photos ?? null,
         instagram: d.instagram || '',
         facebook: d.facebook || '',
+        whatsapp: d.whatsapp || '',
       });
     }
   }
@@ -280,4 +286,11 @@ async function scrapeMany(queries, opts = {}) {
   return all;
 }
 
-module.exports = { launchBrowser, scrapeQuery, scrapeMany, scrollFeedToEnd, enrichOneByQuery };
+function waFromHref(href) {
+  const h = String(href || '');
+  if (!/wa\.me\/|api\.whatsapp\.com/.test(h)) return '';
+  const m = h.match(/(?:phone=|wa\.me\/)(\+?\d{6,15})/);
+  return m ? m[1].replace('+', '') : '';
+}
+
+module.exports = { launchBrowser, scrapeQuery, scrapeMany, scrollFeedToEnd, enrichOneByQuery, waFromHref };

@@ -211,6 +211,14 @@ test('placeIdOrHash prefere place_id e cai para sha1', () => {
   assert.strictEqual(placeIdOrHash(b), leadId(b));
 });
 
+test('toRow carrega whatsapp do Maps (dígitos) e preserva null', () => {
+  const { toRow } = require('../../scripts/sync-supabase');
+  const r1 = toRow({ name: 'Loja', address: 'Q 1', source: 'tapecaria', whatsapp: '+55 (61) 99863-8116' });
+  assert.strictEqual(r1.whatsapp, '5561998638116');
+  const r2 = toRow({ name: 'Loja', address: 'Q 2', source: 'tapecaria' });
+  assert.strictEqual(r2.whatsapp, null);
+});
+
 test('planUpsert: negócio novo vira insert', () => {
   const { planUpsert, toRow } = require('../../scripts/sync-supabase');
   const nr = toRow({ name: 'Nova', address: 'Rua B', source: 'tapecaria' });

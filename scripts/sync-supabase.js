@@ -92,6 +92,7 @@ function toRow(l) {
     closed: l.closed === true,
     instagram: l.instagram || null,
     facebook: l.facebook || null,
+    whatsapp: String(l.whatsapp || '').replace(/\D/g, '') || null,
   };
 }
 
