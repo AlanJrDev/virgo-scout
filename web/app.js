@@ -394,7 +394,11 @@
           return;
         }
         var outside = !(e.target && e.target.closest && e.target.closest('.kebab-wrap'));
-        if (outside) document.querySelectorAll('.kebab-menu').forEach(function (m) { m.hidden = true; });
+        if (outside) document.querySelectorAll('.kebab-menu').forEach(function (m) {
+          m.hidden = true;
+          var kb = m.parentElement && m.parentElement.querySelector('.kebab');
+          if (kb) kb.setAttribute('aria-expanded', 'false');
+        });
       });
     }
     var areas = (D.areas || []).filter(function (a) { return a.label !== 'Geral'; }).slice(0, 5);
