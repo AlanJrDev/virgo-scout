@@ -203,6 +203,16 @@ test('descarta artefato de paginação do Maps (nome vazio ou Resultados)', asyn
   assert.strictEqual(rows[0].name, 'Advogado Real');
 });
 
+test('isLead descarta fantasma (só nome) e aceita lead com sinal de identidade/contato', () => {
+  const { isLead } = require('../../scripts/sync-supabase');
+  assert.strictEqual(isLead({ name: 'Loja X' }), false);
+  assert.strictEqual(isLead({ name: 'Resultados' }), false);
+  assert.strictEqual(isLead({ name: 'Loja X', address: 'Q 1' }), true);
+  assert.strictEqual(isLead({ name: 'Loja X', phone: '61999998888' }), true);
+  assert.strictEqual(isLead({ name: 'Loja X', instagram: '@x' }), true);
+  assert.strictEqual(isLead({ name: 'Loja X', place_id: '0x1:0x2' }), true);
+});
+
 test('placeIdOrHash prefere place_id e cai para sha1', () => {
   const { placeIdOrHash, leadId } = require('../../scripts/sync-supabase');
   const a = { name: 'Loja', address: 'Rua A', place_id: '0x1:0x9' };

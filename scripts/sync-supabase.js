@@ -55,11 +55,12 @@ function cleanAddr(v) {
   return s || null;
 }
 
-/* Artefato de paginação do Google Maps ("Resultados") ou nome vazio não é lead —
-   mesma regra do prepare() dos metrics (evita id colidindo entre categorias). */
+/* Artefato de paginação do Google Maps ("Resultados"), nome vazio ou lead "fantasma"
+   (só nome, sem place_id/endereço/telefone/site/IG/email) não é lead. */
 function isLead(l) {
   const name = String((l && l.name) || '').trim();
-  return !!name && !/^resultados?$/i.test(name);
+  if (!name || /^resultados?$/i.test(name)) return false;
+  return !!(l.place_id || l.address || l.phone || l.website || l.instagram || l.email);
 }
 
 function placeIdOrHash(l) {
