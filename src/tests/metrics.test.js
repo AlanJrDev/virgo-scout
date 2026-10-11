@@ -205,8 +205,8 @@ test('tier ladder: primeiro-match a > b > c > d', () => {
   const rows = [
     { id: '1', name: 'A', phone: '61999998888', whatsapp: '5561999998888' },                    // a: zap real sem site
     { id: '2', name: 'B', phone: '61999998888', whatsapp: '5561999998888', website: 'https://x.com' }, // b: site rebaixa
-    { id: '3', name: 'C', phone: '61999998888', instagram: '@x' },                              // c: IG
-    { id: '4', name: 'D', phone: '61999998888' },                                               // d: resto
+    { id: '3', name: 'C', phone: '(61) 3222-1234', instagram: '@x' },                           // c: IG
+    { id: '4', name: 'D', phone: '(61) 3222-1234' },                                            // d: resto
   ];
   const out = buildTop(rows, 4);
   const byId = Object.fromEntries(out.map((l) => [l.id, l]));
@@ -214,6 +214,18 @@ test('tier ladder: primeiro-match a > b > c > d', () => {
   assert.strictEqual(byId['2'].tier, 'b');
   assert.strictEqual(byId['3'].tier, 'c');
   assert.strictEqual(byId['4'].tier, 'd');
+});
+
+test('tier A: sem site + celular (sem zap declarado) é principal; fixo não é', () => {
+  const out = buildTop([
+    { id: '1', name: 'Cel', phone: '(61) 99999-8888' },
+    { id: '2', name: 'Fix', phone: '(61) 3222-1234' },
+    { id: '3', name: 'Zap', phone: '(61) 99999-8888', website: 'https://x.com' },
+  ], 3);
+  const byId = Object.fromEntries(out.map((l) => [l.id, l]));
+  assert.strictEqual(byId['1'].tier, 'a');
+  assert.strictEqual(byId['2'].tier, 'd');
+  assert.strictEqual(byId['3'].tier, 'b');
 });
 
 test('wa: botão só com zap declarado (phone do Maps não gera mais wa)', () => {
@@ -242,7 +254,7 @@ test('buildStats: contagens zapReal e tiers', () => {
   const stats = buildStats([
     { phone: '61999998888', whatsapp: '5561999998888' },
     { phone: '61999998888', website: 'https://x.com' },
-    { phone: '61999998888', instagram: '@x' },
+    { phone: '(61) 3222-1234', instagram: '@x' },
   ]);
   assert.strictEqual(stats.zapReal, 1);
   assert.strictEqual(stats.tierA, 1);

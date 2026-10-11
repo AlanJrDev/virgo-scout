@@ -290,7 +290,7 @@
     if (!row) return;
     var chips = [];
     function n(v) { return (typeof v === 'number' && isFinite(v)) ? Math.round(v) : null; }
-    [[s && s.tierA, 'principais · zap real'], [s && s.tierB, 'com site'], [s && s.tierC, 'instagram'], [s && s.tierD, 'só telefone']]
+    [[s && s.tierA, 'principais · sem site, zap/celular'], [s && s.tierB, 'com site'], [s && s.tierC, 'instagram'], [s && s.tierD, 'só telefone']]
       .forEach(function (pair) {
         var v = n(pair[0]);
         if (v != null) chips.push('<span class="q-chip"><b>' + fmtInt(v) + '</b> ' + pair[1] + '</span>');

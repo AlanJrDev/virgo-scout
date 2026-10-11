@@ -168,7 +168,8 @@ function regionOf(address) {
 }
 
 function tierOf(l) {
-  if (l.whatsapp && !l.website) return 'a';
+  const cel = waDigits(l.phone || '').length >= 13;
+  if (!l.website && (l.whatsapp || cel)) return 'a';
   if (l.website) return 'b';
   if (l.instagram) return 'c';
   return 'd';
