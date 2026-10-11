@@ -181,6 +181,16 @@ button.chip:active{transform:scale(.97)}
 .wa-btn:not(.disabled):active{transform:scale(.92)}
 .kebab{background:none;border:0;color:var(--faint);font-size:16px;letter-spacing:1px;padding:4px 6px;border-radius:6px;line-height:1}
 @media(hover:hover) and (pointer:fine){.kebab:hover{color:var(--text);background:rgba(120,160,255,.08)}}
+.ig-btn{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);transition:transform 160ms var(--ease-out),background 160ms var(--ease-out),border-color 160ms var(--ease-out);cursor:pointer}
+.ig-btn svg{width:15px;height:15px}
+@media(hover:hover) and (pointer:fine){.ig-btn:hover{background:rgba(120,160,255,.12);border-color:var(--border-strong);transform:scale(1.08)}}
+.ig-btn:active{transform:scale(.92)}
+.kebab-wrap{position:relative;flex:none}
+.feat-list li:has(.kebab-menu:not([hidden])){z-index:70}
+.kebab-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:190px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:6px;display:flex;flex-direction:column;gap:2px}
+.kebab-menu[hidden]{display:none}
+.kebab-menu button{background:none;border:0;color:var(--text);font:inherit;font-size:12.5px;text-align:left;padding:8px 10px;border-radius:7px;cursor:pointer}
+@media(hover:hover) and (pointer:fine){.kebab-menu button:hover{background:rgba(120,160,255,.08)}}
 
 /* evolution */
 .evo-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:8px;align-items:center}
