@@ -420,9 +420,10 @@ button.chip:active{transform:scale(.97)}
 .c-rating .rate{font-weight:600}
 .c-rating .rate i{font-style:normal;color:var(--amber);margin-left:2px}
 .c-rating .rev{color:var(--faint)}
-.cell-wa,.cell-tel,.cell-site{color:var(--cyan);border-bottom:1px solid transparent;transition:color 160ms var(--ease-out),border-color 160ms var(--ease-out)}
+.cell-wa,.cell-tel,.cell-site,.cell-link{color:var(--cyan);border-bottom:1px solid transparent;transition:color 160ms var(--ease-out),border-color 160ms var(--ease-out)}
 .cell-wa{color:#25D366}
-.cell-wa:hover,.cell-tel:hover,.cell-site:hover{border-bottom-color:currentColor}
+.cell-link{color:var(--cyan);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+.cell-wa:hover,.cell-tel:hover,.cell-site:hover,.cell-link:hover{border-bottom-color:currentColor}
 .cell-none{color:var(--faint)}
 .cell-yes{color:var(--green);font-weight:600}
 .c-channels{display:flex;align-items:center;gap:8px}

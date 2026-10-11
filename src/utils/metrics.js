@@ -104,7 +104,7 @@ function cleanName(s) {
 function hasChannel(l) { return /\d{8,}/.test(l.phone || '') || !!l.email || !!l.instagram; }
 
 // Score 0–99: sem canal → 0 (Incontatável); fechado → 0 (Fechado).
-// Base 20 com canal; fone +15, e-mail +8, Instagram +4; rating×6 (máx 30);
+// Base 20 com canal; fone +15, e-mail +8, Instagram +4, whatsapp declarado +15; rating×6 (máx 30);
 // prova social log10(reviews+1)×4; sem site +15 (é a oferta); site antigo +4; não reclamado +4.
 function scoreOf(l) {
   if (l.closed) return 0;

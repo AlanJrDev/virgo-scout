@@ -1,7 +1,6 @@
-// Geração de link WhatsApp (wa.me) a partir do telefone do lead.
-// Regra do produto: usar o número disponível na base mesmo quando não foi
-// marcado como WhatsApp — a ausência de um número indicado direto não é motivo
-// para descartar o contato.
+// Geração de link WhatsApp. O botão de zap usa apenas o número DECLARADO no site
+// do lead (coluna whatsapp); o phone do Maps vira fallback só como link na coluna
+// Telefone (wa.me p/ celular, tel: p/ fixo).
 
 function waDigits(phone) {
   let d = String(phone || '').replace(/\D/g, '');

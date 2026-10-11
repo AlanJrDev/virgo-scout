@@ -199,6 +199,13 @@
       var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
       return '<a class="cell-wa" href="' + esc(l.wa) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' + esc(fmtPhone(d)) + '</a>';
     }
+    if (l.phone_link) {
+      var isWa = /^https:\/\/wa\.me\//i.test(l.phone_link);
+      var tip = isWa ? 'Tentar WhatsApp' : 'Ligar';
+      var aria = isWa ? 'Tentar WhatsApp com ' + esc(l.name) : 'Ligar para ' + esc(l.name);
+      var blank = isWa ? ' target="_blank" rel="noopener noreferrer"' : '';
+      return '<a class="cell-link" href="' + esc(l.phone_link) + '" title="' + tip + '" aria-label="' + aria + '"' + blank + '>' + esc(fmtPhone(d)) + '</a>';
+    }
     if (d.length >= 8) {
       return '<a class="cell-tel" href="tel:+55' + esc(normPhone(d)) + '" title="Ligar" aria-label="Ligar para ' + esc(l.name) + '">' + esc(fmtPhone(d)) + '</a>';
     }

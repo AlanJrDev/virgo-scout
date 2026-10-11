@@ -285,11 +285,16 @@
   }
 
   /* ---------- qualidade da base (consumo defensivo: só existe se a API mandar) ---------- */
-  function renderQuality(q) {
+  function renderQuality(q, s) {
     var row = document.getElementById('qualityRow');
     if (!row) return;
     var chips = [];
     function n(v) { return (typeof v === 'number' && isFinite(v)) ? Math.round(v) : null; }
+    [[s && s.tierA, 'principais · zap real'], [s && s.tierB, 'com site'], [s && s.tierC, 'instagram'], [s && s.tierD, 'só telefone']]
+      .forEach(function (pair) {
+        var v = n(pair[0]);
+        if (v != null) chips.push('<span class="q-chip"><b>' + fmtInt(v) + '</b> ' + pair[1] + '</span>');
+      });
     if (q && typeof q === 'object') {
       [['semTelefone', 'sem telefone'], ['semSite', 'sem site'], ['semAvaliacao', 'sem avaliação'], ['semEndereco', 'sem endereço']]
         .forEach(function (pair) {
@@ -319,7 +324,7 @@
       if (D.delta_pct == null) { dEl.textContent = '1ª captura'; dEl.className = 'flat'; }
       else { dEl.textContent = (D.delta_pct >= 0 ? '↑ +' : '↓ ') + D.delta_pct + '% vs anterior'; dEl.className = D.delta_pct >= 0 ? 'up' : 'down'; }
     }
-    renderQuality(D.quality);
+    renderQuality(D.quality, D.stats);
 
     /* destaques + filtro por área */
     var pool = D.pool && D.pool.length ? D.pool : (D.top || []);
@@ -329,7 +334,8 @@
         var cid = l.id ? ' data-contact-id="' + escapeHtml(l.id) + '"' : '';
         return '<a class="wa-btn" href="' + escapeHtml(l.wa) + '"' + cid + ' target="_blank" rel="noopener noreferrer" aria-label="Conversar no WhatsApp com ' + escapeHtml(l.name) + '" title="Abrir WhatsApp">' + WA_SVG + '</a>';
       }
-      return '<span class="wa-btn disabled" role="img" aria-label="Sem telefone na base" title="Sem telefone na base">' + WA_SVG + '</span>';
+      var semZap = l.phone ? 'Sem WhatsApp declarado no site' : 'Sem telefone na base';
+      return '<span class="wa-btn disabled" role="img" aria-label="' + semZap + '" title="' + semZap + '">' + WA_SVG + '</span>';
     }
     function featRows(area) {
       var rows = pool.filter(function (l) { return !area || l.area === area; }).slice(0, 5);
