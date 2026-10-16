@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { waDigits, waLink, waMessage } = require('../utils/wa');
+const { waDigits, waLink, waMessage, hasWa } = require('../utils/wa');
 
 test('celular BR com DDD vira 55 + DDD + numero', () => {
   assert.strictEqual(waDigits('(61) 99999-0000'), '5561999990000');
@@ -13,6 +13,25 @@ test('numero que ja tem 55 nao ganha 55 duplo', () => {
 
 test('fixo com 0 de longa local perde o 0 e ganha 55', () => {
   assert.strictEqual(waDigits('061 3333-4444'), '556133334444');
+});
+
+test('DDD 55 (RS) de 13 digitos NAO e destruido', () => {
+  assert.strictEqual(waDigits('5555999793397'), '5555999793397');
+});
+
+test('pais duplicado (55 55 + DDD) perde o 55 extra', () => {
+  assert.strictEqual(waDigits('555561999990000'), '5561999990000');
+});
+
+test('numero de servico 0800 nao vira link de zap', () => {
+  assert.strictEqual(waDigits('5508008830113'), '');
+  assert.strictEqual(waDigits('08008830113'), '');
+});
+
+test('hasWa so true quando o link e montavel', () => {
+  assert.strictEqual(hasWa({ whatsapp: '5555999793397' }), true);
+  assert.strictEqual(hasWa({ whatsapp: '12345' }), false);
+  assert.strictEqual(hasWa({}), false);
 });
 
 test('numero curto/lixo vira null', () => {

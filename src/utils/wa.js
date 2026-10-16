@@ -9,11 +9,17 @@ function waDigits(phone) {
   if (d.startsWith('00')) d = d.slice(2);
   // remove 0 de longa local (061...)
   if (d.startsWith('0') && d.length <= 12) d = d.slice(1);
+  // já tem país: 55 + DDD + (9)?numero. DDD 55 (RS) também começa com 5555 — não destruir.
+  if (d.startsWith('55') && (d.length === 12 || d.length === 13)) {
+    if (/^0?(800|300|900)/.test(d.slice(2))) return ''; // 0800/0300/0900 não têm WhatsApp
+    return d;
+  }
+  // país duplicado (55 55 + DDD...): remove um 55
+  if (d.startsWith('5555')) d = d.slice(2);
   // adiciona BR quando faltar
   if (!d.startsWith('55') && d.length <= 11) d = '55' + d;
-  // evita 55 duplo (5555...)
-  if (d.startsWith('5555')) d = d.slice(2);
   if (d.length < 12) return '';
+  if (/^0?(800|300|900)/.test(d.slice(2))) return '';
   return d;
 }
 
@@ -23,6 +29,12 @@ function waLink(phone, message) {
   if (!d) return null;
   const text = message ? '?text=' + encodeURIComponent(message) : '';
   return `https://wa.me/${d}${text}`;
+}
+
+// Fonte de verdade de "tem zap contatável": só quando o link é montável.
+// Um whatsapp cru malformado (ex.: lixo no regex do site) NÃO conta.
+function hasWa(lead) {
+  return !!waLink(lead && lead.whatsapp);
 }
 
 // Mensagem de primeira abordagem — personalizada com o que a base já sabe
@@ -46,4 +58,4 @@ function waMessage(lead) {
   return parts.join(' ');
 }
 
-module.exports = { waDigits, waLink, waMessage };
+module.exports = { waDigits, waLink, waMessage, hasWa };
