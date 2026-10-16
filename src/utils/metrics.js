@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { areaDistribution, classifyLead } = require('./classify');
 const { parseRating, parseReviews } = require('./leads');
-const { waLink, waMessage, waDigits } = require('./wa');
+const { waLink, waMessage, waDigits, hasWa } = require('./wa');
 const { matchFile } = require('./leads-io');
 const { typeList, typeOfLead, CAT_KEYS } = require('./categories');
 
@@ -113,7 +113,7 @@ function scoreOf(l) {
   if (/\d{8,}/.test(l.phone || '')) s += 15;
   if (l.email) s += 8;
   if (l.instagram) s += 4;
-  if (l.whatsapp) s += 15;
+  if (hasWa(l)) s += 15;
   s += Math.max(0, l.rating || 0) * 6;
   s += Math.log10((l.reviews || 0) + 1) * 4;
   if (!l.website) s += 15;
@@ -143,7 +143,7 @@ function buildStats(leads) {
   const comEmail = leads.filter((l) => l.email).length;
   const comInstagram = leads.filter((l) => l.instagram).length;
   const comZapSite = leads.filter((l) => l.whatsapp_hint === true).length;
-  const zapReal = leads.filter((l) => l.whatsapp).length;
+  const zapReal = leads.filter((l) => hasWa(l)).length;
   const tierA = leads.filter((l) => tierOf(l) === 'a').length;
   const tierB = leads.filter((l) => tierOf(l) === 'b').length;
   const tierC = leads.filter((l) => tierOf(l) === 'c').length;
@@ -169,14 +169,14 @@ function regionOf(address) {
 
 function tierOf(l) {
   const cel = waDigits(l.phone || '').length >= 13;
-  if (!l.website && (l.whatsapp || cel)) return 'a';
+  if (!l.website && (hasWa(l) || cel)) return 'a';
   if (l.website) return 'b';
   if (l.instagram) return 'c';
   return 'd';
 }
 
 function phoneLink(l) {
-  if (l.whatsapp) return null;
+  if (hasWa(l)) return null;
   const d = waDigits(l.phone);
   if (!d) return null;
   return d.length === 12 ? 'tel:+' + d : 'https://wa.me/' + d;
@@ -203,7 +203,7 @@ function buildTop(leads, n = 5) {
       site_url: (typeof l.website === 'string' && l.website) ? l.website : null,
       phone: /\d{8,}/.test(l.phone || ''),
       phone_raw: l.phone || '',
-      wa: l.whatsapp ? waLink(l.whatsapp, waMessage(l)) : null,
+      wa: hasWa(l) ? waLink(l.whatsapp, waMessage(l)) : null,
       phone_link: phoneLink(l),
       email: l.email || null,
       instagram: l.instagram || null,
