@@ -2,7 +2,7 @@
    Resumível: pega leads COM site e sem site_audit. Falha => não grava. */
 require('dotenv').config();
 const { sbFetch } = require('../src/utils/sb');
-const { auditUrl } = require('../src/qualify/site-audit');
+const { auditUrl } = require('../src/enrich/site-audit');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {

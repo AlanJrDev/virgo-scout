@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { auditSite, auditUrl } = require('../qualify/site-audit');
+const { auditSite, auditUrl } = require('../enrich/site-audit');
 
 test('site https com viewport e WordPress nao e ruim', () => {
   const a = auditSite('<html><head><meta name="viewport" content="width=device-width"><link href="/wp-content/x.css"></head><body><form></form></body></html>', 'https://x.com');

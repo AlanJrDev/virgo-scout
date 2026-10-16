@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { parseAdsHtml, checkAds } = require('../qualify/ads');
+const { parseAdsHtml, checkAds } = require('../enrich/ads');
 
 test('pagina vazia => sem anuncio ativo', () => {
   const r = parseAdsHtml('<html><body>Nenhum anúncio encontrado</body></html>');

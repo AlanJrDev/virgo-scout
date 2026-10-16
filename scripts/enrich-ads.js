@@ -2,7 +2,7 @@
    Resumível por ads_checked_at. Falha => grava só ads_checked_at (unknown). */
 require('dotenv').config();
 const { sbFetch } = require('../src/utils/sb');
-const { checkAds } = require('../src/qualify/ads');
+const { checkAds } = require('../src/enrich/ads');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
@@ -20,7 +20,7 @@ async function main() {
       await sbFetch(`leads?id=eq.${encodeURIComponent(r.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: patch });
       ok++;
     } catch (e) { console.error(`[enrich:ads] erro ${r.id}: ${e.message}`); }
-    await sleep(4000);
+    await sleep(500);
   }
   console.log(`[enrich:ads] concluído: ${ok} ok, ${ativos} com anúncio, ${unknown} unknown`);
 }
