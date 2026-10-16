@@ -6,7 +6,7 @@ const { qualify } = require('../src/qualify/engine');
 
 async function main() {
   const rows = await sbFetchAll(
-    'leads?select=id,name,phone,whatsapp,website,instagram,reviews,rating,claimed,since_year,closed,site_audit,ads_active,ig_last_post&order=id'
+    'leads?select=id,name,phone,whatsapp,website,instagram,email,reviews,rating,claimed,since_year,closed,site_audit,ads_active,ig_last_post,multi_unidade&order=id'
   );
   console.log(`[qualify] ${rows.length} leads`);
   let ok = 0, fail = 0;

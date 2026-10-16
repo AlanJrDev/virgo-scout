@@ -34,7 +34,7 @@ function whyNow(l) {
   if (l.ads_active === true) return 'anunciando agora';
   if (l.since_year && year() - l.since_year <= 1) return 'recém-aberto';
   const d = Date.parse(l.ig_last_post);
-  if (Number.isFinite(d) && Date.now() - d <= 30 * 86400000) return 'Instagram ativo recente';
+  if (Number.isFinite(d) && Date.now() - d <= W.intencao.igRecenteDias * 86400000) return 'Instagram ativo recente';
   return null;
 }
 

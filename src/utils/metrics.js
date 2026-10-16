@@ -356,7 +356,7 @@ function buildPayload(leads, opts = {}) {
   }
   const scored = prepared.map((l) => ({ ...l, score: scoreOf(l) })).sort((a, b) => b.score - a.score);
   const icpFilter = opts.icp && opts.icp !== 'all' ? opts.icp : null;
-  const minFit = Number.isFinite(opts.minFit) ? opts.minFit : 0;
+  const minFit = opts.minFit == null ? 0 : Number(opts.minFit) || 0;
   const poolLeads = prepared.filter((l) => {
     const q = qualify(l);
     if (icpFilter && !q.icp.includes(icpFilter)) return false;
