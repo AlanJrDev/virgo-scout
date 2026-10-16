@@ -22,6 +22,7 @@
     "capture:refill": "node scripts/capture-refill.js",
     "repair": "node scripts/repair-data.js",
     "qualify": "node scripts/qualify.js",
+    "qualify:stats": "node scripts/qualify-stats.js",
     "serve": "node scripts/serve-web.js"
   },
   "keywords": [],
