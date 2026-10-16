@@ -20,7 +20,7 @@ function auditSite(html, finalUrl) {
   const cy = t.match(/(?:©|&copy;|copyright)[^0-9<]{0,24}((?:19|20)\d{2})/i);
   const copyright_year = cy ? parseInt(cy[1], 10) : null;
   const has_form = /<form[\s>]/i.test(t) || /mailto:/i.test(t);
-  const has_booking = /agend|agendar|reserv|booking|schedul/i.test(t);
+  const has_booking = /\b(agendamento|agendamentos|agende|agendar|reserva|reservas|reservar|booking|book now|schedul)\b/i.test(t);
   const peso_kb = Math.round(Buffer.byteLength(raw, 'utf8') / 1024);
   const stale = !!copyright_year && new Date().getFullYear() - copyright_year >= 3;
   const ruim = !https || !mobile || stale || platform === 'builder';
