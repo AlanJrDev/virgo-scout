@@ -50,7 +50,7 @@ test('payload ganha quality (completude) e pool com a base completa', () => {
   ];
   const p = buildPayload(leads, { dataDir: TMP, category: 'advogados' });
   assert.strictEqual(p.pool.length, 3); // pool = base completa (antes cap 30)
-  assert.ok(p.pool[0].captured_at); // coluna "Capturado em" ganha dado
+  assert.ok(p.pool.find((l) => l.name === 'Completo SA').captured_at); // coluna "Capturado em" ganha dado
   const q = p.quality;
   assert.strictEqual(q.semTelefone, 2);
   assert.strictEqual(q.semSite, 1);
@@ -261,4 +261,30 @@ test('buildStats: contagens zapReal e tiers', () => {
   assert.strictEqual(stats.tierB, 1);
   assert.strictEqual(stats.tierC, 1);
   assert.strictEqual(stats.tierD, 0);
+});
+
+const { qualify } = require('../qualify/engine'); // sanity de import no arquivo de teste
+
+test('pool expoe fit/icp/reasons e ordena por fit', () => {
+  const leads = [
+    { name: 'Forte', reviews: 200, rating: 4.9, whatsapp: '5561999990000', claimed: true },      // sem site, volume
+    { name: 'Fraco', reviews: 1, rating: 3.0, website: 'https://x.com' },
+  ];
+  const p = buildPayload(leads, { dataDir: TMP, category: 'advogados' });
+  assert.strictEqual(typeof p.pool[0].fit, 'number');
+  assert.ok(Array.isArray(p.pool[0].icp));
+  assert.ok(Array.isArray(p.pool[0].reasons));
+  assert.strictEqual(p.pool[0].name, 'Forte');       // maior fit primeiro
+  assert.ok(p.stats.icpSite >= 1);
+  assert.strictEqual(typeof p.stats.avgFit, 'number');
+});
+
+test('buildPayload filtra por icp e minFit', () => {
+  const leads = [
+    { name: 'Site', reviews: 200, whatsapp: '5561999990000', claimed: true },
+    { name: 'Sistema', website: 'https://x.com', reviews: 300, whatsapp: '5561999990000' },
+  ];
+  const p = buildPayload(leads, { dataDir: TMP, category: 'advogados', icp: 'sistema', minFit: 1 });
+  assert.strictEqual(p.pool.length, 1);
+  assert.strictEqual(p.pool[0].name, 'Sistema');
 });

@@ -7,6 +7,7 @@ const { parseRating, parseReviews } = require('./leads');
 const { waLink, waMessage, waDigits, hasWa } = require('./wa');
 const { matchFile } = require('./leads-io');
 const { typeList, typeOfLead, CAT_KEYS } = require('./categories');
+const { qualify } = require('../qualify/engine');
 
 // Regiões do DF com coordenadas (aproximação por região — a base não tem geocoding)
 const REGIONS = [
@@ -151,11 +152,16 @@ function buildStats(leads) {
   const naoReclamados = leads.filter((l) => l.claimed === false).length;
   const desdeAntigo = leads.filter((l) => l.since_year && new Date().getFullYear() - l.since_year >= 5).length;
   const pct = (n) => (total ? Math.round((100 * n) / total) : 0);
+  const icpSite = leads.filter((l) => qualify(l).icp.includes('site')).length;
+  const icpSistema = leads.filter((l) => qualify(l).icp.includes('sistema')).length;
+  const fits = leads.map((l) => qualify(l).fit);
+  const avgFit = fits.length ? Math.round(fits.reduce((a, b) => a + b, 0) / fits.length) : 0;
   return {
     total, comSite, semSite: total - comSite, comPhone, alta, qualif,
     comEmail, comInstagram, comZapSite, naoReclamados, desdeAntigo,
     zapReal, tierA, tierB, tierC, tierD,
     pctSite: pct(comSite), pctAlta: pct(alta), pctQualif: pct(qualif),
+    icpSite, icpSistema, avgFit,
   };
 }
 
@@ -184,8 +190,8 @@ function phoneLink(l) {
 
 function buildTop(leads, n = 5) {
   return leads
-    .map((l) => ({ ...l, score: scoreOf(l) }))
-    .sort((a, b) => b.score - a.score)
+    .map((l) => ({ ...l, score: scoreOf(l), _q: qualify(l) }))
+    .sort((a, b) => b._q.fit - a._q.fit)
     .slice(0, n)
     .map((l) => ({
       id: l.id || null,
@@ -213,6 +219,11 @@ function buildTop(leads, n = 5) {
       closed: l.closed === true,
       claimed: l.claimed === null ? null : l.claimed === true,
       captured_at: l.captured_at || null,
+      fit: l._q.fit,
+      reach: l._q.reach,
+      icp: l._q.icp,
+      reasons: l._q.reasons,
+      why_now: l._q.why_now,
     }));
 }
 
@@ -344,17 +355,24 @@ function buildPayload(leads, opts = {}) {
     prepared = prepared.map((l) => ({ ...l, area: l.area || classifyLead(l, category).area }));
   }
   const scored = prepared.map((l) => ({ ...l, score: scoreOf(l) })).sort((a, b) => b.score - a.score);
-  const stats = buildStats(prepared);
+  const icpFilter = opts.icp && opts.icp !== 'all' ? opts.icp : null;
+  const minFit = Number.isFinite(opts.minFit) ? opts.minFit : 0;
+  const poolLeads = prepared.filter((l) => {
+    const q = qualify(l);
+    if (icpFilter && !q.icp.includes(icpFilter)) return false;
+    return q.fit >= minFit;
+  });
+  const stats = buildStats(poolLeads);
   return {
     generated_at: new Date().toISOString(),
     stats,
     delta_pct: buildDelta(dataDir, category),
-    areas: areaDistribution(prepared, category),
-    regions: regionAgg(prepared),
-    ratingBuckets: ratingBuckets(prepared),
-    top: buildTop(prepared),
-    pool: buildTop(prepared, prepared.length), // base completa (antes cap de 30)
-    quality: buildQuality(prepared),
+    areas: areaDistribution(poolLeads, category),
+    regions: regionAgg(poolLeads),
+    ratingBuckets: ratingBuckets(poolLeads),
+    top: buildTop(poolLeads),
+    pool: buildTop(poolLeads, poolLeads.length), // base completa (antes cap de 30)
+    quality: buildQuality(poolLeads),
     dots: buildDots(scored),
     series: buildSeries(prepared, fallbackTs),
     donut: [
