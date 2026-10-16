@@ -17,6 +17,7 @@
     "enrich:wa": "node scripts/enrich-wa.js",
     "enrich:audit": "node scripts/enrich-audit.js",
     "enrich:ads": "node scripts/enrich-ads.js",
+    "enrich:ig": "node scripts/enrich-ig.js",
     "audit:wa": "node scripts/audit-wa.js",
     "capture:refill": "node scripts/capture-refill.js",
     "repair": "node scripts/repair-data.js",
