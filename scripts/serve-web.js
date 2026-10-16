@@ -9,6 +9,7 @@ const { destroySession } = require('../src/utils/session-store');
 const { parseCookies, authCookie, clearAuthCookie } = require('../src/utils/cookies');
 const { json } = require('../src/utils/http-json');
 const { markContacted } = require('../src/utils/contact');
+const { markOutcome } = require('../src/utils/outcomes');
 const { sbFetchAll, SbError } = require('../src/utils/sb');
 const { askGroq, formatContext } = require('./groq');
 const { CATEGORIES, matchesType } = require('../src/utils/categories');
@@ -213,6 +214,23 @@ async function handler(req, res) {
           json(res, 200, { ok: true });
         } catch (e) {
           if (e && e.code === 'invalid_id') { json(res, 400, { error: 'invalid_id' }); return; }
+          if (e instanceof SbError) { json(res, e.status >= 500 ? 503 : e.status, { error: e.code }); return; }
+          json(res, 500, { error: 'internal' });
+        }
+      });
+      return;
+    }
+    if (url === '/api/outcome' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 1024) req.destroy(); });
+      req.on('end', async () => {
+        let id = '', outcome;
+        try { const j = JSON.parse(body || '{}'); id = String(j.id || ''); outcome = j.outcome; } catch {}
+        try {
+          await markOutcome(id, outcome);
+          json(res, 200, { ok: true });
+        } catch (e) {
+          if (e && (e.code === 'invalid_id' || e.code === 'invalid_outcome')) { json(res, 400, { error: e.code }); return; }
           if (e instanceof SbError) { json(res, e.status >= 500 ? 503 : e.status, { error: e.code }); return; }
           json(res, 500, { error: 'internal' });
         }
