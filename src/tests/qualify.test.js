@@ -29,6 +29,11 @@ test('negocio com site e escala vira ICP sistema', () => {
   assert.ok(q.icp.includes('sistema'));
 });
 
+test('multi_unidade nao conta como escala para ICP sistema', () => {
+  const q = qualify({ name: 'X', website: 'https://x.com', reviews: 10, multi_unidade: true, whatsapp: '5561999990000' });
+  assert.ok(!q.icp.includes('sistema'));
+});
+
 test('site ruim (auditoria) conta como oportunidade', () => {
   const q = qualify({ name: 'X', website: 'https://x.com', site_audit: { ruim: true }, whatsapp: '5561999990000' });
   assert.ok(q.reasons.includes('site desatualizado'));

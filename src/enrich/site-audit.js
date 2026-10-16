@@ -6,7 +6,8 @@ function platformOf(t) {
   if (/wp-content|wp-includes|wordpress/i.test(t)) return 'wordpress';
   if (/squarespace/i.test(t)) return 'squarespace';
   if (/cdn\.shopify|shopify/i.test(t)) return 'shopify';
-  if (/canva|godaddy|weebly|site123|jimdo/i.test(t)) return 'builder';
+  if (/\bcanva\.com\b/i.test(t)) return 'builder';
+  if (/godaddy|weebly|site123|jimdo/i.test(t)) return 'builder';
   return 'outro';
 }
 

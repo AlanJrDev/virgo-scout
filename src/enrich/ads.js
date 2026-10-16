@@ -1,8 +1,9 @@
 // Detecção de anúncio ativo no Google Ads Transparency Center (público).
 // FRÁGIL por natureza (página dinâmica): falha => null (= unknown), nunca false.
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36';
-const EMPTY_RE = /nenhum an[úu]ncio|no ads|sem resultados|no results|nenhum resultado/i;
-const CARD_RE = /\d+\s+an[úu]ncios?|ad creatives|an[úu]ncio(s)?\b/i;
+const EMPTY_RE = /nenhum an[úu]ncio|no ads|sem resultados|no results|nenhum resultado|n[ãa]o encontramos/i;
+const CARD_RE = /\b(\d{1,3})\s+an[úu]ncios?\b/i;
+const AD_CREATIVES = 'ad creatives';
 
 function extractLanding(t) {
   const m = String(t || '').match(/https?:\/\/([a-z0-9-]+(?:\.[a-z0-9-]+)+)(?=["'<\/\s])/i);
@@ -11,9 +12,18 @@ function extractLanding(t) {
 
 function parseAdsHtml(html) {
   const t = String(html || '');
-  const empty = EMPTY_RE.test(t);
-  const active = !empty && CARD_RE.test(t);
-  return { active, landing: active ? extractLanding(t) : null };
+  let idx = -1;
+  let len = 0;
+  const card = t.match(CARD_RE);
+  if (card) { idx = card.index; len = card[0].length; }
+  else {
+    const i = t.indexOf(AD_CREATIVES);
+    if (i === -1) return EMPTY_RE.test(t) ? { active: false, landing: null } : null;
+    idx = i; len = AD_CREATIVES.length;
+  }
+  const start = Math.max(0, idx - 200);
+  const window = t.slice(start, idx + len + 200);
+  return { active: true, landing: extractLanding(window) };
 }
 
 async function checkAds(query, { fetchImpl, timeoutMs = 10000 } = {}) {

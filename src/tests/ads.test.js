@@ -15,6 +15,24 @@ test('pagina com card de anuncio e landing => ativo', () => {
   assert.strictEqual(r.landing, 'clinicax.com.br');
 });
 
+test('shell do google com chrome i18n e sem card => unknown', () => {
+  const html = '<html><head><title>Central de transparência de anúncios</title></head><body>Central de transparência de anúncios</body></html>';
+  assert.strictEqual(parseAdsHtml(html), null);
+});
+
+test('card real "3 anuncios" com landing => ativo', () => {
+  const html = '<html><body><h2>3 anúncios</h2><a href="https://vendor.com/ads">ver</a></body></html>';
+  const r = parseAdsHtml(html);
+  assert.strictEqual(r.active, true);
+  assert.strictEqual(r.landing, 'vendor.com');
+});
+
+test('texto de vazio "nao encontramos nada" => inativo', () => {
+  const r = parseAdsHtml('<html><body>Não encontramos nada para essa busca</body></html>');
+  assert.strictEqual(r.active, false);
+  assert.strictEqual(r.landing, null);
+});
+
 test('checkAds devolve null quando fetch falha', async () => {
   const r = await checkAds('Clínica X', { fetchImpl: async () => { throw new Error('boom'); } });
   assert.strictEqual(r, null);

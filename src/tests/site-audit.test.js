@@ -24,6 +24,12 @@ test('formulario e agendamento detectados', () => {
   assert.strictEqual(a.has_booking, true);
 });
 
+test('tag canvas nao casa como builder', () => {
+  const a = auditSite('<html><head><meta name="viewport" content="width=device-width"></head><body><canvas id="c"></canvas></body></html>', 'https://x.com');
+  assert.notStrictEqual(a.platform, 'builder');
+  assert.strictEqual(a.ruim, false);
+});
+
 test('auditUrl devolve null quando fetch falha', async () => {
   const r = await auditUrl('https://x.com', { fetchImpl: async () => { throw new Error('boom'); } });
   assert.strictEqual(r, null);

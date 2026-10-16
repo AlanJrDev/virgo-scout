@@ -25,7 +25,7 @@ function accessScore(l) {
 function icpOf(l, siteBad) {
   const out = [];
   if (!l.website || siteBad) out.push('site');
-  const escala = (Number(l.reviews) || 0) >= W.sistema.minReviews || l.multi_unidade === true;
+  const escala = (Number(l.reviews) || 0) >= W.sistema.minReviews;
   if (l.website && escala) out.push('sistema');
   return out;
 }

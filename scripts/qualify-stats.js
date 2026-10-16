@@ -6,7 +6,7 @@ const { qualify } = require('../src/qualify/engine');
 
 async function main() {
   const rows = await sbFetchAll(
-    'leads?select=id,name,phone,whatsapp,website,instagram,reviews,rating,claimed,since_year,closed,site_audit,ads_active,ig_last_post&order=id'
+    'leads?select=id,name,phone,whatsapp,website,instagram,email,reviews,rating,claimed,since_year,closed,site_audit,ads_active,ig_last_post&order=id'
   );
   const bands = { '0-19': 0, '20-39': 0, '40-59': 0, '60-79': 0, '80-100': 0 };
   const icp = { site: 0, sistema: 0, nenhum: 0 };
