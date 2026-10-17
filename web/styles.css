@@ -197,7 +197,10 @@ button.chip:active{transform:scale(.97)}
 .card-head .tabs{margin-left:auto;display:flex;gap:6px}
 .tabs .chip{margin-left:0;cursor:pointer}
 .tabs .chip.active{border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,.09)}
-.bars{display:flex;flex-direction:column;gap:9px;padding:4px 4px 4px 0;min-width:0}
+.bars{position:relative;min-height:236px;min-width:0}
+.bars canvas{position:absolute;inset:0}
+.donut-box{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
+.donut-canvas{position:relative;width:144px;height:144px}
 .bar-row{display:grid;grid-template-columns:minmax(72px,auto) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:11.5px;opacity:0;animation:barIn 280ms var(--ease-out) forwards}
 .bar-row .bar-label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar-track{height:9px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
@@ -205,9 +208,8 @@ button.chip:active{transform:scale(.97)}
 .bar-val{color:var(--text);font-variant-numeric:tabular-nums;min-width:66px;text-align:right;font-weight:600}
 .bar-val small{display:block;color:var(--faint);font-weight:400;font-size:11px}
 @keyframes barIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.donut-box{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
-#donut{width:128px;height:128px}
-.donut-center{position:absolute;top:0;left:50%;transform:translateX(-50%);width:128px;height:128px;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+#donut{width:144px;height:144px}
+.donut-center{position:absolute;top:0;left:50%;transform:translateX(-50%);width:144px;height:144px;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
 .donut-center strong{font-size:21px;font-variant-numeric:tabular-nums}
 .donut-center span{font-size:11px;color:var(--muted)}
 .donut-legend{list-style:none;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:5px;width:100%}

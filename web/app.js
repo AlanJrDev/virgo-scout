@@ -4,6 +4,21 @@
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var hasGsap = typeof window.gsap !== 'undefined' && !reduceMotion;
   var $ = function (s, c) { return (c || document).querySelector(s); };
+  var charts = { bars: null, donut: null };
+  var CHART_ANIM = reduceMotion ? { colors: true, x: false, y: false } : { duration: 650, easing: 'easeOutQuart', delay: function (c) { return (c.dataIndex || 0) * 45; } };
+
+  function chartTheme() {
+    if (typeof window.Chart === 'undefined') return null;
+    if (!window.Chart.__virgo) {
+      window.Chart.__virgo = true;
+      window.Chart.defaults.font.family = '"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+      window.Chart.defaults.font.size = 11.5;
+      window.Chart.defaults.color = '#7d90ac';
+      window.Chart.defaults.borderColor = 'rgba(120,160,255,.10)';
+      window.Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
+    }
+    return window.Chart;
+  }
 
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -456,27 +471,33 @@
       notas: (D.ratingBuckets || []).map(function (b) { return { label: b.label, value: b.value }; })
     };
     function renderBars(key) {
-      var list = chartData[key] || [];
+      var list = (chartData[key] || []).map(function (x) { return { label: x.label, value: x.value || 0, sub: x.sub || '' }; });
+      var Canvas = chartTheme();
       var host = $('#barsChart');
-      if (!host) return;
-      var sum = list.reduce(function (a, x) { return a + (x.value || 0); }, 0);
-      var max = Math.max.apply(null, list.map(function (x) { return x.value; }).concat([1]));
-      host.innerHTML = list.map(function (x, i) {
-        var pct = sum ? Math.round((100 * (x.value || 0)) / sum) : 0;
-        var sub = pct + '%' + (x.sub ? ' · ' + x.sub : '');
-        return '<div class="bar-row" role="img" aria-label="' + escapeHtml(x.label) + ': ' + x.value + ' (' + pct + '%)" style="animation-delay:' + (i * 45) + 'ms" title="' + escapeHtml(x.label) + ': ' + x.value + ' (' + pct + '%)">' +
-          '<span class="bar-label">' + escapeHtml(x.label) + '</span>' +
-          '<div class="bar-track"><i class="bar-fill" data-frac="' + (x.value / max).toFixed(3) + '" style="transition-delay:' + (i * 45) + 'ms"></i></div>' +
-          '<span class="bar-val">' + x.value + '<small>' + sub + '</small></span>' +
-          '</div>';
-      }).join('') || emptyBox('Sem dados para este recorte', 'Os números desta aba aparecem quando a categoria tem leads.');
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-          host.querySelectorAll('.bar-fill').forEach(function (f) {
-            f.style.transform = 'scaleX(' + f.getAttribute('data-frac') + ')';
-          });
-        });
-      });
+      if (!host || !Canvas) {
+        if (host && !Canvas) host.innerHTML = emptyBox('Sem dados para este recorte', 'Os números desta aba aparecem quando a categoria tem leads.');
+        return;
+      }
+      var labels = list.map(function (x) { return x.label; });
+      var values = list.map(function (x) { return x.value; });
+      var sum = values.reduce(function (a, v) { return a + v; }, 0);
+      var tooltipSub = { callbacks: { label: function (c) { var x = list[c.dataIndex] || {}; return ' ' + fmtInt(x.value) + (sum ? ' (' + Math.round((100 * x.value) / sum) + '%)' : '') + (x.sub ? ' · ' + x.sub : ''); } } };
+      var config = {
+        type: 'bar', data: { labels: labels, datasets: [{ data: values, borderRadius: 5, borderSkipped: false, maxBarThickness: 14,
+          backgroundColor: function (c) { var a = c.chart && c.chart.chartArea; if (!a) return '#2e7cf6'; var g = c.chart.ctx.createLinearGradient(0, 0, a.right || 0, 0); g.addColorStop(0, '#2e7cf6'); g.addColorStop(1, '#38bdf8'); return g; },
+          hoverBackgroundColor: '#5aa5fb' }] },
+        options: {
+          indexAxis: 'y', maintainAspectRatio: false, animation: CHART_ANIM, layout: { padding: { right: 8 } },
+          plugins: { legend: { display: false }, tooltip: tooltipSub },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(120,160,255,.08)', drawBorder: false } },
+            y: { ticks: { color: '#7d90ac' }, grid: { display: false }, afterFit: function (ax) { ax.width = 96; } }
+          }
+        }
+      };
+      if (!charts.bars) { host.innerHTML = '<canvas id="barsCanvas" role="img" aria-label="Composição da base por recorte"></canvas>'; charts.bars = new Canvas(document.getElementById('barsCanvas'), config); }
+      else { charts.bars.data.labels = labels; charts.bars.data.datasets[0].data = values; charts.bars.update(); }
+      if (!list.length) charts.bars.ctx.clearRect(0, 0, charts.bars.width, charts.bars.height);
     }
     var tabs = $('#chartTabs');
     if (tabs) {
@@ -492,29 +513,27 @@
     }
 
     /* donut */
-    var NS = 'http://www.w3.org/2000/svg';
-    var donut = $('#donut'), R = 54, CC = 2 * Math.PI * R;
+    var DC = chartTheme();
     var donutData = (D.donut || []).filter(function (s) { return s && s.value > 0; });
-    if (donut) donut.innerHTML = '';
+    var donutHost = $('#donut');
     $('#donutTotal').textContent = fmtInt(S.total || 0);
     if (!donutData.length) {
       $('#donutLegend').innerHTML = '<li class="empty-box"><strong>Sem composição ainda</strong><p>Os segmentos aparecem quando a categoria tem leads.</p></li>';
-    } else {
-      var acc = 0;
+      if (charts.donut) { charts.donut.clear(); }
+    } else if (DC && donutHost) {
       var donutSum = donutData.reduce(function (a, x) { return a + x.value; }, 0) || 1;
-      donutData.forEach(function (s) {
-        var frac = s.value / donutSum;
-        var pct = Math.round((100 * s.value) / (S.total || 1));
-        var c = document.createElementNS(NS, 'circle');
-        [['cx', 70], ['cy', 70], ['r', R], ['fill', 'none'], ['stroke', s.color], ['stroke-width', 13],
-         ['stroke-dasharray', (frac * CC).toFixed(1) + ' ' + CC.toFixed(1)],
-         ['stroke-dashoffset', (-acc * CC).toFixed(1)], ['transform', 'rotate(-90 70 70)'], ['data-donut', '1']].forEach(function (a) { c.setAttribute(a[0], a[1]); });
-        var t = document.createElementNS(NS, 'title');
-        t.textContent = s.label + ': ' + fmtInt(s.value) + ' (' + pct + '%)';
-        c.appendChild(t);
-        if (donut) donut.appendChild(c);
-        acc += frac;
-      });
+      if (!charts.donut) {
+        charts.donut = new DC(document.getElementById('donut'), {
+          type: 'doughnut',
+          data: { labels: donutData.map(function (s) { return s.label; }), datasets: [{ data: donutData.map(function (s) { return s.value; }), backgroundColor: donutData.map(function (s) { return s.color; }), borderWidth: 0, hoverOffset: 6 }] },
+          options: { cutout: '76%', maintainAspectRatio: false, animation: { animateRotate: !reduceMotion, duration: reduceMotion ? 0 : 700, easing: 'easeOutQuart' }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { var s = donutData[c.dataIndex] || {}; return ' ' + (s.label || '') + ': ' + fmtInt(s.value) + ' (' + Math.round((100 * (s.value || 0)) / (S.total || 1)) + '%)'; } } } } }
+        });
+      } else {
+        charts.donut.data.labels = donutData.map(function (s) { return s.label; });
+        charts.donut.data.datasets[0].data = donutData.map(function (s) { return s.value; });
+        charts.donut.data.datasets[0].backgroundColor = donutData.map(function (s) { return s.color; });
+        charts.donut.update();
+      }
       $('#donutLegend').innerHTML = donutData.map(function (s) {
         var pct = Math.round((100 * s.value) / (S.total || 1));
         return '<li><i style="background:' + s.color + '"></i>' + escapeHtml(s.label) + '<b>' + fmtInt(s.value) + ' <span style="color:var(--faint)">(' + pct + '%)</span></b></li>';
