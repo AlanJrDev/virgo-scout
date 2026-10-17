@@ -25,6 +25,14 @@ test('RA específico vence menção genérica a DF no mesmo prompt', () => {
   assert.strictEqual(r.ra, 'Taguatinga');
 });
 
+test('cidades oficiais: 37 RAs + Asa Sul/Norte como termos de busca', () => {
+  const OficiaisAusentes = ['Gama', 'Taguatinga', 'Ceilândia', 'Guará', 'Cruzeiro', 'Samambaia', 'Santa Maria', 'São Sebastião', 'Recanto das Emas', 'Lago Sul', 'Riacho Fundo', 'Lago Norte', 'Candangolândia', 'Águas Claras', 'Riacho Fundo II', 'Sudoeste/Octogonal', 'Varjão', 'Park Way', 'Estrutural', 'Sobradinho II', 'Jardim Botânico', 'Itapoã', 'SIA', 'Vicente Pires', 'Fercal', 'Sol Nascente', 'Arniqueira', 'Arapoanga', 'Água Quente', '26 de Setembro', 'Ponte Alta'];
+  const tem = new Set(RAS.map((r) => r));
+  for (const r of OficiaisAusentes) assert.ok(tem.has(r), `RA oficial faltando: ${r}`);
+  const semAsas = RAS.filter((r) => r !== 'Asa Sul' && r !== 'Asa Norte');
+  assert.strictEqual(semAsas.length, 37, `RAs oficiais: ${semAsas}`);
+});
+
 test('buildQueries: UF inteiro = todas as RAs, uma query por RA; RA único = 1 query', () => {
   const all = buildQueries('estofado');
   assert.strictEqual(all.length, RAS.length);

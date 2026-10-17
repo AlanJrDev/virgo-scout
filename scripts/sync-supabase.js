@@ -208,18 +208,23 @@ async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = 
     await sbFetch(`leads?id=in.(${inList(c)})`, { method: 'DELETE' });
   }
   await upsertRows(plan.inserts);
+  let dbDeduped = 0;
+  try {
+    const d = await require('../src/utils/dedupe').dedupeLeads({ apply: true });
+    dbDeduped = d.removed || 0;
+  } catch (e) { console.error('[sync] dedupe db falhou:', e.message); }
   await sbFetch('captures', {
     method: 'POST',
     body: [{ status: 'done', finished_at: new Date().toISOString(), leads_count: rows.length }],
   });
   if (runBuild) execFileSync(process.execPath, [path.join(__dirname, 'build-web-data.js')], { stdio: 'inherit' });
-  return { file: path.basename(file), synced: rows.length, deduped: dropped };
+  return { file: path.basename(file), synced: rows.length, deduped: dropped, dbDeduped };
 }
 
 if (require.main === module) {
   const category = process.argv[2] || 'advogados';
   syncLeads({ category })
-    .then((r) => console.log(`[sync] ${r.synced} leads${r.deduped ? ` (${r.deduped} duplicados removidos)` : ''} → Supabase (${r.file})`))
+    .then((r) => console.log(`[sync] ${r.synced} leads (${r.deduped} local${r.dbDeduped ? `, ${r.dbDeduped} no banco` : ''} dedupe) → Supabase (${r.file})`))
     .catch((e) => { console.error('[sync]', e.message); process.exit(1); });
 }
 

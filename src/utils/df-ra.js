@@ -1,12 +1,16 @@
 /* Cidades/Regiões Administrativas do DF — reconhecimento por prompt (PT-BR, com/sem acento) */
+/* RAs oficiais do DF (37, SEGOV/Wikipédia jul-2026) + Asa Sul/Norte como termos de busca
+   (fazem parte do Plano Piloto, mas no Maps rendem mais por serem áreas menores) */
 const RAS = [
-  'Brasília', 'Gama', 'Taguatinga', 'Brazlândia', 'Sobradinho', 'Planaltina',
-  'Paranoá', 'Núcleo Bandeirante', 'Ceilândia', 'Guará', 'Cruzeiro',
+  'Brasília', 'Asa Sul', 'Asa Norte',
+  'Gama', 'Ponte Alta', 'Taguatinga', 'Brazlândia', 'Sobradinho', 'Planaltina',
+  'Arapoanga', 'Paranoá', 'Núcleo Bandeirante', 'Ceilândia', 'Guará', 'Cruzeiro',
+  'Sudoeste/Octogonal',
   'Águas Claras', 'Arniqueira', 'Candangolândia', 'Fercal', 'Itapoã',
   'Jardim Botânico', 'Lago Norte', 'Lago Sul', 'Park Way', 'Riacho Fundo',
-  'Riacho Fundo II', 'Recanto das Emas', 'Samambaia', 'Santa Maria',
-  'São Sebastião', 'Sobradinho II', 'Sol Nascente', 'Estrutural',
-  'Varjão', 'Vicente Pires', 'SIA', 'Asa Norte', 'Asa Sul',
+  'Riacho Fundo II', 'Recanto das Emas', 'Água Quente', 'Samambaia',
+  'Santa Maria', 'São Sebastião', 'Sobradinho II', '26 de Setembro',
+  'Sol Nascente', 'Estrutural', 'Varjão', 'Vicente Pires', 'SIA',
 ];
 
 const RAS_TIER1 = ['Brasília', 'Lago Sul', 'Lago Norte', 'Asa Sul', 'Asa Norte', 'Águas Claras', 'Cruzeiro', 'Park Way', 'Jardim Botânico', 'Guará'];
@@ -23,8 +27,11 @@ const ALIAS = new Map([
   ['bda', 'Brasília'],
   ['ceilandia', 'Ceilândia'],
   ['vila estrutural', 'Estrutural'],
-  ['sol nascente e por do sol', 'Sol Nascente'],
+  ['scia', 'Estrutural'],
+  ['sudoeste', 'Sudoeste/Octogonal'],
+  ['octogonal', 'Sudoeste/Octogonal'],
   ['por do sol', 'Sol Nascente'],
+  ['sol nascente e por do sol', 'Sol Nascente'],
   ['rural do planalto central', 'Planaltina'],
 ]);
 
