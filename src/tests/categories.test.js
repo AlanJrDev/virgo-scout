@@ -4,8 +4,8 @@ const assert = require('node:assert');
 const { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType } = require('../utils/categories');
 const { matchFile } = require('../utils/leads-io');
 
-test('registro cobre as 4 categorias com tags sem acento', () => {
-  assert.deepStrictEqual(CAT_KEYS, ['advogados', 'arquitetura', 'tapecaria', 'estofado']);
+test('registro cobre as categorias com tags sem acento', () => {
+  assert.deepStrictEqual(CAT_KEYS, ['advogados', 'arquitetura', 'tapecaria', 'estofado', 'topografia']);
   assert.strictEqual(tagOf('tapecaria'), 'tapecaria');
   assert.strictEqual(tagOf('inexistente'), 'advogados');
   assert.strictEqual(CATEGORIES.tapecaria.label, 'Tapeçaria');
