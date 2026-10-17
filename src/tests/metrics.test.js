@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { buildPayload, scoreOf, buildTop, buildStats } = require('../utils/metrics');
+const { buildPayload, scoreOf, buildTop, buildStats, buildSeries } = require('../utils/metrics');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-metrics-'));
 fs.writeFileSync(path.join(TMP, 'advogados-df-max.json'), JSON.stringify([
@@ -287,4 +287,45 @@ test('buildPayload filtra por icp e minFit', () => {
   const p = buildPayload(leads, { dataDir: TMP, category: 'advogados', icp: 'sistema', minFit: 1 });
   assert.strictEqual(p.pool.length, 1);
   assert.strictEqual(p.pool[0].name, 'Sistema');
+});
+
+test('buildSeries retorna multi-série coerente com os filtros de oportunidade', () => {
+  const now = new Date().toISOString();
+  const leads = [
+    { name: 'Completa', website: 'x.com', whatsapp: '5561999990001', phone: '5561999990001', rating: 4.8, reviews: 40, captured_at: now },
+    { name: 'SiteSemWa', website: 'y.com', rating: 4.6, reviews: 25, captured_at: now },
+    { name: 'SemSite', phone: '5561999990002', captured_at: now },
+  ];
+  const s = buildSeries(leads, Date.now());
+  assert.ok(Array.isArray(s.series) && s.series.length >= 6, `series: ${s.series.length}`);
+  const byKey = Object.fromEntries(s.series.map((x) => [x.key, x.values]));
+  const last = (k) => byKey[k][byKey[k].length - 1];
+  assert.strictEqual(last('total'), 3);
+  assert.strictEqual(last('comSite'), 2);
+  assert.strictEqual(last('semSite'), 1);
+  assert.strictEqual(last('comWa'), 1);
+  assert.strictEqual(last('alta'), 2);
+  assert.strictEqual(last('total'), byKey.total.reduce((a, v) => Math.max(a, v), 0), 'total é acumulado');
+  for (const k of ['comSite', 'semSite', 'comWa', 'alta', 'icpSite', 'icpSistema']) {
+    assert.ok(last(k) <= last('total'), `${k} <= total`);
+    assert.strictEqual(byKey[k].length, s.days.length, `${k} alinhado aos days`);
+  }
+});
+
+test('buildSeries usa janela adaptativa quando a base é mais velha que 9 dias', () => {
+  const D = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const leads = [
+    { name: 'Velho', website: 'a.com', captured_at: new Date(now - 60 * D).toISOString() },
+    { name: 'Meio', whatsapp: '5561999990003', captured_at: new Date(now - 30 * D).toISOString() },
+    { name: 'Novo', captured_at: new Date(now - 2000).toISOString() },
+  ];
+  const s = buildSeries(leads, now);
+  assert.strictEqual(s.days.length, 7);
+  assert.strictEqual(s.values[0], 1, 'bucket 0 contém só o lead da era mais antiga');
+  assert.ok(s.values[3] >= 2, 'meio da janela já tem 2 eras');
+  for (let i = 1; i < s.values.length; i++) assert.ok(s.values[i] >= s.values[i - 1], 'acumulado monotônico');
+  assert.strictEqual(s.values[s.values.length - 1], 3);
+  const fmt = /^\d{2}\/\d{2}$/;
+  assert.ok(s.days.every((d) => fmt.test(d)), `labels dd/MM: ${s.days.join(',')}`);
 });

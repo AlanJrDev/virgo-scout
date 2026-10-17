@@ -264,19 +264,48 @@ function buildSeries(leads, fallbackTs) {
     const t = Date.parse(l.captured_at);
     return Number.isFinite(t) ? t : fb;
   };
+  const series = [
+    { key: 'total', label: 'Total' },
+    { key: 'comSite', label: 'Com site', ok: (l) => !!l.website },
+    { key: 'semSite', label: 'Sem site', ok: (l) => !l.website },
+    { key: 'comWa', label: 'Com WhatsApp', ok: (l) => hasWa(l) },
+    { key: 'alta', label: 'Alta oportunidade', ok: (l) => (l.rating || 0) >= 4.5 && (l.reviews || 0) >= 20 },
+    { key: 'icpSite', label: 'ICP site', ok: (l, i) => icps[i].includes('site') },
+    { key: 'icpSistema', label: 'ICP sistema', ok: (l, i) => icps[i].includes('sistema') },
+  ];
+  const icps = leads.map((l) => qualify(l).icp);
   const days = [];
-  const values = [];
-  const today = new Date();
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    d.setHours(23, 59, 59, 999);
-    const end = d.getTime();
-    days.push(String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'));
-    values.push(leads.filter((l) => tsOf(l) <= end).length);
+  const buckets = Object.fromEntries(series.map((x) => [x.key, []]));
+  const now = Number.isFinite(fallbackTs) ? fallbackTs : Date.now();
+  const minTs = leads.reduce((m, l) => (tsOf(l) < m ? tsOf(l) : m), now);
+  const endOfDay = (d) => { d.setHours(23, 59, 59, 999); return d.getTime(); };
+  const DIA = 24 * 60 * 60 * 1000;
+  let ends;
+  if (now - minTs > 9 * DIA) {
+    const span = (now - minTs) / 7;
+    ends = Array.from({ length: 7 }, (_, i) => Math.round(minTs + span * (i + 1)));
+  } else {
+    const today = new Date(now);
+    ends = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - i));
+      return endOfDay(d);
+    });
   }
-  for (let i = 1; i < values.length; i++) values[i] = Math.max(values[i], values[i - 1]);
-  return { days, values };
+  ends.forEach((end, i) => {
+    const dl = new Date(end);
+    days.push(String(dl.getDate()).padStart(2, '0') + '/' + String(dl.getMonth() + 1).padStart(2, '0'));
+    for (const x of series) {
+      const cur = x.ok ? leads.filter((l, i) => tsOf(l) <= end && x.ok(l, i)).length : leads.filter((l) => tsOf(l) <= end).length;
+      const arr = buckets[x.key];
+      arr.push(cur === 0 && arr.length ? Math.max(cur, arr[arr.length - 1]) : cur);
+    }
+  });
+  for (const x of series) {
+    const arr = buckets[x.key];
+    for (let i = 1; i < arr.length; i++) arr[i] = Math.max(arr[i], arr[i - 1]);
+  }
+  return { days, values: buckets.total, series: series.map((x) => ({ key: x.key, label: x.label, values: buckets[x.key] })) };
 }
 
 function relTime(ts) {

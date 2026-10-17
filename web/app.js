@@ -5,6 +5,8 @@
   var hasGsap = typeof window.gsap !== 'undefined' && !reduceMotion;
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var charts = { bars: null, donut: null };
+  var trendState = { visible: null };
+  var TREND_COLORS = { total: '#38bdf8', comSite: '#34d399', semSite: '#fbbf24', comWa: '#2e7cf6', alta: '#f87171', icpSite: '#a78bfa', icpSistema: '#22d3ee' };
   var CHART_ANIM = reduceMotion ? { colors: true, x: false, y: false } : { duration: 650, easing: 'easeOutQuart', delay: function (c) { return (c.dataIndex || 0) * 45; } };
 
   function chartTheme() {
@@ -18,6 +20,123 @@
       window.Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
     }
     return window.Chart;
+  }
+
+  /* Evolução por tipo de leads — D3 multi-linha com chips de visibilidade (todas ligadas no início) */
+  function renderTrend(Series) {
+    var svg = $('#trendChart');
+    if (!svg || typeof window.d3 === 'undefined') return;
+    var d3 = window.d3;
+    var wrap = svg.parentNode;
+    var days = (Series && Series.days) || [];
+    var series = ((Series && Series.series) || []).filter(function (s) { return s && Array.isArray(s.values) && s.values.length === days.length; });
+    var tip = $('#trendTip');
+    if (!series.length || days.length < 2) {
+      svg.setAttribute('viewBox', '0 0 600 200');
+      svg.innerHTML = '<text x="300" y="100" text-anchor="middle" fill="#7d90ac" font-size="13">Sem dados de evolução ainda — execute uma captura.</text>';
+      if (tip) tip.hidden = true;
+      var tgl0 = $('#trendToggles'); if (tgl0) tgl0.innerHTML = '';
+      return;
+    }
+    if (!trendState.visible) {
+      trendState.visible = {};
+      series.forEach(function (s) { trendState.visible[s.key] = true; });
+    }
+    series.forEach(function (s) { if (!(s.key in trendState.visible)) trendState.visible[s.key] = true; });
+    var vis = series.filter(function (s) { return trendState.visible[s.key]; });
+
+    var tgl = $('#trendToggles');
+    tgl.innerHTML = series.map(function (s) {
+      var on = trendState.visible[s.key];
+      return '<button type="button" class="chip trend-chip' + (on ? '' : ' off') + '" data-key="' + s.key + '" aria-pressed="' + (on ? 'true' : 'false') + '"><i style="background:' + (TREND_COLORS[s.key] || '#7d90ac') + '"></i>' + escapeHtml(s.label) + '</button>';
+    }).join('');
+    tgl.querySelectorAll('.trend-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var key = btn.getAttribute('data-key');
+        trendState.visible[key] = !trendState.visible[key];
+        btn.classList.toggle('off', !trendState.visible[key]);
+        btn.setAttribute('aria-pressed', trendState.visible[key] ? 'true' : 'false');
+        renderTrend(Series);
+      });
+    });
+
+    var W = Math.max(wrap.clientWidth || 600, 320), H = 248;
+    var M = { t: 16, r: 60, b: 28, l: 40 };
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.innerHTML = '';
+    var x = d3.scalePoint().domain(days).range([M.l, W - M.r]).padding(0.5);
+    var maxY = d3.max(vis, function (s) { return d3.max(s.values); }) || 1;
+    var y = d3.scaleLinear().domain([0, Math.ceil(maxY * 1.08)]).range([H - M.b, M.t]).nice();
+    var line = d3.line().x(function (d, i) { return x(days[i]); }).y(function (d) { return y(d); }).curve(d3.curveMonotoneX);
+    var defs = svg.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'defs'));
+    defs.innerHTML = '<linearGradient id="trendGridGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgba(120,160,255,.10)"/><stop offset="1" stop-color="rgba(120,160,255,.04)"/></linearGradient>';
+    var g = d3.select(svg).append('g').attr('transform', 'translate(0,0)');
+
+    g.append('g').attr('class', 't-grid').selectAll('line').data(y.ticks(4)).enter().append('line')
+      .attr('x1', M.l).attr('x2', W - M.r).attr('y1', function (d) { return y(d); }).attr('y2', function (d) { return y(d); })
+      .attr('stroke', 'url(#trendGridGrad)');
+    g.append('g').attr('class', 't-axis t-ay').attr('transform', 'translate(' + (M.l - 6) + ',0)')
+      .call(d3.axisLeft(y).ticks(4).tickSize(0).tickPadding(8)).call(function (sel) { sel.select('.domain').remove(); });
+    g.append('g').attr('class', 't-axis t-ax').attr('transform', 'translate(0,' + (H - M.b + 16) + ')')
+      .call(d3.axisBottom(x).tickSize(0).tickPadding(10)).call(function (sel) { sel.select('.domain').remove(); });
+
+    var dur = reduceMotion ? 0 : 850, stag = reduceMotion ? 0 : 130;
+    var endLabels = [];
+    vis.forEach(function (s, si) {
+      var c = TREND_COLORS[s.key] || '#7d90ac';
+      g.append('path').attr('class', 't-line').attr('fill', 'none').attr('stroke', c).attr('stroke-width', 2.2)
+        .attr('stroke-linecap', 'round').attr('d', line(s.values))
+        .attr('opacity', 0.95)
+        .attr('stroke-dasharray', function () { var L = this.getTotalLength ? this.getTotalLength() : 0; return reduceMotion || !L ? null : L + ' ' + L; })
+        .attr('stroke-dashoffset', function () { var L = this.getTotalLength ? this.getTotalLength() : 0; return reduceMotion || !L ? 0 : L; })
+        .transition().duration(dur).delay(reduceMotion ? 0 : si * stag).ease(d3.easeCubicOut)
+        .attr('stroke-dashoffset', 0)
+        .on('end', function () { d3.select(this).attr('stroke-dasharray', null); });
+      var lx = x(days[days.length - 1]), ly = y(s.values[s.values.length - 1]);
+      g.append('circle').attr('class', 't-dot').attr('cx', lx).attr('cy', ly).attr('r', 4.5)
+        .attr('fill', '#0f1524').attr('stroke', c).attr('stroke-width', 2.2)
+        .attr('opacity', 0).attr('transform', reduceMotion ? '' : 'scale(0)')
+        .attr('transform-origin', lx + 'px ' + ly + 'px')
+        .transition().duration(dur ? 420 : 0).delay(reduceMotion ? 0 : si * stag + dur * 0.7).ease(d3.easeBackOut.overshoot(2.4))
+        .attr('opacity', 1).attr('transform', 'scale(1)');
+      endLabels.push({ color: c, ly: ly, text: fmtInt(s.values[s.values.length - 1]), delay: si * stag + dur * 0.85 });
+    });
+    endLabels.sort(function (a, b) { return a.ly - b.ly; });
+    for (var e = 1; e < endLabels.length; e++) {
+      if (endLabels[e].ly - endLabels[e - 1].ly < 13) endLabels[e].ly = endLabels[e - 1].ly + 13;
+    }
+    var lxEnd = x(days[days.length - 1]) + 8;
+    endLabels.forEach(function (L) {
+      g.append('text').attr('class', 't-end').attr('x', lxEnd).attr('y', L.ly + 3.5)
+        .attr('fill', L.color).attr('font-size', 11).attr('font-weight', 600).attr('opacity', 0)
+        .text(L.text).transition().duration(dur ? 500 : 0).delay(reduceMotion ? 0 : L.delay)
+        .attr('opacity', 0.95);
+    });
+
+    if (tip) {
+      var guide = g.append('line').attr('class', 't-guide').attr('y1', M.t).attr('y2', H - M.b)
+        .attr('stroke', 'rgba(125,144,172,.45)').attr('stroke-dasharray', '3 4').attr('opacity', 0);
+      var hDots = g.append('g').attr('class', 't-hipdots');
+      svg.addEventListener('mousemove', function (ev) {
+        var r = svg.getBoundingClientRect();
+        var px = ((ev.clientX - r.left) / r.width) * W;
+        var i = Math.max(0, Math.min(days.length - 1, Math.round((px - M.l) / x.step())));
+        var gx = x(days[i]);
+        guide.attr('x1', gx).attr('x2', gx).attr('opacity', 1);
+        var hsel = hDots.selectAll('circle').data(vis).join('circle')
+          .attr('cx', gx).attr('cy', function (s) { return y(s.values[i]); }).attr('r', 3.4)
+          .attr('fill', function (s) { return TREND_COLORS[s.key] || '#7d90ac'; });
+        tip.hidden = false;
+        tip.innerHTML = '<strong>' + days[i] + '</strong>' + vis.map(function (s, sIdx) {
+          return '<span><i style="background:' + (TREND_COLORS[s.key] || '#7d90ac') + '"></i>' + escapeHtml(s.label) + ' <b>' + fmtInt(s.values[i]) + '</b></span>';
+        }).join('');
+        var wr = wrap.getBoundingClientRect();
+        var tx = Math.min(Math.max(ev.clientX - wr.left + 14, 8), wr.width - 168);
+        tip.style.left = tx + 'px';
+        tip.style.top = Math.max(ev.clientY - wr.top - 14, 4) + 'px';
+      });
+      svg.addEventListener('mouseleave', function () { guide.attr('opacity', 0); hDots.selectAll('circle').remove(); if (tip) tip.hidden = true; });
+    }
   }
 
   function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -539,6 +658,9 @@
         return '<li><i style="background:' + s.color + '"></i>' + escapeHtml(s.label) + '<b>' + fmtInt(s.value) + ' <span style="color:var(--faint)">(' + pct + '%)</span></b></li>';
       }).join('');
     }
+
+    /* evolução por tipo de leads — D3 linhas multi-série com chips de visibilidade */
+    renderTrend(D.series);
 
     /* oportunidades reais derivadas da base */
     var oppIcons = {
