@@ -1147,6 +1147,92 @@
   }
 
   document.addEventListener('click', function (e) {
-    if (e.target && e.target.id === 'capRun') startCapture();
+    if (e.target && e.target.id === 'capRun') {
+      if (capModal) openCaptureModal();
+      else startCapture();
+    }
   });
+
+  /* ---------- captura: modal NLP ---------- */
+  var capModal = document.getElementById('capModal');
+  var capPrompt = document.getElementById('capPrompt');
+  var capInterpret = document.getElementById('capInterpret');
+  var capModalClose = document.getElementById('capModalClose');
+  var capErrorEl = document.getElementById('capError');
+  var CAP_LOW_SIGNAL = 'Não entendi. Cite o nicho (ex.: tapeçaria) e o lugar (ex.: Águas Claras ou DF).';
+
+  function capShowError(msg) {
+    if (!capErrorEl) return;
+    capErrorEl.textContent = msg;
+    capErrorEl.hidden = false;
+  }
+  function capClearError() {
+    if (!capErrorEl) return;
+    capErrorEl.textContent = '';
+    capErrorEl.hidden = true;
+  }
+  function capResetCTA() {
+    if (!capInterpret) return;
+    capInterpret.disabled = false;
+    capInterpret.textContent = 'Interpretar e capturar';
+  }
+  function closeCaptureModal() {
+    if (!capModal) return;
+    capModal.hidden = true;
+    capClearError();
+  }
+  function openCaptureModal() {
+    if (!capModal) { startCapture(); return; }
+    capClearError();
+    capResetCTA();
+    capModal.hidden = false;
+    if (capPrompt) capPrompt.focus();
+  }
+
+  if (capModal) {
+    capModal.addEventListener('click', function (e) {
+      if (e.target === capModal) closeCaptureModal();
+    });
+    var capChips = capModal.querySelectorAll('.cap-chip');
+    for (var ci = 0; ci < capChips.length; ci++) {
+      capChips[ci].addEventListener('click', function (e) {
+        var chip = e.currentTarget;
+        if (capPrompt) { capPrompt.value = chip.textContent; capPrompt.focus(); }
+        capClearError();
+      });
+    }
+    if (capModalClose) capModalClose.addEventListener('click', closeCaptureModal);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !capModal.hidden) closeCaptureModal();
+    });
+    if (capInterpret) {
+      capInterpret.addEventListener('click', function () {
+        var prompt = capPrompt ? String(capPrompt.value || '').trim() : '';
+        capClearError();
+        capInterpret.disabled = true;
+        capInterpret.textContent = 'Interpretando...';
+        fetch('/api/capture/interpret', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: prompt }) })
+          .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, b: b }; }); })
+          .then(function (res) {
+            capResetCTA();
+            var b = res.b || {};
+            var itp = b.interpretation;
+            if (res.ok && b.ok && itp) {
+              var job = b.job || { status: 'running', done: 0, total: 0 };
+              if (!job.total && itp.queriesTotal) job.total = itp.queriesTotal;
+              closeCaptureModal();
+              toast('Captura iniciada: ' + itp.label + ' \u00B7 ' + (itp.placeType === 'df' ? 'DF' : (itp.place || 'DF')), 'ok');
+              setCaptureUI(job);
+              return;
+            }
+            if (b.error === 'low_signal') { capShowError(CAP_LOW_SIGNAL); return; }
+            capShowError(b.error ? String(b.error) : CAP_LOW_SIGNAL);
+          })
+          .catch(function () {
+            capResetCTA();
+            capShowError(CAP_LOW_SIGNAL);
+          });
+      });
+    }
+  }
 })();

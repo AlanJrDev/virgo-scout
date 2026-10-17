@@ -1,0 +1,24 @@
+﻿require("dotenv").config();
+const { chromium } = require("playwright");
+const { createSession, destroySession } = require("../src/utils/session-store");
+(async () => {
+  const token = await createSession({ email: "probe-modal@virgo.test", role: "founder", ttlMs: 5 * 60 * 1000 });
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
+  page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
+  await page.context().clearCookies();
+  await page.context().addCookies([{ name: "vs_auth", value: token, url: "http://127.0.0.1:8901" }]);
+  await page.goto("http://127.0.0.1:8901/", { waitUntil: "networkidle", timeout: 30000 });
+  await page.locator("#capRun").click();
+  const open = await page.evaluate(() => !document.getElementById("capModal").hidden);
+  await page.fill("#capPrompt", "algo sem nicho nenhum falando");
+  await page.locator("#capInterpret").click();
+  await page.waitForTimeout(9000);
+  const errTxt = await page.evaluate(() => { const el = document.getElementById("capError"); return el ? [el.hidden, el.textContent] : null; });
+  await page.screenshot({ path: require("path").join(__dirname, "probe-shot-modal.png") });
+  console.log("modal abriu:", open, "| erro exibido:", JSON.stringify(errTxt), "| erros js:", errors.length ? errors.slice(0, 3) : "nenhum");
+  await browser.close();
+  await destroySession(token);
+})().catch((e) => { console.error(e.message); process.exit(1); });

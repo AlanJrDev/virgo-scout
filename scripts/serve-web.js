@@ -11,8 +11,9 @@ const { json } = require('../src/utils/http-json');
 const { markContacted } = require('../src/utils/contact');
 const { markOutcome } = require('../src/utils/outcomes');
 const { sbFetchAll, SbError } = require('../src/utils/sb');
-const { askGroq, formatContext } = require('./groq');
+const { askGroq, formatContext, interpretCapture } = require('./groq');
 const { CATEGORIES, matchesType } = require('../src/utils/categories');
+const { findRA, buildQueries } = require('../src/utils/df-ra');
 
 const ROOT = path.join(__dirname, '..', 'web');
 const DATA = path.join(__dirname, '..', 'data');
@@ -75,24 +76,23 @@ function jobStatus() {
     return { status: summary ? 'done' : 'failed', started_at: job.started_at, finished_at: job.finished_at || null, category: job.category || 'advogados', summary };
   }
 
-function startCapture(category = 'advogados') {
+function startCapture(category = 'advogados', { queries: queriesOverride = null } = {}) {
   const st = jobStatus();
   if (st.status === 'running') return { code: 409, body: { error: 'already_running', job: st } };
   const cfg = CATEGORIES[category] || CATEGORIES.advogados;
-  const queries = require(cfg.queriesModule)[cfg.queriesExport];
-  const effective = process.env.QUERIES ? process.env.QUERIES.split('|').filter(Boolean) : queries;
+  const queries = queriesOverride && queriesOverride.length ? queriesOverride : require(cfg.queriesModule)[cfg.queriesExport];
   const out = fs.openSync(JOB_LOG, 'w');
   const err = fs.openSync(JOB_ERR, 'w');
   const child = spawn(process.execPath, [path.join(__dirname, cfg.script)], {
     detached: true,
     stdio: ['ignore', out, err],
     cwd: path.join(__dirname, '..'),
-    env: process.env,
+    env: { ...process.env, QUERIES: queries.join('|') },
   });
-  const job = { pid: child.pid, started_at: new Date().toISOString(), queries: effective.length, category: cfg.tag, log: path.basename(JOB_LOG) };
+  const job = { pid: child.pid, started_at: new Date().toISOString(), queries: queries.length, category: cfg.tag, log: path.basename(JOB_LOG) };
   fs.writeFileSync(JOB_FILE, JSON.stringify(job, null, 2));
   child.unref();
-  return { code: 202, body: { ok: true, job: { ...job, status: 'running', done: 0, total: job.queries } } };
+  return { code: 202, body: { ok: true, job: { ...job, status: 'running', done: 0, total: queries.length } } };
 }
 
 let payloadCache = { at: 0, type: null, payload: null };
@@ -192,6 +192,36 @@ async function handler(req, res) {
         let cat = category;
         try { const j = JSON.parse(body || '{}'); if (CATEGORIES[j.category]) cat = j.category; } catch {}
         try { const r = startCapture(cat); json(res, r.code, r.body); } catch (e) { json(res, 500, { error: e.message }); }
+      });
+      return;
+    }
+    if (url === '/api/capture/interpret' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
+      req.on('end', async () => {
+        let prompt = '';
+        try { prompt = String(JSON.parse(body || '{}').prompt || '').slice(0, 500); } catch {}
+        if (!prompt) { json(res, 400, { ok: false, error: 'empty_prompt' }); return; }
+        try {
+          const { nicho, lugar } = await interpretCapture(prompt);
+          const NICHO_WORDS = { advogados: 'advogado advogados direito advocacia lei juridico', arquitetura: 'arquiteto arquitetos arquitetura urbanismo', tapecaria: 'tapecaria tapete carpete', estofado: 'estofado estofados sofa poltrona colchoes colchao' };
+          const rn = String(nicho || prompt).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          let cat = null;
+          for (const [k, words] of Object.entries(NICHO_WORDS)) if (words.split(' ').some((w) => rn.includes(w))) { cat = k; break; }
+          if (!cat) { json(res, 200, { ok: false, error: 'low_signal' }); return; }
+          const loc = findRA(lugar) || findRA(prompt);
+          const term = CATEGORIES[cat].label.toLowerCase();
+          let place = 'DF', placeType = 'df', queries;
+          if (loc && loc.raType === 'ra') { place = loc.ra; placeType = 'ra'; queries = buildQueries(term, { ra: loc.ra }); }
+          else queries = buildQueries(term);
+          const st = jobStatus();
+          if (st.status === 'running') { json(res, 409, { ok: false, error: 'already_running' }); return; }
+          const r = startCapture(cat, { queries });
+          json(res, 200, { ok: true, interpretation: { category: cat, label: CATEGORIES[cat].label, place, placeType, queries, queriesTotal: queries.length }, job: r.body.job });
+        } catch (e) {
+          if (e.code === 'no_key') { json(res, 503, { ok: false, error: 'groq indisponível (sem GROQ_API_KEY)' }); return; }
+          json(res, 503, { ok: false, error: 'groq_error' });
+        }
       });
       return;
     }

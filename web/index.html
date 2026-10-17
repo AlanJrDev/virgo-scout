@@ -264,6 +264,24 @@
   </aside>
 </div>
 
+  <!-- ============ MODAL: NOVA CAPTURA (NLP) ============ -->
+  <div class="cap-modal modal-back" id="capModal" hidden>
+    <div class="cap-modal-card capture-modal" role="dialog" aria-modal="true" aria-labelledby="capModalTitle">
+      <h3 id="capModalTitle">Nova captura</h3>
+      <textarea id="capPrompt" rows="3" placeholder="Ex.: capturar estofados em Águas Claras" aria-label="Descreva a captura desejada"></textarea>
+      <div class="cap-chip-row" role="group" aria-label="Exemplos de captura">
+        <button type="button" class="cap-chip">tapeçaria no Lago Sul</button>
+        <button type="button" class="cap-chip">capturar advogados em Taguatinga</button>
+        <button type="button" class="cap-chip">estofados no DF</button>
+      </div>
+      <p class="cap-error" id="capError" role="alert" hidden></p>
+      <div class="cap-modal-foot">
+        <button type="button" class="modal-ghost" id="capModalClose">Cancelar</button>
+        <button type="button" class="capture-cta cap-cta-capture" id="capInterpret">Interpretar e capturar</button>
+      </div>
+    </div>
+  </div>
+
 <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
 <script src="vendor/gsap.min.js"></script>

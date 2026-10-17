@@ -60,4 +60,47 @@ async function askGroq({ question, context, history = [] }) {
   }
 }
 
-module.exports = { GROQ_URL, MODEL, SYSTEM, formatContext, buildMessages, askGroq };
+/* NLP da modal "Nova captura": nicho (categoria) + lugar (RA/cidade do DF ou DF inteiro)
+   Resposta: JSON puro {nicho, lugar} — validação do lado do servidor. */
+const INTERPRET_SYSTEM = [
+  'Você converte pedidos de captura de leads em JSON estrito.',
+  'O usuário descreve em português o que capturar. Responda SOMENTE com JSON: {"nicho": string, "lugar": string}.',
+  'nicho: o tipo de negócio/termo de busca (ex.: "tapeçaria", "advogado", "consultório odontológico", "arquiteto").',
+  'lugar: a cidade/região que citou (ex.: "Águas Claras", "Lago Sul", "Taguatinga") ou "DF"/"Distrito Federal"/"Brasília" se pediu todo o estado. Escreva o nome com os acentos corretos do português.',
+  'Se o prompt não citar nenhum nicho comercial nem lugar, responda {"nicho": "", "lugar": ""}.',
+  'Nunca adicione chaves além de nicho e lugar.',
+].join(' ');
+
+async function interpretCapture(prompt) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) { const e = new Error('GROQ_API_KEY não definida'); e.code = 'no_key'; throw e; }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const r = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: INTERPRET_SYSTEM },
+          { role: 'user', content: String(prompt || '').slice(0, 500) },
+        ],
+        temperature: 0,
+        max_tokens: 200,
+        response_format: { type: 'json_object' },
+      }),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) { const e = new Error(`groq http ${r.status}`); e.code = 'http'; e.status = r.status; throw e; }
+    const j = await r.json();
+    const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+    const parsed = JSON.parse(text || '{}');
+    return { nicho: String(parsed.nicho || '').trim(), lugar: String(parsed.lugar || '').trim() };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = { GROQ_URL, MODEL, SYSTEM, formatContext, buildMessages, askGroq, interpretCapture };
+
