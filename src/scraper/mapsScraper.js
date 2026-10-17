@@ -121,12 +121,17 @@ async function readPlaceDetail(page) {
     let plus_code = '';
     const olocBtn = document.querySelector('button[data-item-id="oloc"]');
     if (olocBtn) plus_code = (olocBtn.querySelector('.Io6YTe')?.innerText || olocBtn.innerText).trim();
-    // redes sociais: âncoras externas além do authority
+    // redes sociais: apenas âncoras formalmente vinculadas ao place (data-item-id URL).
+    // O seletor genérico a[href*="instagram.com"] pegava cards patrocinados/sugeridos
+    // (ex.: "Arte e Cores DF"Injected em 14 leads de tapeçaria que não têm essa conta).
     let instagram = '';
     let facebook = '';
-    document.querySelectorAll('a[data-item-id^="http"], a[href*="instagram.com"], a[href*="facebook.com"]').forEach((a) => {
+    const SOCIAL_RE = /instagram\.com\/([A-Za-z0-9_.]+)/i;
+    const SOCIAL_RESERVED = /^(p|reel|reels|explore|stories|accounts|tv|directory)\/?$/i;
+    document.querySelectorAll('a[data-item-id^="http"]').forEach((a) => {
       const h = a.getAttribute('href') || '';
-      if (/instagram\.com\//.test(h) && !instagram) instagram = h;
+      const im = h.match(SOCIAL_RE);
+      if (im && !SOCIAL_RESERVED.test(im[1]) && !instagram) instagram = h;
       if (/facebook\.com\//.test(h) && !facebook) facebook = h;
     });
     // texto do painel para sinais (não-reclamado primeiro: "claim this business" contém "claim")

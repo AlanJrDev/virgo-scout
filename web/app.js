@@ -159,6 +159,12 @@
     if (!href) return '';
     return '<a class="ig-btn" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer" aria-label="Abrir Instagram de ' + escapeHtml(l.name) + '" title="Abrir Instagram">' + IG_SVG + '</a>';
   }
+  function siteBtn(l) {
+    var s = String(l.site_url || '').trim();
+    if (!s) return '';
+    var href = /^https?:\/\//i.test(s) ? s : 'https://' + s;
+    return '<a class="site-btn" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer" aria-label="Abrir site de ' + escapeHtml(l.name) + '" title="Abrir site">' + SITE_SVG + '</a>';
+  }
 
   /* ---------- toast: feedback de ações ---------- */
   function toast(msg, kind) {
@@ -715,7 +721,7 @@
         if (l.since_year) why.push('desde ' + l.since_year);
         return '<li data-id="' + escapeHtml(l.id || '') + '">' +
           '<div class="q-info"><strong>' + escapeHtml(l.name) + '</strong><span>' + escapeHtml((l.area || 'Geral') + (why.length ? ' · ' + why.join(' · ') : '')) + '</span></div>' +
-          ring(l.score) + (l.wa ? waBtn(l) : '') + igBtn(l) + '</li>';
+          ring(l.score) + (l.wa ? waBtn(l) : '') + siteBtn(l) + igBtn(l) + '</li>';
       }).join('');
       drawRings(document.getElementById('queueList'));
     }

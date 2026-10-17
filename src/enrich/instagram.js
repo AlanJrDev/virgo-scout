@@ -1,13 +1,16 @@
 // Instagram público — melhor esforço. Muro de login => blocked (unknown).
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36';
 
+// handles reservados do IG (páginas internas, não perfis de negócio)
+const RESERVED = /^(p|reel|reels|explore|stories|accounts|tv|directory)$/i;
+
 function handleFrom(value) {
   let v = String(value || '').trim();
   if (!v) return null;
   v = v.replace(/^@/, '');
   const m = v.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
-  if (m) return m[1];
-  return /^[A-Za-z0-9_.]{2,40}$/.test(v) ? v : null;
+  if (m) return RESERVED.test(m[1]) ? null : m[1];
+  return RESERVED.test(v) ? null : (/^[A-Za-z0-9_.]{2,40}$/.test(v) ? v : null);
 }
 
 function num(s) {

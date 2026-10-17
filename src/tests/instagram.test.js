@@ -22,3 +22,12 @@ test('handleFrom normaliza URL ou @handle', () => {
   assert.strictEqual(handleFrom('clinicax'), 'clinicax');
   assert.strictEqual(handleFrom(''), null);
 });
+
+test('handleFrom rejeita handles reservados (páginas internas do IG)', () => {
+  assert.strictEqual(handleFrom('https://instagram.com/p/ABC123/'), null);
+  assert.strictEqual(handleFrom('https://instagram.com/reel/XYZ/'), null);
+  assert.strictEqual(handleFrom('https://www.instagram.com/stories/alguem/'), null);
+  assert.strictEqual(handleFrom('https://instagram.com/explore/tags/advocacia'), null);
+  assert.strictEqual(handleFrom('p'), null);
+  assert.strictEqual(handleFrom('https://instagram.com/arteecoresdf/'), 'arteecoresdf');
+});
