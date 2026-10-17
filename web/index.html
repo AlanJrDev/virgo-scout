@@ -42,13 +42,6 @@
       <kbd>Ctrl + K</kbd>
       <div class="search-results" id="searchResults" role="listbox" hidden></div>
     </label>
-    <div class="type-switch" id="typeSwitch" role="group" aria-label="Tipo de lead">
-      <button type="button" class="type-btn active" data-type="all" aria-pressed="true" title="Todos os tipos">Todos</button>
-      <button type="button" class="type-btn" data-type="advogados" aria-pressed="false" title="Advogados">Adv</button>
-      <button type="button" class="type-btn" data-type="arquitetura" aria-pressed="false" title="Arquitetura">Arq</button>
-      <button type="button" class="type-btn" data-type="tapecaria" aria-pressed="false" title="Tapeçaria">Tap</button>
-      <button type="button" class="type-btn" data-type="estofado" aria-pressed="false" title="Estofado">Est</button>
-    </div>
     <div class="top-user">
       <button class="icon-btn bell" aria-label="Notificações"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></button>
       <div class="avatar" id="uAvatar" aria-hidden="true">VS</div>
@@ -174,6 +167,7 @@
             <span class="head-ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M9.5 9.5V20"/></svg></span>
             <h2 id="leadsTitle">Base de Leads</h2>
             <span class="tbl-summary" id="tblSummary">…</span>
+            <div class="type-switch" id="typeSwitch" role="group" aria-label="Filtrar por categoria"></div>
           </div>
 
           <div class="tbl-tools">

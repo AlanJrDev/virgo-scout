@@ -1,7 +1,7 @@
 // src/tests/categories.test.js
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType } = require('../utils/categories');
+const { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType, rootsFor, relevanceFilter } = require('../utils/categories');
 const { matchFile } = require('../utils/leads-io');
 
 test('registro cobre as categorias com tags sem acento', () => {
@@ -32,4 +32,24 @@ test('matchFile separa prefixos de arquivo por categoria', () => {
   assert.strictEqual(matchFile('advogados-df-max.json', 'advogados'), true);
   assert.strictEqual(matchFile('arquitetura-df-max.json', 'advogados'), false);
   assert.strictEqual(matchFile('estofado-df-max.json', 'estofado'), true);
+});
+
+test('relevanceFilter: mantem raizes do nicho e descarta ruído misturado pelo Maps', () => {
+  assert.deepStrictEqual(rootsFor('topografia').length >= 1, true);
+  const out = relevanceFilter([
+    { name: 'TOPOGRAFIA PLANALTO', category: 'Engenheiro(a) agrônomo(a)' },
+    { name: '2GEO Consultoria Ambiental e Engenharia', category: 'Engenharia ambiental' },
+    { name: 'Garcia Topografia', category: 'Empresa de Terraplenagem' },
+    { name: 'Residencial Santa Mônica', category: 'Complexo habitacional' },
+    { name: 'Jardim Botânico de Brasília', category: 'Jardim botânico' },
+    { name: 'Amey Limpeza e Impermeabilização de Estofados', category: 'Serviço de limpeza de estofado' },
+  ], 'topografia');
+  assert.deepStrictEqual(out.kept.map((r) => r.name), ['TOPOGRAFIA PLANALTO', '2GEO Consultoria Ambiental e Engenharia', 'Garcia Topografia']);
+  assert.strictEqual(out.dropped, 3);
+  const est = relevanceFilter([
+    { name: 'Amey Limpeza e Impermeabilização de Estofados', category: 'Serviço de limpeza' },
+    { name: 'Distribuidora de Réfrigeração', category: null },
+  ], 'estofado');
+  assert.deepStrictEqual(est.kept.map((r) => r.name), ['Amey Limpeza e Impermeabilização de Estofados', 'Distribuidora de Réfrigeração']);
+  assert.strictEqual(relevanceFilter([{ name: 'Qualquer' }], 'desconhecida').kept.length, 1);
 });

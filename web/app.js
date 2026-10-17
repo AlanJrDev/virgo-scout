@@ -230,6 +230,29 @@
   try { var vt = sessionStorage.getItem('vs_type'); if (vt) typeFilter = vt; } catch (e) {}
   var captureCat = 'advogados';
   try { var vc = sessionStorage.getItem('vs_capture_cat'); if (vc) captureCat = vc; } catch (e) {}
+  var CAT_LABELS = { advogados: 'Advogados', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado', topografia: 'Topografia' };
+  function catLabel(tag) {
+    return CAT_LABELS[tag] || tag.charAt(0).toUpperCase() + tag.slice(1).replace(/-/g, ' ');
+  }
+  /* chips dinâmicos: categorias vêm dos dados (l.types/source do payload) — nova captura entra sozinha */
+  function renderTypeSwitch() {
+    var box = document.getElementById('typeSwitch');
+    if (!box) return;
+    var pool = (currentPayload && currentPayload.pool) || [];
+    var cats = [];
+    for (var i = 0; i < pool.length; i++) {
+      var raw = pool[i].types != null ? pool[i].types : (pool[i].source != null ? pool[i].source : '');
+      if (typeof raw !== 'string') raw = (raw && raw.join) ? raw.join(',') : '';
+      var tag = String(raw).split(',').map(function (s) { return s.trim(); }).filter(Boolean)[0] || '';
+      if (tag && tag !== 'all' && cats.indexOf(tag) === -1) cats.push(tag);
+    }
+    var html = '<button type="button" class="type-btn' + (typeFilter === 'all' ? ' active' : '') + '" data-type="all" aria-pressed="' + (typeFilter === 'all') + '" title="Todas as categorias">Todos</button>';
+    for (var i = 0; i < cats.length; i++) {
+      var on = typeFilter === cats[i];
+      html += '<button type="button" class="type-btn' + (on ? ' active' : '') + '" data-type="' + escapeHtml(cats[i]) + '" aria-pressed="' + on + '" title="' + escapeHtml(catLabel(cats[i])) + '">' + escapeHtml(catLabel(cats[i])) + '</button>';
+    }
+    box.innerHTML = html;
+  }
   function syncTypeUI() {
     var box = document.getElementById('typeSwitch');
     if (box) {
@@ -243,8 +266,8 @@
     var sel = document.getElementById('capCat');
     if (sel) sel.value = captureCat;
     var t = document.getElementById('capTitle');
-    var labels = { advogados: 'Advocacia', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado', topografia: 'Topografia' };
-    if (t) t.textContent = 'Captura — ' + (labels[captureCat] || 'Advocacia');
+    var labels = CAT_LABELS;
+    if (t) t.textContent = 'Captura — ' + (labels[captureCat] || catLabel(captureCat));
   }
   function setCaptureUI(st) {
     var bar = $('#capBar'), pct = $('#capPct'), sub = $('#capSub'), btn = $('#capRun');
@@ -1085,6 +1108,7 @@
   var EMPTY = { stats: {}, top: [], pool: [], regions: [], ratingBuckets: [], dots: [], series: { days: [], values: [0] }, donut: [], recent: [], areas: [] };
   function boot(payload) {
     currentPayload = payload && payload.stats ? payload : (window.VIRGO_DATA || EMPTY);
+    renderTypeSwitch();
     render(currentPayload);
     loadMe();
     pollCapture();

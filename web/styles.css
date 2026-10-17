@@ -308,8 +308,6 @@ button.chip:active{transform:scale(.97)}
   .topbar{flex-wrap:wrap;height:auto;row-gap:10px;padding:10px 14px}
   .search{order:2;flex-basis:100%;max-width:none;height:38px}
   .search kbd{display:none}
-  .type-switch{margin-left:auto}
-  .type-switch + .top-user{margin-left:0}
   .top-user{gap:8px}
   .avatar{width:32px;height:32px;font-size:11px}
   .icon-btn{width:34px;height:34px}
@@ -386,9 +384,8 @@ button.chip:active{transform:scale(.97)}
 .opps li b{color:var(--cyan);font-weight:600;font-variant-numeric:tabular-nums}
 
 /* switch de tipo global (Todos/Adv/Arq/Tap/Est) */
-.type-switch{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--surface);border:1px solid var(--border);margin-left:auto}
-.type-switch + .top-user{margin-left:0}
-.type-btn{border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;padding:6px 14px;border-radius:999px;transition:background 160ms var(--ease-out),color 160ms var(--ease-out)}
+.type-switch{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--surface);border:1px solid var(--border);margin-left:auto;flex-wrap:wrap}
+.type-btn{border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;padding:6px 14px;border-radius:999px;transition:background 160ms var(--ease-out),color 160ms var(--ease-out);white-space:nowrap}
 .type-btn.active{background:linear-gradient(135deg,#2E7CF6,#38BDF8);color:#04101f;box-shadow:0 4px 14px rgba(2,6,16,.4)}
 @media(hover:hover) and (pointer:fine){.type-btn:not(.active):hover{color:var(--text)}}
 

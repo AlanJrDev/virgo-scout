@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { sbEnabled, sbFetch } = require('../src/utils/sb');
 const { newestLeadsFile } = require('../src/utils/leads-io');
-const { tagOf } = require('../src/utils/categories');
+const { tagOf, relevanceFilter } = require('../src/utils/categories');
 
 const CHUNK = 500;
 
@@ -196,7 +196,9 @@ async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = 
     row.types = tag;
     return row;
   });
-  const { rows, dropped } = dedupeRows(rows0);
+  const topRows = rows0.length ? relevanceFilter(rows0, tag).kept : rows0;
+  const { rows, dropped } = dedupeRows(topRows);
+  const relevanceDropped = rows0.length - topRows.length;
   const existing = await fetchExisting(rows);
   const plan = planUpsert(rows, existing);
   for (const p of plan.patches) {
@@ -208,6 +210,16 @@ async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = 
     await sbFetch(`leads?id=in.(${inList(c)})`, { method: 'DELETE' });
   }
   await upsertRows(plan.inserts);
+  let orphanDropped = 0;
+  try {
+    const dbIds = await sbFetch(`leads?select=id&source=eq.${encodeURIComponent(tag)}`);
+    const inSet = new Set(rows.map((r) => r.id));
+    const orphans = dbIds.map((r) => r.id).filter((id) => !inSet.has(id));
+    orphanDropped = orphans.length;
+    for (const c of chunk(orphans, 80)) {
+      await sbFetch(`leads?id=in.(${inList(c)})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    }
+  } catch (e) { console.error('[sync] limpeza de órfãos falhou:', e.message); }
   let dbDeduped = 0;
   try {
     const d = await require('../src/utils/dedupe').dedupeLeads({ apply: true });
@@ -218,13 +230,13 @@ async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = 
     body: [{ status: 'done', finished_at: new Date().toISOString(), leads_count: rows.length }],
   });
   if (runBuild) execFileSync(process.execPath, [path.join(__dirname, 'build-web-data.js')], { stdio: 'inherit' });
-  return { file: path.basename(file), synced: rows.length, deduped: dropped, dbDeduped };
+  return { file: path.basename(file), synced: rows.length, deduped: dropped, relevanceDropped, orphanDropped, dbDeduped };
 }
 
 if (require.main === module) {
   const category = process.argv[2] || 'advogados';
   syncLeads({ category })
-    .then((r) => console.log(`[sync] ${r.synced} leads (${r.deduped} local${r.dbDeduped ? `, ${r.dbDeduped} no banco` : ''} dedupe) → Supabase (${r.file})`))
+    .then((r) => console.log(`[sync] ${r.synced} leads (${r.deduped} local${r.dbDeduped ? `, ${r.dbDeduped} no banco` : ''} dedupe${r.relevanceDropped ? `, ${r.relevanceDropped} fora do nicho` : ''}${r.orphanDropped ? `, ${r.orphanDropped} órfãos removidos` : ''}) → Supabase (${r.file})`))
     .catch((e) => { console.error('[sync]', e.message); process.exit(1); });
 }
 
