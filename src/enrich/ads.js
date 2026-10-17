@@ -15,8 +15,10 @@ function parseAdsHtml(html) {
   let idx = -1;
   let len = 0;
   const card = t.match(CARD_RE);
-  if (card) { idx = card.index; len = card[0].length; }
-  else {
+  if (card) {
+    if (parseInt(card[1], 10) === 0) return { active: false, landing: null };
+    idx = card.index; len = card[0].length;
+  } else {
     const i = t.indexOf(AD_CREATIVES);
     if (i === -1) return EMPTY_RE.test(t) ? { active: false, landing: null } : null;
     idx = i; len = AD_CREATIVES.length;
