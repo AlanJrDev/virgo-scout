@@ -12,6 +12,7 @@
     "capture:arq": "node scripts/capture-arquitetura.js",
     "capture:tap": "node scripts/capture-tapecaria.js",
     "capture:est": "node scripts/capture-estofado.js",
+    "capture:topografia": "node scripts/capture-topografia.js",
     "sync": "node scripts/sync-supabase.js",
     "dedupe": "node scripts/dedupe.js",
     "enrich": "node scripts/enrich-leads.js",

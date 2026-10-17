@@ -204,7 +204,7 @@ async function handler(req, res) {
         if (!prompt) { json(res, 400, { ok: false, error: 'empty_prompt' }); return; }
         try {
           const { nicho, lugar } = await interpretCapture(prompt);
-          const NICHO_WORDS = { advogados: 'advogado advogados direito advocacia lei juridico', arquitetura: 'arquiteto arquitetos arquitetura urbanismo', tapecaria: 'tapecaria tapete carpete', estofado: 'estofado estofados sofa poltrona colchoes colchao' };
+          const NICHO_WORDS = { advogados: 'advogado advogados direito advocacia lei juridico', arquitetura: 'arquiteto arquitetos arquitetura urbanismo', tapecaria: 'tapecaria tapete carpete', estofado: 'estofado estofados sofa poltrona colchoes colchao', topografia: 'topografia topografo topologia' };
           const rn = String(nicho || prompt).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
           let cat = null;
           for (const [k, words] of Object.entries(NICHO_WORDS)) if (words.split(' ').some((w) => rn.includes(w))) { cat = k; break; }

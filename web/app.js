@@ -243,7 +243,7 @@
     var sel = document.getElementById('capCat');
     if (sel) sel.value = captureCat;
     var t = document.getElementById('capTitle');
-    var labels = { advogados: 'Advocacia', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado' };
+    var labels = { advogados: 'Advocacia', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado', topografia: 'Topografia' };
     if (t) t.textContent = 'Captura — ' + (labels[captureCat] || 'Advocacia');
   }
   function setCaptureUI(st) {
