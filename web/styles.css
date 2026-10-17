@@ -424,7 +424,13 @@ button.chip:active{transform:scale(.97)}
 .tbl-check.on{border-color:rgba(46,124,246,.5);color:var(--text);background:rgba(46,124,246,.12)}
 .tbl-check.opp{border-color:rgba(52,211,153,.45);color:var(--green)}
 .tbl-check.opp input{accent-color:var(--green)}
-.tbl-check.opp.on{border-color:rgba(52,211,153,.6);color:var(--green);background:rgba(52,211,153,.12)}
+  .tbl-check.opp.on{border-color:rgba(52,211,153,.6);color:var(--green);background:rgba(52,211,153,.12)}
+  .tbl-check.alta{border-color:rgba(248,113,113,.45);color:#F87171}
+  .tbl-check.alta input{accent-color:#F87171}
+  .tbl-check.alta.on{border-color:rgba(248,113,113,.6);color:#F87171;background:rgba(248,113,113,.12)}
+  .tbl-check.ideal{border-color:rgba(56,189,248,.45);color:#38BDF8}
+  .tbl-check.ideal input{accent-color:#38BDF8}
+  .tbl-check.ideal.on{border-color:rgba(56,189,248,.6);color:#38BDF8;background:rgba(56,189,248,.12)}
 .tbl-clear{height:36px;padding:0 13px;background:transparent;border:1px dashed rgba(120,160,255,.4);border-radius:10px;color:var(--muted);font-family:inherit;font-size:12.5px;transition:color 160ms var(--ease-out),border-color 160ms var(--ease-out),transform 120ms var(--ease-out)}
 .tbl-clear[hidden]{display:none}
 .tbl-clear:active{transform:scale(.97)}

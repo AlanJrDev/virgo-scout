@@ -173,13 +173,13 @@
           <div class="tbl-tools">
             <label class="tbl-search">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-              <input type="search" id="tblSearch" placeholder="Filtrar por nome, telefone ou área..." aria-label="Filtrar leads na tabela" autocomplete="off">
+              <input type="search" id="tblSearch" placeholder="Filtrar por nome, nicho, telefone..." aria-label="Filtrar leads na tabela" autocomplete="off">
             </label>
             <select class="tbl-select" id="tblRegion" aria-label="Filtrar por cidade ou região">
               <option value="">Todas as regiões</option>
             </select>
-            <select class="tbl-select" id="tblArea" aria-label="Filtrar por área de atuação">
-              <option value="">Todas as áreas</option>
+            <select class="tbl-select" id="tblArea" aria-label="Filtrar por nicho">
+              <option value="">Todos os nichos</option>
             </select>
             <select class="tbl-select" id="tblMinRating" aria-label="Nota mínima">
               <option value="0">Qualquer nota</option>
@@ -189,6 +189,8 @@
             </select>
             <label class="tbl-check opp" id="tblNoSiteBox"><input type="checkbox" id="tblNoSite"><span>Sem site · oportunidade</span></label>
             <label class="tbl-check" id="tblPhoneBox"><input type="checkbox" id="tblHasPhone"><span>Contatáveis</span></label>
+            <label class="tbl-check alta" id="tblAltaBox"><input type="checkbox" id="tblAlta"><span>Alta oportunidade</span></label>
+            <label class="tbl-check ideal" id="tblIdealBox"><input type="checkbox" id="tblIdeal"><span>Oportunidades ideais (ICP)</span></label>
             <select class="tbl-select" id="tblStatus" aria-label="Status de contato">
               <option value="">Todos os status</option><option value="novo">Novos</option><option value="contatado">Contatados</option>
             </select>

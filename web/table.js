@@ -83,6 +83,7 @@
   var state = {
     rows: [], total: 0, updated: '',
     q: '', region: '', area: '', minRating: 0, phone: false, noSite: false, status: '',
+    alta: false, ideal: false,
     sortKey: '', sortDir: 'asc',
     page: 1, pageSize: 25
   };
@@ -91,8 +92,13 @@
   var firstRender = true;
   var els = {};
 
-  var TIPO_LABEL = { advogados: 'Advogado', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado' };
-  var TIPO_ORDER = ['advogados', 'arquitetura', 'tapecaria', 'estofado'];
+  var TIPO_LABEL = { advogados: 'Advogado', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado', topografia: 'Topografia' };
+  var TIPO_ORDER = ['advogados', 'arquitetura', 'tapecaria', 'estofado', 'topografia'];
+  function tipoLabel(t) {
+    if (TIPO_LABEL[t]) return TIPO_LABEL[t];
+    var s = String(t || '');
+    return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ');
+  }
 
   var COLS = [
     { key: 'name', label: 'Empresa', w: 22 },
@@ -115,13 +121,18 @@
   /* ---------- filtro / ordenação ---------- */
   function matches(l) {
     if (state.region && regionOf(l) !== state.region) return false;
-    if (state.area && (l.area || 'Geral') !== state.area) return false;
+    if (state.area) {
+      var tags = typesOf(l);
+      if (state.area === 'outros' ? tags.length > 0 : tags.indexOf(state.area) === -1) return false;
+    }
+    if (state.alta && l.badge !== 'Alta') return false;
+    if (state.ideal && !((l.icp || []).length > 0)) return false;
     if (state.phone && !hasChannel(l)) return false;
     if (state.noSite && hasSite(l)) return false;
     if (state.status && (l.status || 'novo') !== state.status) return false;
     if (state.minRating > 0 && !(typeof l.rating === 'number' && isFinite(l.rating) && l.rating >= state.minRating)) return false;
     if (state.q) {
-      var tipoLabels = typesOf(l).map(function (t) { return TIPO_LABEL[t] || t; }).join(' ');
+      var tipoLabels = typesOf(l).map(function (t) { return tipoLabel(t); }).join(' ');
       var hay = norm([l.name, l.area, regionOf(l), l.cat, phoneOf(l), siteUrl(l), l.email, l.instagram, tipoLabels].join(' '));
       if (hay.indexOf(state.q) === -1) return false;
     }
@@ -164,7 +175,7 @@
   }
   function filtered() { return state.rows.filter(matches); }
   function hasFilters() {
-    return !!(state.q || state.region || state.area || state.minRating || state.phone || state.noSite || state.status);
+    return !!(state.q || state.region || state.area || state.minRating || state.phone || state.noSite || state.status || state.alta || state.ideal);
   }
 
   /* ---------- células ---------- */
@@ -255,8 +266,7 @@
     },
     tipo: function (l) {
       return typesOf(l).map(function (t) {
-        var label = TIPO_LABEL[t] || t;
-        return '<span class="tipo t-' + esc(t) + '">' + esc(label) + '</span>';
+        return '<span class="tipo t-' + esc(t) + '">' + esc(tipoLabel(t)) + '</span>';
       }).join(' ');
     },
     phone: phoneCell, channels: channelsCell, since: sinceCell, captured: capturedCell
@@ -358,35 +368,44 @@
     sel.innerHTML = html;
   }
   function fillFilters() {
-    var regions = {}, areas = {};
+    var regions = {}, nichos = {};
     state.rows.forEach(function (l) {
       var r = regionOf(l);
       if (r) regions[r] = (regions[r] || 0) + 1;
-      var a = l.area || 'Geral';
-      areas[a] = (areas[a] || 0) + 1;
+      var tags = typesOf(l);
+      var seen = {};
+      tags.forEach(function (t) {
+        if (t && !seen[t]) { seen[t] = 1; nichos[t] = (nichos[t] || 0) + 1; }
+      });
     });
-    var toItems = function (map) {
-      return Object.keys(map).map(function (k) { return { value: k, label: k + ' · ' + map[k] }; })
+    var toItems = function (map, labelOf) {
+      return Object.keys(map).map(function (k) { return { value: k, label: (labelOf(k) || k) + ' · ' + map[k] }; })
         .sort(function (a, b) { return parseInt(b.label.split('·')[1], 10) - parseInt(a.label.split('·')[1], 10) || (a.value < b.value ? -1 : 1); });
     };
-    var regItems = toItems(regions);
+    var regItems = toItems(regions, function (k) { return k; });
+    var nichoItems = toItems(nichos, tipoLabel);
     if (state.region && !regItems.some(function (it) { return it.value === state.region; })) state.region = '';
-    if (state.area && !Object.prototype.hasOwnProperty.call(areas, state.area)) state.area = '';
+    if (state.area && !nichoItems.some(function (it) { return it.value === state.area; })) state.area = '';
     fillSelect(els.region, regItems, state.region, 'Todas as regiões');
-    fillSelect(els.area, toItems(areas), state.area, 'Todas as áreas');
+    fillSelect(els.area, nichoItems, state.area, 'Todos os nichos');
   }
 
   function syncChecks() {
     els.phone.checked = state.phone;
     els.noSite.checked = state.noSite;
     els.status.value = state.status;
+    els.alta.checked = state.alta;
+    els.ideal.checked = state.ideal;
     document.getElementById('tblPhoneBox').classList.toggle('on', state.phone);
     document.getElementById('tblNoSiteBox').classList.toggle('on', state.noSite);
+    document.getElementById('tblAltaBox').classList.toggle('on', state.alta);
+    document.getElementById('tblIdealBox').classList.toggle('on', state.ideal);
   }
 
   function clearFilters() {
     state.q = ''; state.region = ''; state.area = ''; state.minRating = 0;
-    state.phone = false; state.noSite = false; state.status = ''; state.page = 1;
+    state.phone = false; state.noSite = false; state.status = '';
+    state.alta = false; state.ideal = false; state.page = 1;
     els.search.value = '';
     els.minRating.value = '0';
     fillFilters();
@@ -422,6 +441,8 @@
     els.minRating.addEventListener('change', function () { state.minRating = parseFloat(els.minRating.value) || 0; state.page = 1; renderRows(); });
     els.phone.addEventListener('change', function () { state.phone = els.phone.checked; state.page = 1; syncChecks(); renderRows(); });
     els.noSite.addEventListener('change', function () { state.noSite = els.noSite.checked; state.page = 1; syncChecks(); renderRows(); });
+    els.alta.addEventListener('change', function () { state.alta = els.alta.checked; state.page = 1; syncChecks(); renderRows(); });
+    els.ideal.addEventListener('change', function () { state.ideal = els.ideal.checked; state.page = 1; syncChecks(); renderRows(); });
     els.status.addEventListener('change', function () { state.status = els.status.value; state.page = 1; renderRows(); });
     els.pageSize.addEventListener('change', function () {
       state.pageSize = parseInt(els.pageSize.value, 10) || 25;
@@ -462,6 +483,7 @@
     empty: $('tblEmpty'), count: $('tblCount'), page: $('tblPage'), prev: $('tblPrev'), next: $('tblNext'),
     search: $('tblSearch'), region: $('tblRegion'), area: $('tblArea'), minRating: $('tblMinRating'),
     phone: $('tblHasPhone'), noSite: $('tblNoSite'), status: $('tblStatus'), clear: $('tblClear'), pageSize: $('tblPageSize'),
+    alta: $('tblAlta'), ideal: $('tblIdeal'),
     summary: $('tblSummary'), scroll: $('tblScroll')
   };
   if (els.root && els.head && els.search) bind();
