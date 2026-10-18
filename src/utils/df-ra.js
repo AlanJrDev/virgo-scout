@@ -54,10 +54,21 @@ function findRA(prompt) {
   return null;
 }
 
-/* queries de captura do nicho, uma por RA ("de uma em uma") */
+/* plano de captura: [{ra, query}] — Brasília é o DF inteiro: não duplica o termo */
+function buildPlan(term, opts = {}) {
+  const scope = opts.ra ? [opts.ra] : RAS;
+  const seen = new Set();
+  const out = [];
+  for (const ra of scope) {
+    const query = ra === 'Brasília' ? `${term} Brasília DF` : `${term} ${ra} Brasília DF`;
+    if (seen.has(query)) continue;
+    seen.add(query);
+    out.push({ ra, query });
+  }
+  return out;
+}
 function buildQueries(term, opts = {}) {
-  const scope = opts.ra ? [opts.ra] : RAS_TIER1.concat(RAS_TIER2);
-  return scope.map((ra) => `${term} ${ra} Brasília DF`);
+  return buildPlan(term, opts).map((p) => p.query);
 }
 
-module.exports = { RAS, RAS_TIER1, RAS_TIER2, findRA, buildQueries, raName };
+module.exports = { RAS, RAS_TIER1, RAS_TIER2, findRA, buildPlan, buildQueries, raName };

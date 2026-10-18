@@ -1,7 +1,7 @@
 // Cidades do DF + janela adaptativa (findRA/buildQueries)
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { findRA, buildQueries, RAS, RAS_TIER1 } = require('../utils/df-ra');
+const { findRA, buildQueries, RAS } = require('../utils/df-ra');
 
 test('findRA reconhece RA por nome, plural, sem acento e alias', () => {
   assert.strictEqual(findRA('capturar estofados em Aguas Claras').ra, 'Águas Claras');
@@ -40,6 +40,19 @@ test('buildQueries: UF inteiro = todas as RAs, uma query por RA; RA único = 1 q
   assert.strictEqual(buildQueries('tapeçaria', { ra: 'Guará' }).length, 1);
   const one = buildQueries('estofado', { ra: 'Guará' })[0];
   assert.strictEqual(one, 'estofado Guará Brasília DF');
-  const first = buildQueries('estofado')[0].startsWith('estofado Brasília') ? 'Brasília' : null;
-  assert.ok(RAS_TIER1.includes(first), 'primeiro RA capture = tier 1');
+  const qs = buildQueries('estofado');
+  assert.strictEqual(qs[0], 'estofado Brasília DF', 'ordem natural: Brasília primeiro, sem duplicar o termo');
+  assert.strictEqual(qs[1], 'estofado Asa Sul Brasília DF', 'ordem natural de RAS (não TIER1)');
+});
+
+test('buildPlan: pares ra/query, Brasília sem duplicação, compat buildQueries', () => {
+  const { buildPlan, buildQueries } = require('../utils/df-ra');
+  const plan = buildPlan('topografia', { ra: 'Brasília' });
+  assert.deepStrictEqual(plan, [{ ra: 'Brasília', query: 'topografia Brasília DF' }]);
+  const ac = buildPlan('topografia', { ra: 'Águas Claras' });
+  assert.strictEqual(ac[0].query, 'topografia Águas Claras Brasília DF');
+  const full = buildPlan('topografia');
+  assert.strictEqual(full.length, 39); // 37 RAs + Asa Sul + Asa Norte
+  assert.strictEqual(new Set(full.map((p) => p.query)).size, full.length); // sem queries duplicadas
+  assert.ok(buildQueries('topografia', { ra: 'Brasília' })[0].includes('Brasília DF'));
 });
