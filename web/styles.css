@@ -6,6 +6,7 @@
   --blue:#2e7cf6; --cyan:#38bdf8; --green:#34d399; --amber:#fbbf24; --red:#f87171;
   --r-lg:16px; --r-md:12px; --r-sm:9px;
   --ease-out:cubic-bezier(.23,1,.32,1);
+  --d-fast:150ms; --d-med:240ms;
   --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   color-scheme:dark;
 
@@ -352,14 +353,15 @@ body.ia-open .ia-fab{opacity:0;visibility:hidden;pointer-events:none;transform:s
 .cap-run:active{transform:scale(.97)}
 .cap-run:disabled{opacity:.55;cursor:default}
 .filter-row{display:flex;flex-wrap:wrap;gap:6px;padding:7px 0 3px}
-.filter-row .chip{margin-left:0;cursor:pointer}
+.filter-row .chip{margin-left:0;cursor:pointer;transition:border-color var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out),background-color var(--d-fast) var(--ease-out),box-shadow var(--d-fast) var(--ease-out),transform 120ms var(--ease-out)}
 .filter-row .chip b{color:var(--faint);font-weight:600}
-.filter-row .chip.active{border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,.09)}
+.filter-row .chip.active{border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,.09);box-shadow:0 0 0 3px rgba(56,189,248,.08)}
 .filter-row .chip.active b{color:var(--cyan)}
+.filter-row .chip:active{transform:scale(.97)}
 .feat-empty{color:var(--faint);font-size:12.5px;padding:14px 2px;border-top:1px solid var(--border)}
 .kpi small.down{color:#f87171;font-weight:600}
 .kpi small.flat{color:var(--faint);font-weight:600}
-@media (hover:hover){.cap-run:hover{filter:brightness(1.1)}.filter-row .chip:hover{border-color:rgba(120,160,255,.4);color:var(--text)}}
+@media (hover:hover) and (pointer:fine){.cap-run:hover{filter:brightness(1.1)}.filter-row .chip:hover{border-color:rgba(120,160,255,.4);color:var(--text);background-color:rgba(120,160,255,.07)}}
 
 /* ---------- rodada visual UX: busca, toasts, chat IA, estados ---------- */
 .search{position:relative}
@@ -583,3 +585,34 @@ body.ia-open .ia-fab{opacity:0;visibility:hidden;pointer-events:none;transform:s
 @media(hover:hover){.capture-cta:hover{filter:brightness(1.1)}}
 .cap-cta-capture:disabled{opacity:.55;cursor:default}
 .cap-cta-capture:active{transform:scale(.97)}
+
+/* ===== Fase B — camada de movimento (CURVA/DURAÇÃO herdam dos tokens: transform+opacity apenas) ===== */
+/* reveal dos cards: 1x por sessão (classe aplicada via JS ao 1º boot); fill backwards
+   p/ não prender o transform — hover lift volta a dominar após o fim da animation */
+.reveal-once{animation:cardReveal var(--d-med) var(--ease-out) backwards;animation-delay:calc(var(--reveal-i,0)*45ms)}
+@keyframes cardReveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.dash-lift{transition:transform 160ms var(--ease-out),box-shadow 160ms var(--ease-out)}
+/* troca de view: 200ms, fade + 4px rise, por troca (classe re-aplicada só no clique) */
+.view-enter{animation:viewIn 200ms var(--ease-out) backwards}
+@keyframes viewIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* título (N) do card de destaques: fade opacity-only na troca de recorte */
+.card:has(#areaFilter) .card-head h2{transition:opacity 160ms var(--ease-out)}
+/* estados vazios: fade-in opacity-only (elemento novo por render — animation segura) */
+.feat-empty,.empty-box{animation:emptyIn 200ms var(--ease-out) backwards}
+@keyframes emptyIn{from{opacity:0}to{opacity:1}}
+/* FAB: pulse duplo sutil (2×[1→1.06→1] , 400ms) — budget de delight, 1x por sessão */
+.fab-pulse{animation:fabPulse 400ms var(--ease-out)}
+@keyframes fabPulse{0%,50%,100%{transform:scale(1)}25%,75%{transform:scale(1.06)}}
+@media(hover:hover) and (pointer:fine){.dash-lift:hover{transform:translateY(-2px);box-shadow:0 16px 36px rgba(2,6,16,.42),inset 0 1px 0 rgba(255,255,255,.02)}}
+@media(prefers-reduced-motion:reduce){
+  .reveal-once{animation:cardRevealRO var(--d-med) ease backwards;animation-delay:0}
+  .view-enter{animation:viewInRO 200ms ease backwards}
+  .feat-empty,.empty-box{animation:none}
+  .fab-pulse{animation:none}
+  .dash-lift{transition:none}
+  .card:has(#areaFilter) .card-head h2{transition:none}
+  .filter-row .chip{transition:none}
+  .filter-row .chip:active{transform:none}
+}
+@keyframes cardRevealRO{from{opacity:0}to{opacity:1}}
+@keyframes viewInRO{from{opacity:0}to{opacity:1}}
