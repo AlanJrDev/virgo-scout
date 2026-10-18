@@ -364,3 +364,28 @@ test('run partial pré-migration: legado estreia status como done (check constra
   assert.strictEqual(capCalls.length, 2);             // full + legado (ambos falham, erro sobe)
   assert.strictEqual(capCalls[1][0].status, 'done');  // legado remapeia partial → done
 });
+
+test('400 de captures com corpo SEM keyword de schema ainda cai no legado (400 raramente é de lógica)', async () => {
+  fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([{ name: 'Adv O', address: 'Rua O', source: 'q' }]));
+  const { syncLeads } = require('../../scripts/sync-supabase');
+  const capCalls = [];
+  let firstCapture = true;
+  global.fetch = async (url, opts) => {
+    const u = String(url);
+    if (!u.includes('/captures')) return { ok: true, status: 201, text: async () => '' };
+    if (opts.method === 'GET') return { ok: true, status: 201, text: async () => '[]' };
+    capCalls.push(JSON.parse(opts.body));
+    if (firstCapture) {
+      firstCapture = false;
+      return { ok: false, status: 400, text: async () => 'motivo estranho, sem keyword reconhecível' };
+    }
+    return { ok: true, status: 201, text: async () => '[]' };
+  };
+  const r = await syncLeads({ dataDir: TMP, runBuild: false, capture: {
+    category: 'advogados', qs: [], started_at: '2026-10-17T10:00:00.000Z', budget_min: 3, ra_count: 2,
+  } });
+  assert.strictEqual(capCalls.length, 2);              // full (400) + legado (ok)
+  assert.strictEqual(capCalls[1][0].status, 'done');
+  assert.strictEqual(capCalls[1][0].leads_count, r.synced);
+  assert.ok(!('qs' in capCalls[1][0]));                // legado não tem colunas V2
+});

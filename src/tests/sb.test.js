@@ -88,3 +88,24 @@ test('sbFetchAll pagina com limit/offset até buscar todos (teto de 1000 do Post
   assert.ok(calls[0].includes('limit=1000') && calls[0].includes('offset=0'), calls[0]);
   assert.ok(calls[1].includes('offset=1000'), calls[1]);
 });
+
+test('SbError 4xx anexa o corpo do PostgREST (prefixo sb_<status> e code estáveis)', async () => {
+  global.fetch = async () => ({
+    ok: false, status: 400,
+    text: async () => JSON.stringify({ message: 'column captures.category does not exist', code: '42703' }),
+  });
+  await assert.rejects(
+    sbFetch('captures', { method: 'POST', body: [{}] }),
+    (e) => e instanceof SbError
+      && e.status === 400
+      && e.code === 'sb_400'
+      && String(e.message).startsWith('sb_400 :: column captures.category does not exist')
+  );
+  // corpo não-JSON: apenda cru, truncado
+  global.fetch = async () => ({ ok: false, status: 400, text: async () => 'x'.repeat(2000) });
+  await assert.rejects(sbFetch('users'), (e) => {
+    assert.strictEqual(e.code, 'sb_400');
+    assert.strictEqual(String(e.message).length, 10 + 300); // 'sb_400 :: ' (10) + 300 chars truncados
+    return true;
+  });
+});

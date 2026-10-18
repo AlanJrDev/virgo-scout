@@ -263,14 +263,22 @@ function legacyCaptureRecord(record) {
   };
 }
 
-// 400 de schema (colunas inexistentes/constraint) = migration pendente, não desastre
+/* 400 em captures pode SER schema (colunas V2 ausentes: PGRST204/42703/23514,
+   relationship) OU constraint violation (status 'partial' pré-0009 → check
+   captures_status_check) — ambos pedem o fallback legado. O corpo real do
+   PostgREST chega anexado ao e.message pelo sb.js ('sb_400 :: <corpo>'). Como
+   400 nesse endpoint raramente é erro de lógica, QUALQUER sb_400 da write
+   cai no legado; rethrow só para 401/404/rede/5xx. */
 function isCaptureSchemaError(msg) {
-  return /sb_400|PGRST204|42703|schema|column|constraint|categor|budget|ra_count|\bqs\b/i.test(String(msg || ''));
+  return /\bsb_400\b|PGRST204|42703|23514|schema|column|constraint|relationship|categor|budget|ra_count|\bqs\b/i.test(String(msg || ''));
 }
 
 /* captures NÃO tem UNIQUE: idempotência por started_at da rodada — registro
    existente vira PATCH; check-first que falhar segue para POST (pior caso:
-   1 registro extra, nunca perca a sincronização por causa disso) */
+   1 registro extra, nunca perca a sincronização por causa disso). */
+// > Se houver DUPLICATAS do mesmo started_at, pegamos a 1ª (order implícito)
+// > e ignoramos as demais — aceitação consciente: o sync nunca trava por dado
+// > sujo, e a 0009 (Task 6) pode criar UNIQUE em started_at.
 async function captureRowId(startedAt) {
   if (!startedAt) return null;
   try {

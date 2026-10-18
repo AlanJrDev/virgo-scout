@@ -9,8 +9,27 @@ class SbError extends Error {
     super(message);
     this.name = 'SbError';
     this.status = status;
-    this.code = status >= 500 ? 'supabase_down' : message;
+    // code = prefixo estável ('sb_404'): o corpo do erro, quando anexado ao
+    // message via ' :: ', NÃO vira código (callers compilam pelo prefixo)
+    this.code = status >= 500 ? 'supabase_down' : String(message).split(' :: ')[0];
   }
+}
+
+/* Erro HTTP < 500: anexa o CORPO da resposta ao message (1ª vez, truncado a
+   300 chars) para decode do motivo real (PGRST204/42703/23514 check etc.);
+   prefixo 'sb_<status>' é preservado exato no início. try/JSON → extrai o
+   message/details em vez do corpo cru quando possível. */
+function errBodyMsg(status, text) {
+  const body = String(text || '').trim();
+  if (!body) return `sb_${status}`;
+  let detail = body;
+  try {
+    const j = JSON.parse(body);
+    if (j && typeof j === 'object') {
+      detail = [j.message, j.error, j.details, j.hint].filter(Boolean).join(' :: ') || body;
+    }
+  } catch (e) { /* corpo não-JSON: usa cru */ }
+  return `sb_${status} :: ${detail.slice(0, 300)}`;
 }
 
 async function sbFetch(path, { method = 'GET', body, headers = {} } = {}) {
@@ -34,7 +53,7 @@ async function sbFetch(path, { method = 'GET', body, headers = {} } = {}) {
   }
   if (res.status === 204) return null;
   const text = await res.text();
-  if (!res.ok) throw new SbError(res.status >= 500 ? 'supabase_down' : `sb_${res.status}`, res.status >= 500 ? 503 : res.status);
+  if (!res.ok) throw new SbError(res.status >= 500 ? 'supabase_down' : errBodyMsg(res.status, text), res.status >= 500 ? 503 : res.status);
   if (!text) return null;
   try { return JSON.parse(text); } catch { throw new SbError('sb_bad_json', 502); }
 }
