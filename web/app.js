@@ -770,7 +770,6 @@
         .from('.leads-sec', { y: 14, autoAlpha: 0, duration: 0.28 }, 0.26)
         .from('.filter-row .chip', { y: 6, autoAlpha: 0, duration: 0.22, stagger: 0.04 }, 0.34)
         .from('.row-2 .card, .row-3 .card', { y: 14, autoAlpha: 0, duration: 0.28, stagger: 0.07 }, 0.24)
-        .from('.ia > *', { x: 14, autoAlpha: 0, duration: 0.26, stagger: 0.06 }, 0.2)
         .from('.feat-list li, .recent-list li', { x: 10, autoAlpha: 0, duration: 0.24, stagger: 0.045 }, 0.4)
         .from('.map-bubble', { autoAlpha: 0, duration: 0.28, stagger: 0.03 }, 0.45);
       countUp($('#kTotal'), S.total || 0); countUp($('#kSite'), S.comSite || 0);
@@ -1002,6 +1001,10 @@
     if (open) {
       var input = $('#aiInput');
       if (input) input.focus({ preventScroll: true });
+      var log = $('#chatLog');
+      if (log) { log.scrollTop = log.scrollHeight; } // conversa longa reabre na última msg
+      var body = iaDrawer.querySelector('.ia-body'); // #chatLog não é o elemento scrollável (o .ia-body é)
+      if (body) body.scrollTop = body.scrollHeight;
     } else if (iaLastTrigger && iaLastTrigger.focus) {
       iaLastTrigger.focus({ preventScroll: true });
       iaLastTrigger = null;
