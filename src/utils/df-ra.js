@@ -78,4 +78,4 @@ function buildQueries(term, opts = {}) {
   return buildPlan(term, opts).map((p) => p.query);
 }
 
-module.exports = { RAS, RAS_TIER1, RAS_TIER2, findRA, buildPlan, buildQueries, raName };
+module.exports = { RAS, RAS_TIER1, RAS_TIER2, ALIAS, findRA, buildPlan, buildQueries, raName };

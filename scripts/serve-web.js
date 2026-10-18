@@ -13,7 +13,8 @@ const { markOutcome } = require('../src/utils/outcomes');
 const { sbFetchAll, SbError } = require('../src/utils/sb');
 const { askGroq, formatContext, interpretCapture } = require('./groq');
 const { CATEGORIES, matchesType } = require('../src/utils/categories');
-const { findRA, buildQueries } = require('../src/utils/df-ra');
+const { findRA } = require('../src/utils/df-ra');
+const { parseCapturePrompt, planFor } = require('../src/utils/prompt-parse');
 
 const ROOT = path.join(__dirname, '..', 'web');
 const DATA = path.join(__dirname, '..', 'data');
@@ -241,22 +242,40 @@ async function handler(req, res) {
         let prompt = '';
         try { prompt = String(JSON.parse(body || '{}').prompt || '').slice(0, 500); } catch {}
         if (!prompt) { json(res, 400, { ok: false, error: 'empty_prompt' }); return; }
+        const parsed = parseCapturePrompt(prompt);
+        if (parsed.category) {
+          /* 1º parser local: grátis, determinístico, SEM Groq — multi-RA nativo */
+          const cat = parsed.category;
+          const { plan, place, placeType } = planFor(cat, parsed);
+          const queries = plan.map((p) => p.query);
+          const st = jobStatus();
+          if (st.status === 'running') { json(res, 409, { ok: false, error: 'already_running' }); return; }
+          const r = startCapture(cat, { queries });
+          json(res, 200, { ok: true, interpretation: { category: cat, label: CATEGORIES[cat].label, ras: parsed.ras, df: parsed.df, places: plan.map((p) => p.ra), place, placeType, queries, queriesTotal: queries.length, via: 'local' }, job: r.body.job });
+          return;
+        }
+        /* sem nicho nos keywords → Groq (SÓ para achar o nicho); o lugar é
+           resolvido pelo parser local no MESMO prompt (multi-RA nativo) */
         try {
-          const { nicho, lugar } = await interpretCapture(prompt);
+          const { nicho } = await interpretCapture(prompt);
           const NICHO_WORDS = { advogados: 'advogado advogados direito advocacia lei juridico', arquitetura: 'arquiteto arquitetos arquitetura urbanismo', tapecaria: 'tapecaria tapete carpete', estofado: 'estofado estofados sofa poltrona colchoes colchao', topografia: 'topografia topografo topologia' };
           const rn = String(nicho || prompt).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
           let cat = null;
           for (const [k, words] of Object.entries(NICHO_WORDS)) if (words.split(' ').some((w) => rn.includes(w))) { cat = k; break; }
           if (!cat) { json(res, 200, { ok: false, error: 'low_signal' }); return; }
-          const loc = findRA(lugar) || findRA(prompt);
-          const term = CATEGORIES[cat].label.toLowerCase();
-          let place = 'DF', placeType = 'df', queries;
-          if (loc && loc.raType === 'ra') { place = loc.ra; placeType = 'ra'; queries = buildQueries(term, { ra: loc.ra }); }
-          else queries = buildQueries(term);
+          const parsedPrompt = parseCapturePrompt(prompt);
+          let ras = parsedPrompt.ras;
+          if (!ras.length) {
+            const loc = findRA(prompt);
+            if (loc && loc.raType === 'ra') ras = [loc.ra];
+          }
+          const parsedE = { ras, df: parsedPrompt.df };
+          const { plan, place, placeType } = planFor(cat, parsedE);
+          const queries = plan.map((p) => p.query);
           const st = jobStatus();
           if (st.status === 'running') { json(res, 409, { ok: false, error: 'already_running' }); return; }
           const r = startCapture(cat, { queries });
-          json(res, 200, { ok: true, interpretation: { category: cat, label: CATEGORIES[cat].label, place, placeType, queries, queriesTotal: queries.length }, job: r.body.job });
+          json(res, 200, { ok: true, interpretation: { category: cat, label: CATEGORIES[cat].label, ras: parsedE.ras, df: parsedE.df, places: plan.map((p) => p.ra), place, placeType, queries, queriesTotal: queries.length, via: 'groq' }, job: r.body.job });
         } catch (e) {
           if (e.code === 'no_key') { json(res, 503, { ok: false, error: 'groq indisponível (sem GROQ_API_KEY)' }); return; }
           json(res, 503, { ok: false, error: 'groq_error' });
