@@ -41,9 +41,9 @@ function lowYieldRAs(plan, telemetry = [], { threshold = 3, termsPool = [] } = {
    OUTROS termos da categoria. `exclude` = TODAS as queries já executadas na
    rodada (o runner passa o plan completo/ordered, não só as low) — nada de
    re-rodar query que acabou de virar lead; as próprias queries dos entries low
-   ficam de fora também. _explicit só marca origem serve-web e não bloqueia
-   bloqueia nada aqui. Dedupe por query, ordem estável; entries sem RA ficam
-   de fora. */
+    ficam de fora também. _explicit só marca origem serve-web e não bloqueia
+    nada aqui. Dedupe por query, ordem estável; entries sem RA ficam
+    de fora. */
 function collectAltQueries(entries, category, exclude = []) {
   const terms = termsOfCategory(category);
   const selfQ = new Set(

@@ -23,8 +23,11 @@ function raName(s) {
 const byName = new Map(RAS.map((r) => [raName(r), r]));
 /* ordem de matching do findRA: RA específico VENCE a menção genérica 'Brasília DF'
    (suffixo presente em TODAS as queries de captura) — itera todo mundo EXCETO
-   Brasília primeiro e só depois Brasília. */
-const byNameSpecificFirst = [...byName].sort((a, b) => (a[0] === 'brasilia') - (b[0] === 'brasilia'));
+   Brasília primeiro e só depois Brasília. Dentro dos específicos, chave mais
+   LONGA vence (senão 'Riacho Fundo' come 'Riacho Fundo II' e 'Sobradinho' come
+   'Sobradinho II'); empate de comprimento cai na ordem natural de RAS (sort estável). */
+const byNameSpecificFirst = [...byName].sort((a, b) => (a[0] === 'brasilia') - (b[0] === 'brasilia')
+  || b[0].length - a[0].length);
 
 const ALIAS = new Map([
   ['plano piloto', 'Brasília'],

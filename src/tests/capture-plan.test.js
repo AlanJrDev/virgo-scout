@@ -1,7 +1,7 @@
 // Testes do planner de budget do Capture V2 (partes puras, sem browser)
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { findRA, buildQueries } = require('../utils/df-ra');
+const { findRA, buildQueries, buildPlan } = require('../utils/df-ra');
 const { defaultBudgetMinutes, orderPlan, lowYieldRAs, collectAltQueries, freshPlaceIds } = require('../utils/capture-plan');
 
 test('budget proporcional: 1 RA ~8 min; DF inteiro cap 60', () => {
@@ -59,6 +59,13 @@ test('integração: plan de wrapper topografia com backfill findRA → alternati
   const plan = qs.map((q) => ({ ra: (findRA(q) || {}).ra || null, query: q, _explicit: true }));
   const lowRAs = new Set(['Gama', 'Águas Claras', 'Ceilândia']);
   assert.ok(plan.every((p) => p.ra), 'todas as RAs resolvíveis (wrap Brasília DF não sequestra o RA)');
+  // round-trip: para cada par de buildPlan(term, {ra}) do plano simulado, findRA
+  // devolve o MESMO ra (esperado vem do buildPlan, não do backfill acima — seria
+  // tautologia). A colisão de prefixo II ('Riacho Fundo'/'Sobradinho') pegaria aqui.
+  for (const p of buildPlan('topografia')) {
+    const pair = buildPlan('topografia', { ra: p.ra })[0];
+    assert.strictEqual((findRA(pair.query) || {}).ra, pair.ra, `round-trip findRA: ${pair.query}`);
+  }
   const tel = plan.map((p) => ({ query: p.query, relevant: lowRAs.has(p.ra) ? 0 : 20 }));
   const low = lowYieldRAs(plan, tel, { threshold: 3 });
   const norm = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');

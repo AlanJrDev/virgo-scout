@@ -62,3 +62,8 @@ test('buildPlan: pares ra/query, Brasília sem duplicação, compat buildQueries
   assert.strictEqual(new Set(full.map((p) => p.query)).size, full.length); // sem queries duplicadas
   assert.ok(buildQueries('topografia', { ra: 'Brasília' })[0].includes('Brasília DF'));
 });
+
+test('findRA: sufixo II vence o prefixo (chave mais longa desempata)', () => {
+  assert.strictEqual(findRA('topografia Riacho Fundo II Brasília DF').ra, 'Riacho Fundo II');
+  assert.strictEqual(findRA('topografia Sobradinho II Brasília DF').ra, 'Sobradinho II');
+});
