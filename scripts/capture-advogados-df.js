@@ -13,7 +13,12 @@ async function main() {
   const maxScrolls = parseInt(process.env.MAX_SCROLLS || '40', 10);
   console.log(`[capture] ${only.length} buscas | maxDetails=${maxDetails} maxScrolls=${maxScrolls}`);
   const t0 = Date.now();
-  const raw = await scrapeMany(only, { maxDetails, maxScrolls });
+  const { leads: raw, telemetry } = await scrapeMany(only, { maxDetails, maxScrolls });
+  const agg = (telemetry || []).reduce(
+    (a, t) => ({ cards: a.cards + (t.cards || 0), relevant: a.relevant + (t.relevant || 0), dropped: a.dropped + (t.dropped || 0), failed: a.failed + (t.failed ? 1 : 0) }),
+    { cards: 0, relevant: 0, dropped: 0, failed: 0 }
+  );
+  console.log(`[capture] telemetria: cards=${agg.cards} rel=${agg.relevant} desc=${agg.dropped} falhas=${agg.failed}`);
   const uniq = dedupeLeads(raw.map((l) => ({ ...l, name: l.name || '', address: l.address || '' })).filter((l) => l.name));
   const stamp = new Date().toISOString().slice(0, 10);
   const basename = process.env.BASENAME || `advogados-df-${stamp}`;

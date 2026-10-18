@@ -1,5 +1,6 @@
 const { chromium } = require('playwright');
 const { normalizeLead } = require('../utils/leads');
+const { buildDetailQueue } = require('../utils/queue-util');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -58,7 +59,7 @@ async function extractCards(page, source) {
   return page.$$eval('a.hfpxzc', (anchors, src) => {
     const phoneRe = /(\+?55\s?)?(\(?\d{2}\)?[\s-]?9?\d{4}[\s-]?\d{4})/;
     return anchors
-      .map((a) => {
+      .map((a, elIdx) => {
         const href = a.getAttribute('href') || '';
         // ignora âncoras de cabeçalho ("Resultados", voltar, etc.): só places reais
         if (!/\/maps\/place\//.test(href)) return null;
@@ -77,7 +78,9 @@ async function extractCards(page, source) {
         let phoneHint = '';
         const pm = text.match(phoneRe);
         if (pm) phoneHint = pm[0].trim();
-        return { name: label, rating, reviews, address: '', phone: '', website: '', source: src, _phoneHint: phoneHint };
+        // _elIdx: índice do âncora na lista DOM (antes do filtro) — enrichWithDetailsV2
+        // usa p/ clicar no card certo mesmo com cabeçalhos filtrados
+        return { name: label, rating, reviews, address: '', phone: '', website: '', source: src, _phoneHint: phoneHint, _elIdx: elIdx };
       })
       .filter(Boolean);
   }, source).catch(() => []);
@@ -161,62 +164,57 @@ async function readPlaceDetail(page) {
   return d;
 }
 
-// Abre cada card p/ detalhe e extrai telefone/site/endereço — otimizado p/ máximo com timeout curto
-async function enrichWithDetails(page, leads, { maxDetails = 120, perLeadTimeoutMs = 9000 } = {}) {
+/* Detail otimizado: card el via _elIdx (índice DOM do âncora, sobrevive ao filtro
+   de cabeçalhos do extractCards); reconsulta os âncoras a cada lead — o goBack
+   destrói os element handles antigos; fora do limite inclui sem detail */
+async function enrichWithDetailsV2(page, queue, { maxDetails = 120 } = {}) {
   const enriched = [];
-  const cards = await page.$$('a.hfpxzc');
-  const total = Math.min(cards.length, leads.length, maxDetails);
-  for (let i = 0; i < total; i++) {
-    const base = leads[i];
+  const limit = Math.min(queue.length, maxDetails);
+  for (let i = 0; i < limit; i++) {
+    const base = queue[i];
     try {
-      const card = await page.$$(`a.hfpxzc`).then((els) => els[i]).catch(() => null);
-      if (!card) {
-        enriched.push(base);
-        continue;
-      }
+      const els = await page.$$('a.hfpxzc').catch(() => []);
+      const card = els[base._elIdx ?? base._cardIndex] || null;
+      if (!card) { enriched.push(pushLead(base, false)); continue; }
       await card.scrollIntoViewIfNeeded().catch(() => {});
       await card.click({ timeout: 5000 }).catch(() => {});
       // espera painel de detalhe: h1 com nome
       await page.waitForSelector('h1', { timeout: 6000 }).catch(() => {});
       await sleep(900);
       const detail = await readPlaceDetail(page);
-      enriched.push(
-        normalizeLead({
-          name: detail.name || base.name,
-          rating: detail.rating || base.rating,
-          reviews: detail.reviews || base.reviews,
-          address: detail.address || base.address,
-          phone: detail.phone || base._phoneHint || '',
-          website: detail.website || '',
-          source: base.source,
-          category: detail.category || base.category || '',
-          plus_code: detail.plus_code || base.plus_code || '',
-          lat: detail.lat || base.lat || '',
-          lng: detail.lng || base.lng || '',
-          place_id: detail.place_id || base.place_id || '',
-          claimed: detail.claimed !== undefined && detail.claimed !== null ? detail.claimed : (base.claimed ?? null),
-          hours: detail.hours || base.hours || '',
-          closed: detail.closed || base.closed || false,
-          photos: detail.photos !== undefined && detail.photos !== null ? detail.photos : (base.photos ?? null),
-          instagram: detail.instagram || base.instagram || '',
-          facebook: detail.facebook || base.facebook || '',
-          whatsapp: detail.whatsapp || '',
-        })
-      );
+      enriched.push(pushLead(base, true, detail));
       // volta p/ lista
       await page.goBack({ waitUntil: 'domcontentloaded', timeout: 8000 }).catch(() => {});
       await sleep(700);
     } catch (e) {
-      enriched.push(normalizeLead(base));
+      enriched.push(pushLead(base, false));
     }
     if ((i + 1) % 10 === 0) await sleep(800);
   }
   // se sobraram leads além do maxDetails, inclui sem detalhe
-  for (let i = total; i < leads.length; i++) enriched.push(normalizeLead(leads[i]));
+  for (let i = limit; i < queue.length; i++) enriched.push(pushLead(queue[i], false));
   return enriched;
 }
 
+/* Mescla card (base) + detail (d): detail vence, _phoneHint do card resgata
+   telefone quando o painel não traz; marca ambiguo/details_done */
+function pushLead(base, detailed, d) {
+  const n = normalizeLead(d ? {
+    name: d.name || base.name, rating: d.rating || base.rating, reviews: d.reviews || base.reviews,
+    address: d.address || base.address, phone: d.phone || base._phoneHint || '', website: d.website || '',
+    source: base.source, category: d.category || base.category || '', plus_code: d.plus_code || base.plus_code || '',
+    lat: d.lat || base.lat || '', lng: d.lng || base.lng || '', place_id: d.place_id || base.place_id || '',
+    claimed: d.claimed ?? base.claimed ?? null, hours: d.hours || base.hours || '', closed: d.closed || base.closed || false,
+    photos: d.photos ?? base.photos ?? null, instagram: d.instagram || base.instagram || '',
+    facebook: d.facebook || base.facebook || '', whatsapp: d.whatsapp || '',
+  } : { ...base });
+  if (base._ambiguo) n.ambiguo = true;
+  n.details_done = !!detailed;
+  return n;
+}
+
 async function scrapeQuery(page, query, opts = {}) {
+  const t0 = Date.now();
   const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   // aceita consent se aparecer ("Concordar"/"Concordo"/"Accept"/"I agree")
@@ -225,8 +223,21 @@ async function scrapeQuery(page, query, opts = {}) {
   await sleep(1500);
   const found = await scrollFeedToEnd(page, { maxScrolls: opts.maxScrolls ?? 60 });
   const cards = await extractCards(page, query);
-  const enriched = await enrichWithDetails(page, cards, { maxDetails: opts.maxDetails ?? 120 });
-  return { query, foundCards: found, leads: enriched };
+  // fase 2: gate de relevância → fila ordenada (match primeiro, ambiguo ao final)
+  const relevance = opts.relevance || null; // { category, skipPlaceIds, skipNames }
+  const queue = relevance
+    ? buildDetailQueue(cards, relevance.category, { skipPlaceIds: relevance.skipPlaceIds, skipNames: relevance.skipNames })
+    : cards.map((c, i) => ({ ...c, _cardIndex: i }));
+  const relevant = queue.filter((c) => !c._ambiguo).length;
+  const ambiguous = queue.filter((c) => c._ambiguo).length;
+  const dropped = cards.length - queue.length;
+  const enriched = await enrichWithDetailsV2(page, queue, { maxDetails: opts.maxDetails ?? 120 });
+  return {
+    query,
+    foundCards: found,
+    leads: enriched,
+    telemetry: { cards: cards.length, relevant, ambiguous, dropped, details: Math.min(queue.length, opts.maxDetails ?? 120), seconds: Math.round((Date.now() - t0) / 1000) },
+  };
 }
 
 /* Refill nominal: busca um lead pelo nome e devolve o detalhe do primeiro card */
@@ -272,23 +283,27 @@ async function enrichOneByQuery(page, query, opts = {}) {
 
 async function scrapeMany(queries, opts = {}) {
   const { browser, page } = await launchBrowser(opts);
-  const all = [];
+  const leads = [];
+  const telemetry = [];
   try {
     for (const q of queries) {
       try {
         console.log(`[scraper] buscando: ${q}`);
         const r = await scrapeQuery(page, q, opts);
-        console.log(`[scraper] "${q}" -> ${r.leads.length} leads (cards: ${r.foundCards})`);
-        all.push(...r.leads);
-        await sleep(2000);
+        console.log(`[scraper] "${q}" -> ${r.leads.length} leads (cards: ${r.foundCards}, rel: ${r.telemetry.relevant}, desc: ${r.telemetry.dropped})`);
+        leads.push(...r.leads);
+        telemetry.push({ query: q, ...r.telemetry });
       } catch (e) {
         console.error(`[scraper] falha em "${q}": ${e.message}`);
+        telemetry.push({ query: q, cards: 0, relevant: 0, ambiguous: 0, dropped: 0, details: 0, seconds: 0, failed: true });
       }
+      // jitter entre queries: respiro anti-rate-limit do Maps
+      await sleep(8000 + Math.floor(Math.random() * 7000));
     }
   } finally {
     await browser.close().catch(() => {});
   }
-  return all;
+  return { leads, telemetry };
 }
 
 function waFromHref(href) {
