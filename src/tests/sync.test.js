@@ -269,3 +269,98 @@ test('planUpsert: row sha1 antigo do mesmo lugar migra o id para place_id e órf
   assert.strictEqual(plan.patches[0].set.types, 'advogados,tapecaria');
   assert.deepStrictEqual(plan.deletes, []);
 });
+
+test('captureRecord monta payload V2 (category/budget/ra_count/qs array/status partial) e base sem capture', () => {
+  const { captureRecord } = require('../../scripts/sync-supabase');
+  const r = captureRecord(7, {
+    category: 'topografia', qs: [{ query: 'q', cards: 5, relevant: 3 }], budget_min: 7.6,
+    ra_count: 12, partial: true, started_at: '2026-10-17T10:00:00.000Z',
+  });
+  assert.strictEqual(r.status, 'partial');            // true = cortado
+  assert.strictEqual(r.leads_count, 7);
+  assert.strictEqual(r.started_at, '2026-10-17T10:00:00.000Z');
+  assert.deepStrictEqual(r.qs, [{ query: 'q', cards: 5, relevant: 3 }]); // jsonb: array, não string
+  assert.strictEqual(r.category, 'topografia');
+  assert.strictEqual(r.budget_min, 7.6);
+  assert.strictEqual(r.ra_count, 12);
+  assert.strictEqual(r.queries, 12);                  // coluna legada preenchida com ra_count
+  const base = captureRecord(3);
+  assert.strictEqual(base.status, 'done');
+  assert.strictEqual(base.leads_count, 3);
+  assert.ok(!('qs' in base) && !('category' in base));
+});
+
+test('syncLeads grava telemetria em captures (fallback legado se colunas não existem)', async () => {
+  fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([{ name: 'Adv T2', address: 'Rua A', source: 'q' }]));
+  const { syncLeads } = require('../../scripts/sync-supabase');
+  const capCalls = [];
+  let firstCapture = true;
+  global.fetch = async (url, opts) => {
+    const u = String(url);
+    if (!u.includes('/captures')) return { ok: true, status: 201, text: async () => '' };
+    if (opts.method === 'GET') return { ok: true, status: 201, text: async () => '[]' }; // check-first: nenhum registro
+    capCalls.push({ method: opts.method, body: JSON.parse(opts.body) });
+    if (firstCapture) {
+      firstCapture = false;
+      return { ok: false, status: 400, text: async () => 'column captures.category does not exist' };
+    }
+    return { ok: true, status: 201, text: async () => '' };
+  };
+  const r = await syncLeads({ dataDir: TMP, runBuild: false, capture: {
+    category: 'topografia', started_at: '2026-10-17T10:00:00.000Z',
+    qs: [{ query: 'q', cards: 5, relevant: 3 }], budget_min: 7.6, ra_count: 1,
+  } });
+  assert.strictEqual(capCalls.length, 2);             // 1 tentativa cheia + 1 legado
+  assert.strictEqual(capCalls[0].method, 'POST');
+  assert.strictEqual(capCalls[0].body[0].category, 'topografia');
+  assert.deepStrictEqual(capCalls[0].body[0].qs, [{ query: 'q', cards: 5, relevant: 3 }]);
+  assert.strictEqual(capCalls[1].body[0].status, 'done');    // fallback legado (2ª tentativa)
+  assert.strictEqual(capCalls[1].body[0].leads_count, r.synced);
+  assert.ok(!('category' in capCalls[1].body[0]));
+  assert.ok(!('qs' in capCalls[1].body[0]));
+});
+
+test('captures idempotente: started_at casado vira PATCH do registro, não POST duplicado', async () => {
+  fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([{ name: 'Adv Dup', address: 'Rua D', source: 'q' }]));
+  const { syncLeads } = require('../../scripts/sync-supabase');
+  const writes = [];
+  let getByStarted = true;
+  global.fetch = async (url, opts) => {
+    const u = String(url);
+    if (!u.includes('/captures')) return { ok: true, status: 201, text: async () => '' };
+    if (opts.method === 'GET') {
+      const body = getByStarted ? JSON.stringify([{ id: 'cap-42' }]) : '[]';
+      getByStarted = false;
+      return { ok: true, status: 201, text: async () => body };
+    }
+    writes.push({ method: opts.method, url });
+    return { ok: true, status: 201, text: async () => '' };
+  };
+  await syncLeads({ dataDir: TMP, runBuild: false, capture: {
+    category: 'advogados', qs: [], started_at: '2026-10-17T09:00:00.000Z', budget_min: 10, ra_count: 5,
+  } });
+  assert.strictEqual(writes.length, 1);
+  assert.strictEqual(writes[0].method, 'PATCH');
+  assert.ok(writes[0].url.includes('id=eq.cap-42'));
+});
+
+test('run partial pré-migration: legado estreia status como done (check constraint antiga) e lança só após falha dupla', async () => {
+  fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([{ name: 'Adv P', address: 'Rua P', source: 'q' }]));
+  const { syncLeads } = require('../../scripts/sync-supabase');
+  const capCalls = [];
+  global.fetch = async (url, opts) => {
+    const u = String(url);
+    if (!u.includes('/captures')) return { ok: true, status: 201, text: async () => '' };
+    if (opts.method === 'GET') return { ok: true, status: 201, text: async () => '[]' };
+    capCalls.push(JSON.parse(opts.body));
+    return { ok: false, status: 400, text: async () => 'violates check constraint captures_status_check' }; // 0009 não aplicada
+  };
+  await assert.rejects(
+    syncLeads({ dataDir: TMP, runBuild: false, capture: {
+      category: 'topografia', qs: [], started_at: '2026-10-17T08:00:00.000Z', budget_min: 5, ra_count: 2, partial: true,
+    } }),
+    /captur|sb_|400|constraint/i
+  );
+  assert.strictEqual(capCalls.length, 2);             // full + legado (ambos falham, erro sobe)
+  assert.strictEqual(capCalls[1][0].status, 'done');  // legado remapeia partial → done
+});

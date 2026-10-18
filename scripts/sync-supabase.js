@@ -183,7 +183,7 @@ async function upsertRows(rows) {
   }
 }
 
-async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = {}) {
+async function syncLeads({ dataDir, category = 'advogados', runBuild = true, capture = null } = {}) {
   if (!sbEnabled()) throw new Error('SUPABASE_URL/SUPABASE_SECRET_KEY não configurados');
   const dir = dataDir || path.join(__dirname, '..', 'data');
   const file = newestLeadsFile(dir, category);
@@ -225,12 +225,88 @@ async function syncLeads({ dataDir, category = 'advogados', runBuild = true } = 
     const d = await require('../src/utils/dedupe').dedupeLeads({ apply: true });
     dbDeduped = d.removed || 0;
   } catch (e) { console.error('[sync] dedupe db falhou:', e.message); }
-  await sbFetch('captures', {
-    method: 'POST',
-    body: [{ status: 'done', finished_at: new Date().toISOString(), leads_count: rows.length }],
-  });
+  await writeCapture(rows.length, capture);
   if (runBuild) execFileSync(process.execPath, [path.join(__dirname, 'build-web-data.js')], { stdio: 'inherit' });
   return { file: path.basename(file), synced: rows.length, deduped: dropped, relevanceDropped, orphanDropped, dbDeduped };
+}
+
+/* ===== Captures V2 (telemetria) ===== */
+
+/* Payload da rodada em captures. status 'partial' só vale depois da migration
+   0009 (check constraint atual aceita running/done/failed); sem capture →
+   payload legado mínimo. qs vai como ARRAY jsonb (não string dupla). */
+function captureRecord(leadsCount, cap = null) {
+  if (!cap) return { status: 'done', finished_at: new Date().toISOString(), leads_count: leadsCount };
+  const raCount = cap.ra_count ?? null;
+  return {
+    status: cap.partial ? 'partial' : 'done', // partial: true = rodada cortada por budget
+    started_at: cap.started_at || null,
+    finished_at: new Date().toISOString(),
+    leads_count: leadsCount,
+    queries: raCount,
+    category: cap.category || null,
+    budget_min: cap.budget_min ?? null,
+    ra_count: raCount,
+    qs: Array.isArray(cap.qs) ? cap.qs : [],
+  };
+}
+
+/* Legado pré-0009: só colunas de 0001; 'partial' vira 'done' (check constraint
+   antiga rejeita) — o sidecar <basename>-meta.json é a fonte real do estado. */
+function legacyCaptureRecord(record) {
+  return {
+    status: record.status === 'partial' ? 'done' : record.status,
+    started_at: record.started_at ?? null,
+    finished_at: record.finished_at,
+    leads_count: record.leads_count,
+    queries: record.queries ?? null,
+  };
+}
+
+// 400 de schema (colunas inexistentes/constraint) = migration pendente, não desastre
+function isCaptureSchemaError(msg) {
+  return /sb_400|PGRST204|42703|schema|column|constraint|categor|budget|ra_count|\bqs\b/i.test(String(msg || ''));
+}
+
+/* captures NÃO tem UNIQUE: idempotência por started_at da rodada — registro
+   existente vira PATCH; check-first que falhar segue para POST (pior caso:
+   1 registro extra, nunca perca a sincronização por causa disso) */
+async function captureRowId(startedAt) {
+  if (!startedAt) return null;
+  try {
+    const rows = await sbFetch(`captures?select=id&started_at=eq.${encodeURIComponent(startedAt)}`);
+    return (rows && rows[0] && rows[0].id) || null;
+  } catch (e) {
+    console.error(`[sync] captures check-first falhou (segue com POST): ${e.message}`);
+    return null;
+  }
+}
+
+async function writeCapture(leadsCount, cap) {
+  const record = captureRecord(leadsCount, cap);
+  try {
+    const id = await captureRowId(record.started_at);
+    if (id) {
+      await sbFetch(`captures?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: record, headers: { Prefer: 'return=minimal' } });
+      return;
+    }
+    await sbFetch('captures', { method: 'POST', body: [record] });
+  } catch (e) {
+    if (!isCaptureSchemaError(e.message)) throw e;
+    console.error(`[sync] captures sem colunas V2 (migration 0009 pendente?): ${e.message} — tentando payload legado`);
+    try {
+      const legacy = legacyCaptureRecord(record);
+      const id = await captureRowId(record.started_at);
+      if (id) {
+        await sbFetch(`captures?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: legacy, headers: { Prefer: 'return=minimal' } });
+      } else {
+        await sbFetch('captures', { method: 'POST', body: [legacy] });
+      }
+    } catch (e2) {
+      console.error(`[sync] captures legado também falhou: ${e2.message}`);
+      throw e2;
+    }
+  }
 }
 
 if (require.main === module) {
@@ -240,4 +316,4 @@ if (require.main === module) {
     .catch((e) => { console.error('[sync]', e.message); process.exit(1); });
 }
 
-module.exports = { norm, leadId, placeIdOrHash, planUpsert, toRow, normPhone, cleanAddr, isLead, dedupeRows, upsertRows, syncLeads };
+module.exports = { norm, leadId, placeIdOrHash, planUpsert, toRow, normPhone, cleanAddr, isLead, dedupeRows, upsertRows, syncLeads, captureRecord, legacyCaptureRecord, writeCapture };

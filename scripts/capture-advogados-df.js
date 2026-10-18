@@ -181,7 +181,11 @@ async function main() {
     try {
       const s = await syncLeads({
         category: tag, runBuild: true,
-        capture: { category: tag, qs: qsTrim, budget_min: budget, ra_count: ordered.length, partial: cutByBudget },
+        capture: {
+          basename, category: tag, started_at: startedAt, seconds: meta.seconds,
+          budget_min: budget, ra_count: ordered.length, partial: cutByBudget,
+          qs: qsTrim, telemetry: allTel, perRA: raStats,
+        },
       });
       console.log(`[sync] ${s.synced} leads → Supabase (${s.file})`);
     } catch (e) {
