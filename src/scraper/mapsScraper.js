@@ -341,8 +341,11 @@ async function scrapeMany(queries, opts = {}) {
         console.error(`[scraper] falha em "${q}": ${e.message}`);
         telemetry.push({ query: q, cards: 0, relevant: 0, ambiguous: 0, dropped: 0, details: 0, seconds: 0, failed: true });
       }
-      // jitter entre queries (não dorme depois da última): respiro anti-rate-limit
-      if (idx + 1 < queries.length) await sleep(8000 + Math.floor(Math.random() * 7000));
+      // jitter entre queries — não dorme na última nem quando o budget já estourou
+      // (o check do topo do loop corta na próxima iteração e não gasta o jitter)
+      if (idx + 1 < queries.length && !(opts.deadline && Date.now() > opts.deadline - DEADLINE_MARGIN_MS)) {
+        await sleep(8000 + Math.floor(Math.random() * 7000));
+      }
     }
   } finally {
     await browser.close().catch(() => {});

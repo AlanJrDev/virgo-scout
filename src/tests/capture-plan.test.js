@@ -1,7 +1,7 @@
 // Testes do planner de budget do Capture V2 (partes puras, sem browser)
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { defaultBudgetMinutes, orderPlan, lowYieldRAs, freshPlaceIds } = require('../utils/capture-plan');
+const { defaultBudgetMinutes, orderPlan, lowYieldRAs, collectAltQueries, freshPlaceIds } = require('../utils/capture-plan');
 
 test('budget proporcional: 1 RA ~8 min; DF inteiro cap 60', () => {
   assert.strictEqual(defaultBudgetMinutes(1), 7.6);
@@ -30,6 +30,26 @@ test('lowYieldRAs: RA com < N relevantes na primeira passada entra na segunda (u
     'georreferenciamento Gama Brasília DF',
   ]);
   assert.strictEqual(second[0].ra, 'Gama');
+});
+
+test('lowYieldRAs sem termsPool devolve os próprios pares low-yield (entrada do collectAltQueries)', () => {
+  const plan = [{ ra: 'Gama', query: 'q-ga' }, { ra: 'Águas Claras', query: 'q-ac' }];
+  const tel = [{ query: 'q-ga', relevant: 1 }, { query: 'q-ac', relevant: 12 }];
+  assert.deepStrictEqual(lowYieldRAs(plan, tel, { threshold: 3 }), [{ ra: 'Gama', query: 'q-ga' }]);
+});
+
+test('collectAltQueries: entries de QUERIES (incl. _explicit) com RA ganham alternativas dos outros termos', () => {
+  const entries = [
+    { ra: 'Gama', query: 'topógrafo Gama Brasília DF' }, // _explicit não bloqueia nada aqui
+    { ra: 'Gama', query: 'levantamento topográfico Gama Brasília DF' },
+    { ra: null, query: 'advogado sem lugar' },             // sem RA: fora
+  ];
+  const alt = collectAltQueries(entries, 'topografia');
+  assert.deepStrictEqual(alt.map((p) => p.query), [
+    'topografia Gama Brasília DF',
+    'georreferenciamento Gama Brasília DF',
+  ]);
+  assert.strictEqual(alt[0].ra, 'Gama');
 });
 
 test('freshPlaceIds: Set só com place_id presente', () => {

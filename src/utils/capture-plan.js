@@ -1,5 +1,6 @@
 /* Planner do Capture V2: budget proporcional, fila por yield histórico, segunda passada por termo. */
 const { buildPlan } = require('./df-ra');
+const { termsOfCategory } = require('./categories');
 
 function defaultBudgetMinutes(nQueries) {
   // RAs demoram ~1.6 min (cards+details+jitter); DF inteiro fica capado em 60
@@ -20,12 +21,13 @@ function orderPlan(plan, history = []) {
   });
 }
 
-/* RAs (pares [{ra, query}]) com yield abaixo do threshold: 1 plano por termo
-   extra da categoria (termsPool), mantendo a mesma RA. Queries cortadas por
-   budget (sem telemetry) voltam com relevant 0 → entram na 2ª passada. */
+/* RAs (pares [{ra, query}]) com yield abaixo do threshold. Com termsPool, devolve
+   1 plano de captura por termo extra (buildPlan(term, {ra})); SEM termsPool
+   devolve os próprios pares low-yield (entrada para collectAltQueries). */
 function lowYieldRAs(plan, telemetry = [], { threshold = 3, termsPool = [] } = {}) {
   const tel = new Map(telemetry.map((t) => [t.query, t]));
   const low = plan.filter((p) => (tel.get(p.query)?.relevant || 0) < threshold);
+  if (!termsPool.length) return low;
   const out = [];
   for (const p of low) {
     for (const term of termsPool) {
@@ -35,8 +37,31 @@ function lowYieldRAs(plan, telemetry = [], { threshold = 3, termsPool = [] } = {
   return out;
 }
 
+/* Alternativas multi-termo para pares low-yield: cada RA ganha query com os
+   OUTROS termos da categoria. Exclui a própria query do entry E queries de
+   outros entries low-yield (acabam de rodar e rendem < threshold — re-rodar
+   seria gasto menor); _explicit só marca origem serve-web e não bloqueia nada
+   aqui. Dedupe por query, ordem estável; entries sem RA ficam de fora. */
+function collectAltQueries(entries, category) {
+  const terms = termsOfCategory(category);
+  const selfQ = new Set((entries || []).map((p) => p && p.query).filter(Boolean));
+  const seen = new Set();
+  const out = [];
+  for (const p of entries || []) {
+    if (!p || !p.ra) continue;
+    for (const term of terms) {
+      for (const pair of buildPlan(term, { ra: p.ra })) {
+        if (selfQ.has(pair.query) || seen.has(pair.query)) continue;
+        seen.add(pair.query);
+        out.push(pair);
+      }
+    }
+  }
+  return out;
+}
+
 function freshPlaceIds(rows) {
   return new Set((rows || []).map((r) => r && r.place_id).filter(Boolean));
 }
 
-module.exports = { defaultBudgetMinutes, orderPlan, lowYieldRAs, freshPlaceIds };
+module.exports = { defaultBudgetMinutes, orderPlan, lowYieldRAs, collectAltQueries, freshPlaceIds };

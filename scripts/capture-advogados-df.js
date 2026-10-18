@@ -13,7 +13,7 @@ const { sbEnabled, sbFetchAll } = require('../src/utils/sb');
 const { syncLeads } = require('./sync-supabase');
 const { CATEGORIES, CAT_KEYS, rootsFor, termsOfCategory, relevanceFilter, relevanceScore } = require('../src/utils/categories');
 const { buildPlan, findRA } = require('../src/utils/df-ra');
-const { defaultBudgetMinutes, orderPlan, lowYieldRAs, freshPlaceIds } = require('../src/utils/capture-plan');
+const { defaultBudgetMinutes, orderPlan, lowYieldRAs, collectAltQueries, freshPlaceIds } = require('../src/utils/capture-plan');
 const { normalizeName } = require('../src/utils/queue-util');
 
 async function main() {
@@ -35,23 +35,40 @@ async function main() {
   const capSurfaced = parseInt(process.env.BASE_MAX_SURFACED || '', 10) || 0;
   const t0h = process.hrtime.bigint();
 
-  // fila: strings explícitas do serve-web OU plano multi-RA com o termo principal
+  // fila: strings explícitas do serve-web OU plano multi-RA com o termo principal.
+  // _explicit só marca origem serve-web (sem semântica além da doc);
+  // backfill de ra em TODOS os pares — explicitas com RA detectável também
+  // participam da 2ª passada multi-termo (wrappers: same RA, outros termos).
   let plan;
   if (explicit) {
     plan = explicit.map((q) => ({ ra: (findRA(q) || {}).ra || null, query: q, _explicit: true }));
   } else {
     plan = buildPlan(termsOfCategory(tag)[0]);
   }
+  plan = plan.map((p) => ({ ...p, ra: p.ra || ((findRA(p.query) || {}).ra || null) }));
   if (!plan.length) throw new Error('[capture] fila de captura vazia (QUERIES vazia?)');
   const budget = budgetMinEnv || defaultBudgetMinutes(plan.length);
   const deadline = Date.now() + budget * 60000;
 
-  // histórico: yield da última meta do nicho (ordena a fila, boost = yield desc)
+  // histórico dedicado por BASENAME (append por rodada): data/<basename>-hist.json
+  // = { runs: [{ts, perRA: {ra: {queries, relevant, ...}}, queries: [{query, relevant,...}]}]}
+  // (guarda só as 10 últimas). orderPlan usa as queries da ÚLTIMA rodada; ausente/
+  // inválido → ordem natural. Fallback legado <tag>-df-max-meta.json, se existir.
+  const histFile = path.join('data', `${basename}-hist.json`);
   let history = [];
   try {
-    const h = JSON.parse(fs.readFileSync(path.join('data', `${tag}-df-max-meta.json`), 'utf8'));
-    if (Array.isArray(h.qs)) history = h.qs.map((r) => ({ query: r.query, relevant: r.relevant || 0 }));
-  } catch (e) { /* primeira rodada: sem histórico (ordem natural) */ }
+    const h = JSON.parse(fs.readFileSync(histFile, 'utf8'));
+    const runs = h && Array.isArray(h.runs) ? h.runs : (Array.isArray(h) ? h : []);
+    const last = runs.length ? runs[runs.length - 1] : null;
+    if (last && Array.isArray(last.queries)) {
+      history = last.queries.map((r) => ({ query: r.query, relevant: r.relevant || 0 }));
+    }
+  } catch (e) {
+    try {
+      const h = JSON.parse(fs.readFileSync(path.join('data', `${tag}-df-max-meta.json`), 'utf8'));
+      if (Array.isArray(h.qs)) history = h.qs.map((r) => ({ query: r.query, relevant: r.relevant || 0 }));
+    } catch (e2) { /* primeira rodada: sem histórico (ordem natural) */ }
+  }
 
   // recaptura incremental: leads frescos da base (≤30d) não recebem detail de novo.
   // Cards da fase 1 NÃO têm place_id — o skip EFETIVO é por NOME normalizado;
@@ -82,23 +99,39 @@ async function main() {
   let cutByBudget = p1.partial;
   if (cutByBudget) console.log('[capture] 1ª passada cortada por budget');
 
-  // 2ª passada: termos extras da categoria nas RAs de baixo yield, se sobrou budget
-  const t2Pool = termsOfCategory(tag).slice(1);
-  if (t2Pool.length && Date.now() < deadline - DEADLINE_MARGIN_MS) {
-    const nonExplicit = ordered.filter((p) => !p._explicit);
-    const second = lowYieldRAs(nonExplicit, allTel, { threshold: 3, termsPool: t2Pool });
+  // 2ª passada multi-termo: TODAS as entries com RA (explicitas incluídas —
+  // wrappers topografia/tapecaria/estofado/arquitetura ganham, para cada RA
+  // lowYield, queries com os OUTROS termos da categoria). Sem budget restante
+  // para mais queries → marca corte e loga (a fila nunca morre silenciosa).
+  if (termsOfCategory(tag).length > 1) {
+    const low = lowYieldRAs(ordered, allTel, { threshold: 3 });
+    const second = collectAltQueries(low, tag);
     if (second.length) {
-      console.log(`[capture] 2ª passada: ${second.length} buscas (${t2Pool.join(', ')})`);
-      const p2 = await runQueue(second, opts);
-      allLeads = allLeads.concat(p2.leads);
-      allTel.push(...p2.telemetry);
-      cutByBudget = cutByBudget || p2.partial;
+      if (Date.now() < deadline - DEADLINE_MARGIN_MS) {
+        console.log(`[capture] 2ª passada: ${second.length} buscas alternativas (${new Set(low.map((p) => p.ra)).size} RAs lowYield)`);
+        const p2 = await runQueue(second, opts);
+        allLeads = allLeads.concat(p2.leads);
+        allTel.push(...p2.telemetry);
+        cutByBudget = cutByBudget || p2.partial;
+      } else {
+        cutByBudget = true;
+        console.log(`[capture] 2ª passada cortada por budget (${new Set(low.map((p) => p.ra)).size} RAs lowYield aguardaram)`);
+      }
     }
   }
 
   const uniq = dedupeLeads(allLeads.map((l) => ({ ...l, name: l.name || '', address: l.address || '' })).filter((l) => l.name));
   const { kept, dropped } = relevanceFilter(uniq, tag); // defesa extra antes de salvar
-  const sample = capSurfaced && capSurfaced < kept.length ? kept.slice(0, capSurfaced) : kept;
+  // cap opcional de leads surfados: melhor primeiro (score DESC) para não
+  // descartar lead relevante antes de ruído; knob sem spec formal (ver report)
+  let sample = kept;
+  if (capSurfaced && capSurfaced < kept.length) {
+    sample = kept
+      .slice()
+      .sort((a, b) => relevanceScore(b, tag).score - relevanceScore(a, tag).score)
+      .slice(0, capSurfaced);
+    console.log(`[capture] BASE_MAX_SURFACED=${capSurfaced}: kept=${kept.length} ordenado por relevância, surfando os melhores ${capSurfaced}`);
+  }
   const rejected_sample = uniq
     .filter((r) => relevanceScore(r, tag).verdict === 'reject')
     .slice(0, 15)
@@ -106,17 +139,39 @@ async function main() {
   const out = await saveLeads(sample, { basename, outDir: './data', formats: ['csv', 'json', 'xlsx'] });
 
   const seconds = Number(process.hrtime.bigint() - t0h) / 1e9;
+  // cópias pequenas (sem refs ao array vivo; sem foundCards de telemetria crua)
+  const qsTrim = allTel.map((t) => ({
+    query: t.query, ra: t.ra || null, relevant: t.relevant || 0, ambiguous: t.ambiguous || 0,
+    dropped: t.dropped || 0, details: t.details || 0, seconds: t.seconds || 0, failed: !!t.failed,
+  }));
+  const raStats = perRAStats(allTel);
+  const perRAObj = {};
+  for (const r of raStats) perRAObj[r.ra || '(sem RA)'] = r;
+  const finishedAt = new Date().toISOString();
   const meta = {
-    generated_at: new Date().toISOString(),
-    started_at: startedAt, finished_at: new Date().toISOString(), startedAt, finishedAt: new Date().toISOString(),
+    generated_at: finishedAt,
+    started_at: startedAt, finished_at: finishedAt, startedAt, finishedAt,
     seconds: Math.round(seconds),
     category: tag, basename, budget_min: budget, budget, ra_count: ordered.length, partial: cutByBudget,
-    qs: allTel, // compat: histórico do nicho lê h.qs (e Task 5 usa capture.qs)
-    telemetry: allTel,
-    perRA: perRAStats(allTel),
+    qs: qsTrim,
+    telemetry: allTel, // telemetria crua (com foundCards) da mesma rodada
+    perRA: raStats,
     rejected_sample,
   };
   fs.writeFileSync(path.join('data', `${basename}-meta.json`), JSON.stringify(meta, null, 2), 'utf8');
+  // histórico por rodada (orderPlan boost): append com guard de 10 rodadas
+  try {
+    let runs = [];
+    try {
+      const j = JSON.parse(fs.readFileSync(histFile, 'utf8'));
+      runs = j && Array.isArray(j.runs) ? j.runs : (Array.isArray(j) ? j : []);
+    } catch (e) { /* primeira rodada */ }
+    runs.push({ ts: finishedAt, perRA: perRAObj, queries: qsTrim });
+    while (runs.length > 10) runs.shift();
+    fs.writeFileSync(histFile, JSON.stringify({ runs }, null, 2), 'utf8');
+  } catch (e) {
+    console.error(`[capture] hist não gravado (${e.message}) — next run roda com ordem natural`);
+  }
 
   console.log(`[capture] RAW=${allLeads.length} UNICOS=${uniq.length} KEPT=${sample.length} DROPPED=${dropped} em ${meta.seconds}s${capSurfaced ? ` (cap ${capSurfaced})` : ''}`);
   console.log(JSON.stringify(out, null, 2));
@@ -124,7 +179,7 @@ async function main() {
     try {
       const s = await syncLeads({
         category: tag, runBuild: true,
-        capture: { category: tag, qs: allTel, budget_min: budget, ra_count: ordered.length, partial: cutByBudget },
+        capture: { category: tag, qs: qsTrim, budget_min: budget, ra_count: ordered.length, partial: cutByBudget },
       });
       console.log(`[sync] ${s.synced} leads → Supabase (${s.file})`);
     } catch (e) {
