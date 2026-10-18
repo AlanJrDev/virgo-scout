@@ -11,12 +11,26 @@ test('buildDetailQueue ordena match antes de ambiguo e respeita skip de place_id
     { name: '2GEO', category: null, place_id: '0xkeep' },
   ];
   const q = buildDetailQueue(rows, 'topografia', { skipPlaceIds: new Set(['0xskip']) });
-  assert.strictEqual(q.length, 3); // 0xskip fora
+  assert.strictEqual(q.length, 3); // 0xskip fora (B rejeitada pela relevância)
   assert.strictEqual(q[0].name, 'TOPOGRAFIA X');
   assert.strictEqual(q[0]._cardIndex, 1);
-  assert.strictEqual(q[1].name, 'Sem categoria'); // ambiguo ao final
-  assert.strictEqual(q[1]._ambiguo, true);
+  // sem categoria = MATCH (alinhado ao filtro de sync): fica na fila sem _ambiguo
+  assert.strictEqual(q[1].name, 'Sem categoria');
+  assert.strictEqual(q[1]._ambiguo, undefined);
   assert.strictEqual(q[2].name, '2GEO');
+  assert.strictEqual(q[2]._ambiguo, undefined);
+});
+
+test('buildDetailQueue: sem categoria fica; categoria irrelevante do nicho é rejeitada', () => {
+  const rows = [
+    { name: 'Loja', category: null },
+    { name: 'Qualquer X', category: 'Complexo habitacional' },
+  ];
+  const q = buildDetailQueue(rows, 'topografia');
+  assert.strictEqual(q.length, 1); // 'Qualquer X' rejeitado
+  assert.strictEqual(q[0].name, 'Loja');
+  assert.strictEqual(q[0]._ambiguo, undefined);
+  assert.strictEqual(q[0].details_done, undefined);
 });
 
 test('buildDetailQueue respeita skipNames (recaptura incremental pela base)', () => {

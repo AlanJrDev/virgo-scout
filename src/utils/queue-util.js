@@ -26,12 +26,14 @@ function buildDetailQueue(rows, category, opts = {}) {
     if (r.verdict === 'reject') return;
     if (skip && row.place_id && skip.has(row.place_id)) return;
     if (skipNames && skipNames.has(normalizeName(row && row.name))) return;
-    // sem categoria no card → ambiguo: entra ao final da fila (pode receber detail se sobrar orçamento)
-    const isAmbiguo = r.verdict === 'ambiguo' || !row.category;
+    // ambíguo só por veredito do relevanceScore; row SEM categoria = match (score 1,
+    // alinhado ao filtro de sync — os cards da fase 1 já trazem category extraída)
+    const isAmbiguo = r.verdict === 'ambiguo';
     queue.push({ ...row, _cardIndex: idx, ...(isAmbiguo ? { _ambiguo: true } : {}) });
   });
   const rank = (x) => (x._ambiguo ? 1 : 0);
-  return queue.sort((a, b) => rank(a) - rank(b) || relevanceScore(a, category).score - relevanceScore(b, category).score);
+  // score desc: melhor sinal de relevância primeiro
+  return queue.sort((a, b) => rank(a) - rank(b) || relevanceScore(b, category).score - relevanceScore(a, category).score);
 }
 
 module.exports = { buildDetailQueue, normalizeName };
