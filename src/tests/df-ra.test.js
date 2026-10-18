@@ -25,6 +25,12 @@ test('RA específico vence menção genérica a DF no mesmo prompt', () => {
   assert.strictEqual(r.ra, 'Taguatinga');
 });
 
+test('queries de captura com suffixo "Brasília DF": RA específico vence Brasília (pares do runner)', () => {
+  assert.strictEqual(findRA('topografia Gama Brasília DF').ra, 'Gama');
+  assert.strictEqual(findRA('topografia Brasília DF').ra, 'Brasília');
+  assert.strictEqual(findRA('estofado Águas Claras Brasília DF').ra, 'Águas Claras');
+});
+
 test('cidades oficiais: 37 RAs + Asa Sul/Norte como termos de busca', () => {
   const OficiaisAusentes = ['Gama', 'Taguatinga', 'Ceilândia', 'Guará', 'Cruzeiro', 'Samambaia', 'Santa Maria', 'São Sebastião', 'Recanto das Emas', 'Lago Sul', 'Riacho Fundo', 'Lago Norte', 'Candangolândia', 'Águas Claras', 'Riacho Fundo II', 'Sudoeste/Octogonal', 'Varjão', 'Park Way', 'Estrutural', 'Sobradinho II', 'Jardim Botânico', 'Itapoã', 'SIA', 'Vicente Pires', 'Fercal', 'Sol Nascente', 'Arniqueira', 'Arapoanga', 'Água Quente', '26 de Setembro', 'Ponte Alta'];
   const tem = new Set(RAS.map((r) => r));

@@ -36,9 +36,10 @@ async function main() {
   const t0h = process.hrtime.bigint();
 
   // fila: strings explícitas do serve-web OU plano multi-RA com o termo principal.
-  // _explicit só marca origem serve-web (sem semântica além da doc);
-  // backfill de ra em TODOS os pares — explicitas com RA detectável também
-  // participam da 2ª passada multi-termo (wrappers: same RA, outros termos).
+  // QUERIES env pode vir do usuário (1 string p/ smoke) ou dos wrappers
+  // (capture-topografia/arquitetura/tapecaria/estofado injetam a fila inteira).
+  // _explicit é SÓ informativo (origem serve-web/wrapper) — não muda comportamento:
+  // backfill de ra abaixo re-habilita o entry para a 2ª passada multi-termo.
   let plan;
   if (explicit) {
     plan = explicit.map((q) => ({ ra: (findRA(q) || {}).ra || null, query: q, _explicit: true }));
@@ -105,7 +106,8 @@ async function main() {
   // para mais queries → marca corte e loga (a fila nunca morre silenciosa).
   if (termsOfCategory(tag).length > 1) {
     const low = lowYieldRAs(ordered, allTel, { threshold: 3 });
-    const second = collectAltQueries(low, tag);
+    // exclude = fila completa executada: nada da 1ª passada é re-rodado
+    const second = collectAltQueries(low, tag, ordered.map((p) => p.query));
     if (second.length) {
       if (Date.now() < deadline - DEADLINE_MARGIN_MS) {
         console.log(`[capture] 2ª passada: ${second.length} buscas alternativas (${new Set(low.map((p) => p.ra)).size} RAs lowYield)`);

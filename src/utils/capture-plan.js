@@ -38,13 +38,18 @@ function lowYieldRAs(plan, telemetry = [], { threshold = 3, termsPool = [] } = {
 }
 
 /* Alternativas multi-termo para pares low-yield: cada RA ganha query com os
-   OUTROS termos da categoria. Exclui a própria query do entry E queries de
-   outros entries low-yield (acabam de rodar e rendem < threshold — re-rodar
-   seria gasto menor); _explicit só marca origem serve-web e não bloqueia nada
-   aqui. Dedupe por query, ordem estável; entries sem RA ficam de fora. */
-function collectAltQueries(entries, category) {
+   OUTROS termos da categoria. `exclude` = TODAS as queries já executadas na
+   rodada (o runner passa o plan completo/ordered, não só as low) — nada de
+   re-rodar query que acabou de virar lead; as próprias queries dos entries low
+   ficam de fora também. _explicit só marca origem serve-web e não bloqueia
+   bloqueia nada aqui. Dedupe por query, ordem estável; entries sem RA ficam
+   de fora. */
+function collectAltQueries(entries, category, exclude = []) {
   const terms = termsOfCategory(category);
-  const selfQ = new Set((entries || []).map((p) => p && p.query).filter(Boolean));
+  const selfQ = new Set(
+    (entries || []).map((p) => p && p.query).filter(Boolean)
+      .concat((Array.isArray(exclude) ? exclude : [exclude]).filter(Boolean))
+  );
   const seen = new Set();
   const out = [];
   for (const p of entries || []) {

@@ -21,6 +21,10 @@ function raName(s) {
 }
 
 const byName = new Map(RAS.map((r) => [raName(r), r]));
+/* ordem de matching do findRA: RA específico VENCE a menção genérica 'Brasília DF'
+   (suffixo presente em TODAS as queries de captura) — itera todo mundo EXCETO
+   Brasília primeiro e só depois Brasília. */
+const byNameSpecificFirst = [...byName].sort((a, b) => (a[0] === 'brasilia') - (b[0] === 'brasilia'));
 
 const ALIAS = new Map([
   ['plano piloto', 'Brasília'],
@@ -40,7 +44,7 @@ const ALIAS = new Map([
 function findRA(prompt) {
   const p = raName(prompt);
   if (!p) return null;
-  for (const [key, ra] of byName) {
+  for (const [key, ra] of byNameSpecificFirst) {
     const re = new RegExp(`(^|[^\\p{L}])${key}(s)?([^\\p{L}]|$)`, 'u');
     if (re.test(p)) return { ra, raType: 'ra' };
   }
