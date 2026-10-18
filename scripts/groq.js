@@ -71,35 +71,60 @@ const INTERPRET_SYSTEM = [
   'Nunca adicione chaves além de nicho e lugar.',
 ].join(' ');
 
+/* Retry do flaky json_object no gpt-oss-120b: 1ª tentativa COM response_format
+   {type:'json_object'} (como sempre); 2ª tentativa SEM response_format e com o
+   prompt reforçado a exigir JSON — só quando a 1ª falhou com http 400 ou JSON.parse
+   do content. Se mesmo a 2ª falhar, extrai nicho/lugar por regex no texto cru;
+   nada disso resolve → {nicho:'', lugar:''} (serve-web faz o match local do prompt
+   ou cai no low_signal). Erros fora do cenário flaky (rede/5xx/timeout) seguem
+   rethrow → groq_error honesto. */
+const INTERPRET_RETRY_SUFFIX = '\nResponda SOMENTE JSON {"nicho":"...","lugar":"..."}.';
+const RE_NICHO = /(?:nicho)\s*[:=]\s*["“]([^"”]+)["”]/i;
+const RE_LUGAR = /(?:lugar)\s*[:=]\s*["“]([^"”]+)["”]/i;
+
 async function interpretCapture(prompt) {
   const key = process.env.GROQ_API_KEY;
   if (!key) { const e = new Error('GROQ_API_KEY não definida'); e.code = 'no_key'; throw e; }
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const r = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
+  const user = String(prompt || '').slice(0, 500);
+  let raw = ''; // conteúdo cru da última resposta com corpo (base do fallback por regex)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    try {
+      const body = {
         model: MODEL,
         messages: [
           { role: 'system', content: INTERPRET_SYSTEM },
-          { role: 'user', content: String(prompt || '').slice(0, 500) },
+          { role: 'user', content: attempt === 0 ? user : user + INTERPRET_RETRY_SUFFIX },
         ],
         temperature: 0,
         max_tokens: 200,
-        response_format: { type: 'json_object' },
-      }),
-      signal: ctrl.signal,
-    });
-    if (!r.ok) { const e = new Error(`groq http ${r.status}`); e.code = 'http'; e.status = r.status; throw e; }
-    const j = await r.json();
-    const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-    const parsed = JSON.parse(text || '{}');
-    return { nicho: String(parsed.nicho || '').trim(), lugar: String(parsed.lugar || '').trim() };
-  } finally {
-    clearTimeout(timer);
+      };
+      if (attempt === 0) body.response_format = { type: 'json_object' };
+      const r = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (!r.ok) { const e = new Error(`groq http ${r.status}`); e.code = 'http'; e.status = r.status; throw e; }
+      const j = await r.json();
+      const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (text) raw = String(text);
+      const parsed = JSON.parse(text || '{}');
+      return { nicho: String(parsed.nicho || '').trim(), lugar: String(parsed.lugar || '').trim() };
+    } catch (e) {
+      const retryable = (e && e.code === 'http' && e.status === 400) || (e instanceof SyntaxError);
+      if (!retryable) throw e; // fora do flaky: comportamento atual (503 groq_error)
+      if (attempt === 1) break; // 2ª tentativa também falhou → fallback por regex
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  const mN = RE_NICHO.exec(raw);
+  const mL = RE_LUGAR.exec(raw);
+  if (mN || mL) return { nicho: ((mN && mN[1]) || '').trim(), lugar: ((mL && mL[1]) || '').trim() };
+  return { nicho: '', lugar: '' };
 }
 
 module.exports = { GROQ_URL, MODEL, SYSTEM, formatContext, buildMessages, askGroq, interpretCapture };

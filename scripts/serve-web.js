@@ -1,7 +1,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, execSync } = require('node:child_process');
 require('dotenv').config();
 const { buildPayload } = require('../src/utils/metrics');
 const { attemptLogin, sessionUser } = require('./serve-web-auth');
@@ -38,21 +38,32 @@ function readJob() {
   }
 }
 
+/* pid de processo vivo = existe E (no Windows) é node.exe — evita job fantasma
+   quando o SO reaproveita o pid para OUTRO app (ex.: steamwebhelper com o mesmo
+   pid do capture que morreu → painel preso em 'running' + 409 nas novas capturas). */
 function pidAlive(pid) {
-  if (!pid) return false;
+  const n = Number(pid);
+  if (!Number.isInteger(n) || n <= 0) return false;
   try {
-    process.kill(pid, 0);
-    return true;
+    process.kill(n, 0);
   } catch {
     return false;
+  }
+  if (process.platform !== 'win32') return true;
+  try {
+    const out = execSync(`tasklist /FI "PID eq ${n}" /FO CSV /NH`, { encoding: 'utf8' });
+    const first = String(out).split(/\r?\n/)[0] || '';
+    const img = first.match(/^"([^"]+)"/); // linha de match = "imagem.exe","pid",... (PT/EN não importa)
+    return !!img && img[1].toLowerCase() === 'node.exe';
+  } catch {
+    return false; // tasklist falhou (processo sumiu entre o kill e o tasklist)
   }
 }
 
 function jobStatus() {
   const job = readJob();
   if (!job) return { status: 'idle' };
-  const alive = pidAlive(job.pid);
-  if (alive) {
+  if (pidAlive(job.pid)) {
     let done = 0;
     let current = '';
     try {
@@ -66,6 +77,9 @@ function jobStatus() {
     } catch {}
     return { status: 'running', pid: job.pid, started_at: job.started_at, total: job.queries, done, current, category: job.category || 'advogados' };
   }
+  // pid morto OU herdado por processo que não é node (ex.: steamwebhelper):
+  // job fantasma — apaga o arquivo e devolve o estado final calculado do log antigo
+  try { fs.unlinkSync(JOB_FILE); } catch {}
   let summary = null;
   try {
     const lines = fs.readFileSync(JOB_LOG, 'utf8').split(/\r?\n/).filter(Boolean);
@@ -73,8 +87,8 @@ function jobStatus() {
       if (l.includes('[capture] RAW=')) summary = l;
     }
   } catch {}
-    return { status: summary ? 'done' : 'failed', started_at: job.started_at, finished_at: job.finished_at || null, category: job.category || 'advogados', summary };
-  }
+  return { status: summary ? 'done' : 'failed', started_at: job.started_at, finished_at: job.finished_at || null, category: job.category || 'advogados', summary };
+}
 
 function startCapture(category = 'advogados', { queries: queriesOverride = null } = {}) {
   const st = jobStatus();

@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { buildMessages, formatContext, askGroq, GROQ_URL, MODEL } = require('../../scripts/groq');
+const { buildMessages, formatContext, askGroq, interpretCapture, GROQ_URL, MODEL } = require('../../scripts/groq');
 
 const PAYLOAD = {
   stats: { total: 1345, comSite: 192, semSite: 1153, comPhone: 240, alta: 578, qualif: 168 },
@@ -64,4 +64,73 @@ test('askGroq sem chave lança no_key (fail-closed)', async () => {
 test('constantes de API', () => {
   assert.match(GROQ_URL, /^https:\/\/api\.groq\.com/);
   assert.match(MODEL, /\//); // formato org/modelo
+});
+
+/* ===== interpretCapture: retry do flaky 400 json_validate_failed (gpt-oss-120b) ===== */
+
+function withFetchMock(fn) {
+  const prevKey = process.env.GROQ_API_KEY;
+  const prevFetch = global.fetch;
+  process.env.GROQ_API_KEY = 'test-key';
+  return fn().finally(() => {
+    global.fetch = prevFetch;
+    if (prevKey === undefined) delete process.env.GROQ_API_KEY;
+    else process.env.GROQ_API_KEY = prevKey;
+  });
+}
+
+test('interpretCapture: 400 flaky → retry sem response_format e prompt reforçado', async () => {
+  await withFetchMock(async () => {
+    const calls = [];
+    global.fetch = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push(body);
+      if (calls.length === 1) {
+        assert.deepStrictEqual(body.response_format, { type: 'json_object' }, '1ª tentativa mantém response_format');
+        return { ok: false, status: 400, json: async () => ({ error: 'json_validate_failed' }) };
+      }
+      assert.strictEqual(body.response_format, undefined, 'retry sai SEM response_format');
+      assert.match(body.messages[body.messages.length - 1].content, /Responda SOMENTE JSON \{"nicho":"\.\.\.","lugar":"\.\.\."\}\./, 'prompt reforçado no retry');
+      return { ok: true, json: async () => ({ choices: [{ message: { content: '{"nicho":"topografia","lugar":"Águas Claras"}' } }] }) };
+    };
+    const r = await interpretCapture('capturar topografia em águas claras');
+    assert.deepStrictEqual(r, { nicho: 'topografia', lugar: 'Águas Claras' });
+    assert.strictEqual(calls.length, 2, 'exatamente 2 tentativas');
+  });
+});
+
+test('interpretCapture: retry falha de novo → extrai nicho/lugar por regex no texto cru', async () => {
+  await withFetchMock(async () => {
+    const calls = [];
+    global.fetch = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push(body);
+      if (calls.length === 1) return { ok: false, status: 400, json: async () => ({}) };
+      assert.strictEqual(body.response_format, undefined);
+      // 200 com conteúdo NÃO-JSON (modelo ignorou a ordem): parse quebra → regex
+      return { ok: true, json: async () => ({ choices: [{ message: { content: 'Aqui está: nicho: "tapeçaria", lugar: "Gama"' } }] }) };
+    };
+    const r = await interpretCapture('preciso de uma tapeçaria no gama');
+    assert.deepStrictEqual(r, { nicho: 'tapeçaria', lugar: 'Gama' });
+    assert.strictEqual(calls.length, 2);
+  });
+});
+
+test('interpretCapture: 2× 400 sem texto → {nicho:"",lugar:""} (serve-web faz o match local)', async () => {
+  await withFetchMock(async () => {
+    const calls = [];
+    global.fetch = async () => { calls.push(1); return { ok: false, status: 400, json: async () => ({}) }; };
+    const r = await interpretCapture('advogados no lago sul');
+    assert.deepStrictEqual(r, { nicho: '', lugar: '' });
+    assert.strictEqual(calls.length, 2, 'retry também tentou');
+  });
+});
+
+test('interpretCapture: erro fora do cenário flaky (500) rethrow — groq_error segue honesto', async () => {
+  await withFetchMock(async () => {
+    const calls = [];
+    global.fetch = async () => { calls.push(1); return { ok: false, status: 500, json: async () => ({}) }; };
+    await assert.rejects(() => interpretCapture('oi'), (e) => e.code === 'http' && e.status === 500);
+    assert.strictEqual(calls.length, 1, '500 não é retryável');
+  });
 });
