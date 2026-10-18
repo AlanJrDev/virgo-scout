@@ -40,24 +40,45 @@ function readJob() {
 
 /* pid de processo vivo = existe E (no Windows) é node.exe — evita job fantasma
    quando o SO reaproveita o pid para OUTRO app (ex.: steamwebhelper com o mesmo
-   pid do capture que morreu → painel preso em 'running' + 409 nas novas capturas). */
+   pid do capture que morreu → painel preso em 'running' + 409 nas novas capturas).
+   Fail-safe: morto só com kill ESRCH ou tasklist OK mostrando não-node; tasklist
+   que FALHA (infra) mantém 'vivo' e deixa o próximo poll decidir — errar para
+   'morto' apagaria o job.json de uma captura VIVA e liberaria 2ª captura concorrente.
+   Cache por pid (TTL 2s): o painel polla /api/capture a cada ~3s e o tasklist
+   bloqueia o event loop 100-400ms. */
+const PID_ALIVE_TTL_MS = 2000;
+const pidAliveCache = new Map(); // pid -> { result, at }
+
 function pidAlive(pid) {
   const n = Number(pid);
   if (!Number.isInteger(n) || n <= 0) return false;
+  const now = Date.now();
+  const hit = pidAliveCache.get(n);
+  if (hit && now - hit.at < PID_ALIVE_TTL_MS) return hit.result;
+  let result;
   try {
     process.kill(n, 0);
-  } catch {
-    return false;
+  } catch (e) {
+    // ESRCH = processo inexistente (morto, estado conhecido). Qualquer outro
+    // erro (ex.: EPERM = existe sem acesso) não prova morte → vivo.
+    result = !!(e && e.code === 'ESRCH') ? false : true;
+    pidAliveCache.set(n, { result, at: now });
+    return result;
   }
-  if (process.platform !== 'win32') return true;
-  try {
-    const out = execSync(`tasklist /FI "PID eq ${n}" /FO CSV /NH`, { encoding: 'utf8' });
-    const first = String(out).split(/\r?\n/)[0] || '';
-    const img = first.match(/^"([^"]+)"/); // linha de match = "imagem.exe","pid",... (PT/EN não importa)
-    return !!img && img[1].toLowerCase() === 'node.exe';
-  } catch {
-    return false; // tasklist falhou (processo sumiu entre o kill e o tasklist)
+  if (process.platform !== 'win32') {
+    result = true;
+  } else {
+    try {
+      const out = execSync(`tasklist /FI "PID eq ${n}" /FO CSV /NH`, { encoding: 'utf8' });
+      const first = String(out).split(/\r?\n/)[0] || '';
+      const img = first.match(/^"([^"]+)"/); // linha de match = "imagem.exe","pid",... (PT/EN não importa)
+      result = !!img && img[1].toLowerCase() === 'node.exe';
+    } catch {
+      result = true; // fail-safe: kill já provou que existe; próximo poll decide
+    }
   }
+  pidAliveCache.set(n, { result, at: now });
+  return result;
 }
 
 function jobStatus() {
