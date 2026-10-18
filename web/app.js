@@ -574,13 +574,28 @@
         counts[a] = (counts[a] || 0) + 1;
       }
       var labels = Object.keys(counts).sort(function (x, y) { return counts[y] - counts[x]; }).slice(0, 6);
+      // área ativa pode não existir no novo recorte: reset ANTES de qualquer early return
+      if (state.active && counts[state.active] == null) state.active = '';
       var fRow = $('#areaFilter');
       if (!fRow) return labels;
       if (!labels.length) { fRow.innerHTML = ''; return labels; }
-      if (state.active && counts[state.active] == null) state.active = '';
       var head = fRow.closest('.card') ? fRow.closest('.card').querySelector('.card-head h2') : null;
       var visible = state.active ? counts[state.active] : pool.length;
-      if (head) head.textContent = 'Leads em Destaque (' + fmtInt(visible) + ')';
+      // título: fade curto (opacity) quando a contagem muda — apropriado aqui,
+      // troca de recorte é pouco frequente e o (N) age como confirmação do dado
+      if (head) {
+        var txt = 'Leads em Destaque (' + fmtInt(visible) + ')';
+        if (head._featTxt !== txt) {
+          if (reduceMotion) { head.textContent = txt; head._featTxt = txt; }
+          else {
+            clearTimeout(head._featT);
+            head.style.opacity = '0';
+            head._featT = setTimeout(function () {
+              head.textContent = txt; head._featTxt = txt; head.style.opacity = '1';
+            }, 160);
+          }
+        }
+      }
       fRow.innerHTML = ['<button class="chip' + (state.active ? '' : ' active') + '" type="button" data-area="">Todas</button>']
         .concat(labels.map(function (a) {
           return '<button class="chip' + (state.active === a ? ' active' : '') + '" type="button" data-area="' + escapeHtml(a) + '">' + escapeHtml(a) + ' <b>' + counts[a] + '</b></button>';
@@ -904,10 +919,12 @@
   }
 
   /* ---------- telas: Visão Geral x Base de Leads ---------- */
+  /* entrada de troca: classe CSS (animation roda 1x por troca; re-render não re-anima) */
   function animateViewIn(viewEl) {
-    if (!hasGsap || !viewEl) return;
-    var kids = viewEl.children;
-    window.gsap.fromTo(kids, { y: 12, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.32, stagger: 0.05, ease: 'expo.out', overwrite: true });
+    if (!viewEl) return;
+    viewEl.classList.remove('view-enter');
+    void viewEl.offsetWidth; // reinicia a animation na troca de volta
+    viewEl.classList.add('view-enter');
   }
   function showView(v) {
     var d = document.getElementById('viewDashboard');
@@ -950,6 +967,26 @@
     var v = null;
     try { v = sessionStorage.getItem('vs_view'); } catch (e) {}
     showView(v === 'leads' ? 'leads' : 'dashboard');
+  })();
+
+  /* ---------- Fase B: reveal dos cards (1x por sessão) + lift de hover + pulse único do FAB ---------- */
+  var DASH_FLAG = 'vs_dash_reveal';
+  (function rigDashCards() {
+    var cards = document.querySelectorAll('#viewDashboard .card');
+    var first = false;
+    try { first = !sessionStorage.getItem(DASH_FLAG); if (first) sessionStorage.setItem(DASH_FLAG, '1'); } catch (e) {}
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].classList.add('dash-lift');
+      if (first) { cards[i].classList.add('reveal-once'); cards[i].style.setProperty('--reveal-i', i); }
+    }
+  })();
+  (function fabPulseOnce() {
+    if (reduceMotion) return;
+    try { if (sessionStorage.getItem('vs_fab_intro')) return; sessionStorage.setItem('vs_fab_intro', '1'); } catch (e) { return; }
+    var fab = document.querySelector('.ia-fab');
+    if (!fab) return;
+    fab.classList.add('fab-pulse');
+    setTimeout(function () { fab.classList.remove('fab-pulse'); }, 450);
   })();
 
   /* ---------- pipeline: marca "contatado" ao abrir o WhatsApp ---------- */
