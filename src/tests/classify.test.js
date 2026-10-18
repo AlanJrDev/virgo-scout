@@ -138,3 +138,44 @@ test('estofado: área pelo nome', () => {
   assert.strictEqual(r.area, 'Estofado');
   assert.ok(r.confidence <= 0.95);
 });
+
+test('topografia: schema próprio, não cai nas áreas numéricas dos advogados', () => {
+  assert.strictEqual(classifyLead({ name: 'Levantamento Topográfico Popular' }, 'topografia').area, 'Levantamento');
+  assert.strictEqual(classifyLead({ name: 'Nebula Terraplanagem', category: 'Georreferenciamento de imóveis rurais' }, 'topografia').area, 'Georreferenciamento');
+  assert.strictEqual(classifyLead({ name: 'Marcos Topógrafos e Consultoria' }, 'topografia').area, 'Topografia');
+  const fb = classifyLead({ name: 'Loja de Ferramentas do Vilarinho' }, 'topografia');
+  assert.strictEqual(fb.area, 'Outros');
+  assert.strictEqual(fb.confidence, 0.3);
+});
+
+test('areaDistribution com leads de tipos diferentes cada esquema no seu lugar', () => {
+  const leads = [
+    { name: 'Levantamento Flutter', types: 'topografia', source: 'topografia' },
+    { name: 'Parque Topografia Agreste', types: 'arquitetura', source: 'arquitetura' },
+    { name: 'Nebula Sem Pista', types: 'topografia', source: '' },
+  ];
+  const dist = areaDistribution(leads, 'all');
+  assert.strictEqual(dist.reduce((a, d) => a + d.value, 0), 3);
+  assert.ok(dist.some((d) => d.label === 'Levantamento' && d.value === 1));
+  assert.ok(dist.some((d) => d.label === 'Outros' && d.value === 1));
+});
+
+test('categoria desconhecida: sem áreas emprestadas, ci no Outros', () => {
+  assert.deepStrictEqual(classifyLead({ name: 'Xpto Ltda' }, 'giboiá'), { area: 'Outros', confidence: 0.3 });
+  // sem categoria → default legado preservado (advogados)
+  assert.strictEqual(classifyLead({ name: 'Xpto Ltda' }).area, 'Geral');
+});
+
+test('registry: AREA_SCHEMA exposto e areasRules do CATEGORIES sobrescreve', () => {
+  const { AREA_SCHEMA } = require('../utils/classify');
+  assert.ok(AREA_SCHEMA.topografia.areas.includes('Levantamento'));
+  assert.ok(AREA_SCHEMA.estofado.fallback === 'Geral');
+  const { CATEGORIES } = require('../utils/categories');
+  CATEGORIES.__teste = { areasRules: { areas: ['Alpha'], rules: { Alpha: ['preciosidade'] }, fallback: 'Outros' } };
+  try {
+    assert.strictEqual(classifyLead({ name: 'Casa sem pista' }, '__teste').area, 'Outros');
+    assert.strictEqual(classifyLead({ name: 'Vende preciosidade raríssima' }, '__teste').area, 'Alpha');
+  } finally {
+    delete CATEGORIES.__teste;
+  }
+});

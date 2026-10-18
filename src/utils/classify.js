@@ -1,7 +1,7 @@
 // Classificador de área de atuação do lead — regras determinísticas (offline, sem custo).
 // Normaliza acentos/caixa dos dois lados antes de casar palavras-chave.
 
-const { typeOfLead } = require('./categories');
+const { CATEGORIES, typeOfLead } = require('./categories');
 
 const AREAS = [
   'Trabalhista',
@@ -28,7 +28,7 @@ const RULES = {
   Consumidor: ['consumidor', 'cdc'],
 };
 
-// Categoria arquitetura/topografia/urbanismo — mesma mecânica, outro mapa
+// Categoria arquitetura/urbanismo — mesma mecânica, outro mapa (topografia tem schema próprio)
 const AREAS_ARQ = ['Arquitetura', 'Urbanismo', 'Topografia'];
 
 const RULES_ARQ = {
@@ -52,11 +52,36 @@ const RULES_EST = {
   Sofás: ['sofa', 'poltron'],
 };
 
+// AREAS_TOP do schema próprio (antigamente saíam nas AREAS numéricas dos advogados — chips estáticos)
+const AREAS_TOP = ['Levantamento', 'Georreferenciamento', 'Topografia', 'Outros'];
+
+const RULES_TOP = {
+  Levantamento: ['levantamento topografico', 'levantamento', 'mapeamento'],
+  Georreferenciamento: ['georreferenc', 'georeferenc', 'geoprocessament', 'geodes', 'agro'],
+  // 'topo' genérico por último — 'topografo/topografia' já casa com 'topograf' antes,
+  // e 'levantamento topografico' casa com Levantamento pela ordem das áreas
+  Topografia: ['topograf', 'topografo', 'topo'],
+};
+
+// REGISTRY por categoria — cada nicho traz o próprio schema de áreas/rules/fallback.
+// Categorias.js pode sobrescrever via CATEGORIES[tag].areasRules (mesma forma do schema).
+const AREA_SCHEMA = {
+  advogados: { areas: AREAS, rules: RULES, fallback: 'Geral' },
+  arquitetura: { areas: AREAS_ARQ, rules: RULES_ARQ, fallback: 'Outros' },
+  tapecaria: { areas: AREAS_TAP, rules: RULES_TAP, fallback: 'Geral' },
+  estofado: { areas: AREAS_EST, rules: RULES_EST, fallback: 'Geral' },
+  topografia: { areas: AREAS_TOP, rules: RULES_TOP, fallback: 'Outros' },
+};
+
+// categoria fora do registry → sem área alguma (não cai nas dos advogados)
+const UNKNOWN_SCHEMA = { areas: ['Outros'], rules: {}, fallback: 'Outros' };
+
 function rulesFor(category) {
-  if (category === 'arquitetura') return { areas: AREAS_ARQ, rules: RULES_ARQ, fallback: 'Outros' };
-  if (category === 'tapecaria') return { areas: AREAS_TAP, rules: RULES_TAP, fallback: 'Geral' };
-  if (category === 'estofado') return { areas: AREAS_EST, rules: RULES_EST, fallback: 'Geral' };
-  return { areas: AREAS, rules: RULES, fallback: 'Geral' };
+  const cfg = CATEGORIES[category];
+  if (cfg && cfg.areasRules) return cfg.areasRules;
+  if (category != null && category !== '' && category !== 'all' && AREA_SCHEMA[category]) return AREA_SCHEMA[category];
+  if (!category || category === 'all') return AREA_SCHEMA.advogados;
+  return UNKNOWN_SCHEMA;
 }
 
 function stripAccents(s) {
@@ -69,31 +94,36 @@ function norm(s) {
   return stripAccents(s).toLowerCase();
 }
 
+// primeira área cujas keywords casam — rules podem faltar (schema desconhecido)
+function hit(text, areas, rules) {
+  for (const area of areas) {
+    const kws = rules[area] || [];
+    if (kws.some((kw) => text.includes(kw))) return area;
+  }
+  return null;
+}
+
 // Retorna { area, confidence } — 0.95 categoria oficial, 0.9 nome, 0.7 origem, 0.6 título do site, 0.3 geral/outros
 function classifyLead(lead = {}, category) {
   const { areas, rules, fallback } = rulesFor(category);
   // categoria oficial do Maps é o sinal mais forte
   const catText = norm(lead.category);
   if (catText) {
-    for (const area of areas) {
-      if (rules[area].some((kw) => catText.includes(kw))) return { area, confidence: 0.95 };
-    }
+    const a = hit(catText, areas, rules);
+    if (a) return { area: a, confidence: 0.95 };
   }
   const nameText = norm(lead.name);
   // origin = query original da captura; source virou tag de categoria ('arquitetura'|'advogados')
   const sourceText = norm(lead.origin || lead.source);
-  for (const area of areas) {
-    if (rules[area].some((kw) => nameText.includes(kw))) return { area, confidence: 0.9 };
-  }
-  for (const area of areas) {
-    if (rules[area].some((kw) => sourceText.includes(kw))) return { area, confidence: 0.7 };
-  }
+  let a = hit(nameText, areas, rules);
+  if (a) return { area: a, confidence: 0.9 };
+  a = hit(sourceText, areas, rules);
+  if (a) return { area: a, confidence: 0.7 };
   // título do site: quarta camada, só quando as anteriores não casaram
   const titleText = norm(lead.site_title);
   if (titleText) {
-    for (const area of areas) {
-      if (rules[area].some((kw) => titleText.includes(kw))) return { area, confidence: 0.6 };
-    }
+    a = hit(titleText, areas, rules);
+    if (a) return { area: a, confidence: 0.6 };
   }
   return { area: fallback, confidence: 0.3 };
 }
@@ -112,4 +142,4 @@ function areaDistribution(leads = [], category) {
     .sort((a, b) => b.value - a.value);
 }
 
-module.exports = { classifyLead, areaDistribution, AREAS, AREAS_ARQ };
+module.exports = { classifyLead, areaDistribution, AREAS, AREAS_ARQ, AREAS_TOP, AREA_SCHEMA, UNKNOWN_SCHEMA };
