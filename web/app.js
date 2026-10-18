@@ -980,12 +980,46 @@
   document.querySelectorAll('.nav-item').forEach(function (n) {
     n.addEventListener('click', function (e) {
       if (n.hasAttribute('data-view')) return; // telas reais têm handler próprio
+      if (n.hasAttribute('data-action')) return; // ações (drawer IA) têm handler próprio
       if (n.classList.contains('active')) return;
       e.preventDefault();
       var label = (n.textContent || '').trim().split('\n')[0];
       toast(label + ' — página em breve');
     });
   });
+
+  /* ---------- IA: drawer retrátil (sidebar + FAB) ---------- */
+  var iaDrawer = document.getElementById('iaDrawer');
+  var iaBackdrop = document.getElementById('iaBackdrop');
+  var iaTriggers = document.querySelectorAll('[data-action="toggle-ia"]');
+  var iaLastTrigger = null;
+  function iaOpen() { return document.body.classList.contains('ia-open'); }
+  function setIaOpen(open, trigger) {
+    if (!iaDrawer) return;
+    if (open) iaLastTrigger = trigger || document.activeElement;
+    document.body.classList.toggle('ia-open', open);
+    iaTriggers.forEach(function (t) { t.setAttribute('aria-expanded', String(open)); });
+    if (open) {
+      var input = $('#aiInput');
+      if (input) input.focus({ preventScroll: true });
+    } else if (iaLastTrigger && iaLastTrigger.focus) {
+      iaLastTrigger.focus({ preventScroll: true });
+      iaLastTrigger = null;
+    }
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    var t = e.target.closest('[data-action="toggle-ia"]');
+    if (!t) return;
+    e.preventDefault();
+    setIaOpen(!iaOpen(), t);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && iaOpen()) setIaOpen(false);
+  });
+  if (iaBackdrop) iaBackdrop.addEventListener('click', function () { setIaOpen(false); });
+  var iaCloseBtn = document.getElementById('iaClose');
+  if (iaCloseBtn) iaCloseBtn.addEventListener('click', function () { setIaOpen(false); });
 
   /* ---------- IA: respondedor local sobre a base real ---------- */
   function aiAnswer(q) {
