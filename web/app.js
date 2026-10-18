@@ -227,6 +227,7 @@
   var pollTimer = null;
   var sawRunning = false;
   var typeFilter = 'all';
+  var areaState = { active: '' };
   try { var vt = sessionStorage.getItem('vs_type'); if (vt) typeFilter = vt; } catch (e) {}
   var captureCat = 'advogados';
   try { var vc = sessionStorage.getItem('vs_capture_cat'); if (vc) captureCat = vc; } catch (e) {}
@@ -501,9 +502,8 @@
     }
     renderQuality(D.quality, D.stats);
 
-    /* destaques + filtro por área */
+    /* destaques + filtro por área — chips derivam do recorte ativo (tipo no topbar), não do payload global */
     var pool = D.pool && D.pool.length ? D.pool : (D.top || []);
-    var activeArea = '';
     function waBtn(l) {
       if (l.wa) {
         var cid = l.id ? ' data-contact-id="' + escapeHtml(l.id) + '"' : '';
@@ -564,23 +564,40 @@
         });
       });
     }
-    var areas = (D.areas || []).filter(function (a) { return a.label !== 'Geral'; }).slice(0, 5);
-    var fRow = $('#areaFilter');
-    if (fRow && areas.length) {
-      fRow.innerHTML = ['<button class="chip active" type="button" data-area="">Todas</button>']
-        .concat(areas.map(function (a) {
-          return '<button class="chip" type="button" data-area="' + escapeHtml(a.label) + '">' + escapeHtml(a.label) + ' <b>' + a.value + '</b></button>';
+    /* chips de área: contagem REAL por área dentro do recorte ativo (pool do tipo),
+       máx 6 + 'Todas', ordem por count desc; 'Geral' (fallback) não vira chip */
+    function renderAreaFilter(state) {
+      var counts = {};
+      for (var i = 0; i < pool.length; i++) {
+        var a = pool[i].area || 'Geral';
+        if (a === 'Geral') continue;
+        counts[a] = (counts[a] || 0) + 1;
+      }
+      var labels = Object.keys(counts).sort(function (x, y) { return counts[y] - counts[x]; }).slice(0, 6);
+      var fRow = $('#areaFilter');
+      if (!fRow) return labels;
+      if (!labels.length) { fRow.innerHTML = ''; return labels; }
+      if (state.active && counts[state.active] == null) state.active = '';
+      var head = fRow.closest('.card') ? fRow.closest('.card').querySelector('.card-head h2') : null;
+      var visible = state.active ? counts[state.active] : pool.length;
+      if (head) head.textContent = 'Leads em Destaque (' + fmtInt(visible) + ')';
+      fRow.innerHTML = ['<button class="chip' + (state.active ? '' : ' active') + '" type="button" data-area="">Todas</button>']
+        .concat(labels.map(function (a) {
+          return '<button class="chip' + (state.active === a ? ' active' : '') + '" type="button" data-area="' + escapeHtml(a) + '">' + escapeHtml(a) + ' <b>' + counts[a] + '</b></button>';
         })).join('');
       fRow.querySelectorAll('.chip').forEach(function (c) {
         c.addEventListener('click', function () {
           fRow.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('active'); });
           c.classList.add('active');
-          activeArea = c.getAttribute('data-area') || '';
-          featRows(activeArea);
+          state.active = c.getAttribute('data-area') || '';
+          renderAreaFilter(state);
+          featRows(state.active);
         });
       });
+      return labels;
     }
-    featRows('');
+    renderAreaFilter(areaState);
+    featRows(areaState.active);
 
     /* IA: top 3 com área */
     function describe(l) {
