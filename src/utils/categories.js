@@ -1,9 +1,9 @@
 const CATEGORIES = {
-  advogados: { tag: 'advogados', label: 'Advogado', script: 'capture-advogados-df.js', queriesModule: './queries', queriesExport: 'QUERIES', basename: null },
-  arquitetura: { tag: 'arquitetura', label: 'Arquitetura', script: 'capture-arquitetura.js', queriesModule: './queries-arquitetura', queriesExport: 'QUERIES_ARQ', basename: 'arquitetura-df-max' },
-  tapecaria: { tag: 'tapecaria', label: 'Tapeçaria', script: 'capture-tapecaria.js', queriesModule: './queries-tapecaria', queriesExport: 'QUERIES_TAP', basename: 'tapecaria-df-max' },
-  estofado: { tag: 'estofado', label: 'Estofado', script: 'capture-estofado.js', queriesModule: './queries-estofado', queriesExport: 'QUERIES_EST', basename: 'estofado-df-max' },
-  topografia: { tag: 'topografia', label: 'Topografia', script: 'capture-topografia.js', queriesModule: './queries-topografia', queriesExport: 'QUERIES_TOP', basename: 'topografia-df-max' },
+  advogados: { tag: 'advogados', label: 'Advogado', script: 'capture-advogados-df.js', queriesModule: './queries', queriesExport: 'QUERIES', basename: null, terms: ['advogado', 'advocacia', 'escritório de advocacia'] },
+  arquitetura: { tag: 'arquitetura', label: 'Arquitetura', script: 'capture-arquitetura.js', queriesModule: './queries-arquitetura', queriesExport: 'QUERIES_ARQ', basename: 'arquitetura-df-max', terms: ['arquitetura', 'arquiteto'] },
+  tapecaria: { tag: 'tapecaria', label: 'Tapeçaria', script: 'capture-tapecaria.js', queriesModule: './queries-tapecaria', queriesExport: 'QUERIES_TAP', basename: 'tapecaria-df-max', terms: ['tapeçaria', 'tapiçaria', 'arroz de tapete'] },
+  estofado: { tag: 'estofado', label: 'Estofado', script: 'capture-estofado.js', queriesModule: './queries-estofado', queriesExport: 'QUERIES_EST', basename: 'estofado-df-max', terms: ['estofados', 'limpeza de estofados', 'tapetes'] },
+  topografia: { tag: 'topografia', label: 'Topografia', script: 'capture-topografia.js', queriesModule: './queries-topografia', queriesExport: 'QUERIES_TOP', basename: 'topografia-df-max', terms: ['topografia', 'topógrafo', 'levantamento topográfico', 'georreferenciamento'] },
 };
 const CAT_KEYS = Object.keys(CATEGORIES);
 function tagOf(category) { return (CATEGORIES[category] || CATEGORIES.advogados).tag; }
@@ -22,7 +22,7 @@ const NICHE_ROOTS = {
   arquitetura: ['arquitet', 'urbanis'],
   tapecaria: ['tapec', 'tapet', 'carpet', 'cortina', 'persiana'],
   estofado: ['estofad', 'tapic', 'poltron', 'colchon', 'sofa', 'impermeabiliz'],
-  topografia: ['topograf', 'geod', 'georref', 'terraplena', 'alinhamento', 'geo'],
+  topografia: ['topograf', 'geod', 'georref', 'terraplena', 'alinhamento', 'geo', 'agronom'],
 };
 const SHORT_MAX = 4;
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -55,4 +55,21 @@ function relevanceFilter(rows, category) {
   }
   return { kept, dropped };
 }
-module.exports = { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType, rootsFor, relevanceFilter };
+function relevanceScore(row, category) {
+  const roots = rootsFor(category);
+  if (!roots) return { score: 0, verdict: 'ambiguo' };
+  const name = normText(row && row.name);
+  const cat = normText(row && row.category);
+  const nameHit = roots.some((re) => re.test(name));
+  const catHit = roots.some((re) => re.test(cat));
+  if (nameHit && catHit) return { score: 2, verdict: 'match' };
+  if (nameHit) return { score: 1, verdict: 'match' };
+  if (!cat) return { score: 1, verdict: 'match' }; // sem categoria: mantém (comportamento do filtro de sync)
+  if (catHit) return { score: 1, verdict: 'match' };
+  return { score: 0, verdict: 'reject' };
+}
+function termsOfCategory(category) {
+  const c = CATEGORIES[category];
+  return c && Array.isArray(c.terms) && c.terms.length ? c.terms.slice() : [category];
+}
+module.exports = { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType, rootsFor, relevanceFilter, relevanceScore, termsOfCategory };

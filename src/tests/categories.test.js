@@ -1,7 +1,7 @@
 // src/tests/categories.test.js
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType, rootsFor, relevanceFilter } = require('../utils/categories');
+const { CATEGORIES, CAT_KEYS, tagOf, typeList, typeOfLead, matchesType, rootsFor, relevanceFilter, relevanceScore, termsOfCategory } = require('../utils/categories');
 const { matchFile } = require('../utils/leads-io');
 
 test('registro cobre as categorias com tags sem acento', () => {
@@ -52,4 +52,18 @@ test('relevanceFilter: mantem raizes do nicho e descarta ruído misturado pelo M
   ], 'estofado');
   assert.deepStrictEqual(est.kept.map((r) => r.name), ['Amey Limpeza e Impermeabilização de Estofados', 'Distribuidora de Réfrigeração']);
   assert.strictEqual(relevanceFilter([{ name: 'Qualquer' }], 'desconhecida').kept.length, 1);
+});
+
+test('relevanceScore: match por nome, reject por categoria, ambiguo sem sinal', () => {
+  assert.deepStrictEqual(relevanceScore({ name: 'TOPOGRAFIA PLANALTO', category: 'Engenheiro(a) agrônomo(a)' }, 'topografia'), { score: 2, verdict: 'match' });
+  assert.deepStrictEqual(relevanceScore({ name: 'Residencial Santa Mônica', category: 'Complexo habitacional' }, 'topografia'), { score: 0, verdict: 'reject' });
+  assert.deepStrictEqual(relevanceScore({ name: '2GEO Consultoria', category: null }, 'topografia'), { score: 1, verdict: 'match' });
+  assert.deepStrictEqual(relevanceScore({ name: 'Amey Limpeza e Impermeabilização de Estofados', category: 'Serviço de limpeza' }, 'topografia'), { score: 0, verdict: 'reject' });
+  assert.deepStrictEqual(relevanceScore({ name: 'Garcia Topografia', category: 'Empresa de Terraplenagem' }, 'topografia'), { score: 2, verdict: 'match' });
+  assert.strictEqual(relevanceScore({ name: 'X' }, 'desconhecida').verdict, 'ambiguo');
+});
+
+test('termsOfCategory: termos do registro, fallback [cat]', () => {
+  assert.deepStrictEqual(termsOfCategory('topografia'), ['topografia', 'topógrafo', 'levantamento topográfico', 'georreferenciamento']);
+  assert.deepStrictEqual(termsOfCategory('desconhecida'), ['desconhecida']);
 });
