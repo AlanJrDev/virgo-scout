@@ -44,9 +44,13 @@ function readJob() {
    Fail-safe: morto só com kill ESRCH ou tasklist OK mostrando não-node; tasklist
    que FALHA (infra) mantém 'vivo' e deixa o próximo poll decidir — errar para
    'morto' apagaria o job.json de uma captura VIVA e liberaria 2ª captura concorrente.
-   Cache por pid (TTL 2s): o painel polla /api/capture a cada ~3s e o tasklist
-   bloqueia o event loop 100-400ms. */
-const PID_ALIVE_TTL_MS = 2000;
+   Cache por pid (TTL 4s): o painel polla /api/capture a cada 3s (web/app.js,
+   pollCapture) e o tasklist bloqueia o event loop 100-400ms — >= interval do
+   poll para NÃO reexecutar o tasklist a cada poll (2s < 3s executava sempre).
+   Trade-off do Map (1 entrada por pid distinto): pids poucos, impacto baixo;
+   se um tasklist quebrado persistir com o pid REUSADO por outro app, deletar
+   data/job.json manualmente destrava o painel. */
+const PID_ALIVE_TTL_MS = 4000;
 const pidAliveCache = new Map(); // pid -> { result, at }
 
 function pidAlive(pid) {
