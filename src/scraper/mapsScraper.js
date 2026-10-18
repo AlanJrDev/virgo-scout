@@ -313,13 +313,24 @@ async function enrichOneByQuery(page, query, opts = {}) {
   return r.leads[0] || null;
 }
 
+/* Folga p/ decidir se ainda cabe uma query no budget (runner passa deadline;
+   por query custa ~2.7 min entre scroll+detail+jitter) */
+const DEADLINE_MARGIN_MS = 162000;
+
 async function scrapeMany(queries, opts = {}) {
   const { browser, page } = await launchBrowser(opts);
   const leads = [];
   const telemetry = [];
+  let partial = false;
   try {
     for (let idx = 0; idx < queries.length; idx++) {
       const q = queries[idx];
+      // corte por budget: antes de iniciar a próxima query, checa o deadline
+      if (opts.deadline && Date.now() > opts.deadline - DEADLINE_MARGIN_MS) {
+        console.log(`[scraper] deadline atingido: ${queries.length - idx} queries cortadas`);
+        partial = true;
+        break;
+      }
       try {
         console.log(`[scraper] buscando: ${q}`);
         const r = await scrapeQuery(page, q, opts);
@@ -336,7 +347,7 @@ async function scrapeMany(queries, opts = {}) {
   } finally {
     await browser.close().catch(() => {});
   }
-  return { leads, telemetry };
+  return { leads, telemetry, partial };
 }
 
 function waFromHref(href) {
@@ -346,4 +357,4 @@ function waFromHref(href) {
   return m ? m[1].replace('+', '') : '';
 }
 
-module.exports = { launchBrowser, scrapeQuery, scrapeMany, scrollFeedToEnd, enrichOneByQuery, waFromHref };
+module.exports = { launchBrowser, scrapeQuery, scrapeMany, scrollFeedToEnd, enrichOneByQuery, waFromHref, DEADLINE_MARGIN_MS };
