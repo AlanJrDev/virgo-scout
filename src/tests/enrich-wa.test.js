@@ -53,7 +53,7 @@ test('enrich:wa consulta leads sem whatsapp e grava só os campos de zap', async
   assert.strictEqual(patches.length, 1, 'só o lead com zap no site leva PATCH');
   assert.ok(patches[0].url.includes('leads?id=eq.a1'));
   const body = JSON.parse(patches[0].opts.body);
-  assert.deepStrictEqual(body, { whatsapp: '5561999990000', whatsapp_hint: true });
+  assert.deepStrictEqual(body, { whatsapp: '5561999990000', whatsapp_hint: true, wa_status: 'declared', wa_source: 'site', wa_evidence: 'https://souzadv.com.br' });
   assert.ok(!('enriched_at' in body), 'não mexe em enriched_at');
   assert.ok(!('email' in body), 'não mexe em email');
   assert.ok(!('instagram' in body), 'não mexe em instagram');
@@ -65,4 +65,16 @@ test('enrich:wa não faz PATCH para lead cujo site não tem zap', async () => {
   await main();
   const patches = calls.filter((c) => c.opts.method === 'PATCH');
   assert.strictEqual(patches.length, 0);
+});
+
+test('enrich:wa degrada: PATCH 400 colunas wa_ ausentes => instrucao 0010 + erro', async () => {
+  const { main } = require('../../scripts/enrich-wa');
+  global.fetch = async (url, opts = {}) => {
+    if (url.includes('/rest/v1/leads')) {
+      if (opts.method === 'PATCH') return { ok: false, status: 400, text: async () => JSON.stringify({ message: "Could not find the 'wa_status' column of 'leads' in the schema cache" }) };
+      return { ok: true, status: 200, text: async () => JSON.stringify([{ id: 'a1', website: 'souzadv.com.br' }]) };
+    }
+    return { ok: true, status: 200, text: async () => HTML };
+  };
+  await assert.rejects(main, /wa_status|0010/);
 });
