@@ -23,6 +23,7 @@
     "enrich:ig-wa": "node scripts/enrich-ig-wa.js",
     "ig-login": "node scripts/ig-login.js",
     "audit:wa": "node scripts/audit-wa.js",
+    "funnel": "node scripts/funnel.js",
     "capture:refill": "node scripts/capture-refill.js",
     "repair": "node scripts/repair-data.js",
     "qualify": "node scripts/qualify.js",
