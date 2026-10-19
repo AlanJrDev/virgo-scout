@@ -1,5 +1,8 @@
-const { test } = require('node:test');
+const { test, after } = require('node:test');
 const assert = require('node:assert');
+
+const nativeFetch = global.fetch;
+after(() => { global.fetch = nativeFetch; });
 
 const { classifyWaNumber, isDfRegion } = require('../utils/wa-audit');
 
@@ -74,4 +77,44 @@ test('waWriteFields declared: differs_phone nao é motivo de exclusão', () => {
 test('waWriteFields sem whatsapp => null (não marca nada de wa_*)', () => {
   assert.strictEqual(waWriteFields({}), null);
   assert.strictEqual(waWriteFields({ whatsapp: '', source: 'site' }), null);
+});
+
+// Case 1: persist PATCHa por id e ignora rows sem id; corpo mínimo (nunca mexe em whatsapp)
+test('audit:wa persistWaStatus grava wa_status/wa_checked_at por id', async () => {
+  process.env.SUPABASE_URL = 'https://x.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_t';
+  const { persistWaStatus } = require('../../scripts/audit-wa');
+  const rows = [
+    { id: 'a1', status: 'suspect' },
+    { id: null, status: 'invalid' }, // local sem id: pula
+    { id: 'b2', status: 'declared' },
+  ];
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    return { ok: true, status: 204, text: async () => '' };
+  };
+  const writes = await persistWaStatus(rows);
+  assert.strictEqual(writes, 2);
+  const patches = calls.filter((c) => c.opts.method === 'PATCH');
+  assert.strictEqual(patches.length, 2);
+  assert.ok(patches[0].url.includes('leads?id=eq.a1'));
+  const body = JSON.parse(patches[0].opts.body);
+  assert.deepStrictEqual(Object.keys(body).sort(), ['wa_checked_at', 'wa_status']);
+  assert.ok(typeof body.wa_checked_at === 'string');
+});
+
+// Case 2: degrade — colunas ausentes não derrubam o script nem dão throw
+test('audit:wa persistWaStatus degrada em 400 de coluna wa_ ausente', async () => {
+  process.env.SUPABASE_URL = 'https://x.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_t';
+  const { persistWaStatus } = require('../../scripts/audit-wa');
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    return { ok: false, status: 400, text: async () => JSON.stringify({ message: "Could not find the 'wa_status' column of 'leads' in the schema cache" }) };
+  };
+  const writes = await persistWaStatus([{ id: 'a1', status: 'suspect' }, { id: 'b2', status: 'declared' }]);
+  assert.strictEqual(writes, 0);
+  assert.strictEqual(calls.length, 1, 'primeiro 400 aborta o resto');
 });

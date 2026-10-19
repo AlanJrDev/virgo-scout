@@ -96,6 +96,30 @@ function toCsv(rows) {
   return [cols.join(',')].concat(rows.map((r) => cols.map((c) => esc(r[c])).join(','))).join('\n');
 }
 
+/* Grava o veredito do classificador na base: só marca wa_status/wa_checked_at.
+   Nunca limpa whatsapp (invalid) nem muda origem — terceiro decide. */
+async function persistWaStatus(rows) {
+  let writes = 0;
+  for (const r of rows) {
+    if (!r.id || !['declared', 'suspect', 'invalid'].includes(r.status)) continue;
+    try {
+      await sbFetch(`leads?id=eq.${encodeURIComponent(r.id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: { wa_status: r.status, wa_checked_at: new Date().toISOString() },
+      });
+      writes++;
+    } catch (e) {
+      if (/wa_(status|checked_at)/.test(e.message)) {
+        console.error('[audit:wa] colunas de evidência ausentes — aplique supabase/migrations/0010 no SQL Editor');
+        return writes; // aborta o resto; relatório de arquivos segue no main
+      }
+      console.warn(`[audit:wa] persist ${r.id} falhou: ${e.message}`);
+    }
+  }
+  return writes;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const localIdx = args.indexOf('--local');
@@ -105,6 +129,7 @@ async function main() {
   const noProbe = args.includes('--no-probe');
 
   const rows = await audit({ local, limit, noProbe });
+  const writes = await persistWaStatus(rows);
   const sum = summarize(rows);
 
   const dir = path.join(__dirname, '..', 'data');
@@ -114,6 +139,7 @@ async function main() {
   fs.writeFileSync(base + '.csv', toCsv(rows));
 
   console.log(`\n[audit:wa] ${sum.total} números declarados`);
+  console.log(`[audit:wa] ${writes} status gravado(s) na base`);
   console.log('[audit:wa] status:', JSON.stringify(sum.status));
   console.log('[audit:wa] probe :', JSON.stringify(sum.probe));
   console.log('[audit:wa] motivos:', JSON.stringify(sum.reasons));
@@ -131,4 +157,4 @@ async function main() {
 if (require.main === module) {
   main().catch((e) => { console.error('[audit:wa]', e.message); process.exit(1); });
 }
-module.exports = { audit, summarize, toCsv, probe };
+module.exports = { audit, summarize, toCsv, probe, persistWaStatus };
