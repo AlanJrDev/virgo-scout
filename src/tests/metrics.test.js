@@ -329,3 +329,48 @@ test('buildSeries usa janela adaptativa quando a base é mais velha que 9 dias',
   const fmt = /^\d{2}\/\d{2}$/;
   assert.ok(s.days.every((d) => fmt.test(d)), `labels dd/MM: ${s.days.join(',')}`);
 });
+
+// ---- Fase 2: funil da base (funnelSummary pura) ----
+const { funnelSummary } = require('../utils/funnel');
+
+test('funnelSummary: contagens/únicos/evidência/tiers sobre arrays em memória', () => {
+  const rows = [
+    { id: 'a', website: 'https://x.com', phone: '61999990000', whatsapp: '5561999990000', wa_source: 'site', wa_status: 'declared', wa_evidence_url: 'https://x.com' },
+    { id: 'b', website: null, phone: '6132224444', whatsapp: '5561999990000', wa_source: 'site', wa_status: 'declared', claimed: true, rating: 4.8, reviews: 200 }, // mesmo zap de a (lead junto) — único conta 1x
+    { id: 'c', website: 'https://y.com', phone: null, whatsapp: null, whatsapp_hint: true, wa_source: 'maps', wa_status: 'suspect' },
+    { id: 'd', website: null, phone: null, whatsapp: '123', wa_source: null, wa_status: null, claimed: true, rating: 4.9, reviews: 150 }, // zap cru malformado: NÃO conta (hasWa)
+    { id: 'e', website: null, phone: '61988880000', whatsapp: '5561988880000', wa_source: 'instagram', wa_status: 'declared', wa_evidence: 'https://ig.com/p/x/', rating: 3.0, reviews: 5 },
+    { id: 'f', website: null, phone: null, whatsapp: null, closed: true }, // fechado: fora de semSites/tiers
+  ];
+  const s = funnelSummary(rows);
+  assert.strictEqual(s.total, 6);
+  assert.strictEqual(s.comSite, 2);
+  assert.strictEqual(s.comPhone, 3);
+  assert.strictEqual(s.comZap, 3, 'a + b + e (d tem zap malformado e não conta)');
+  assert.strictEqual(s.zapsUnicos, 2, 'a/b compartilham número; e é outro');
+  assert.strictEqual(s.comHint, 1, 'hint sem zap válido: só c');
+  assert.strictEqual(s.waStatus.declared, 3);
+  assert.strictEqual(s.waStatus.suspect, 1);
+  assert.strictEqual(s.waStatus.outro, 2, 'd (null) + f (sem wa_status) => outro (buckets fecham em total=6)');
+  assert.strictEqual(s.waStatus.invalid, 0);
+  assert.strictEqual(s.waSource.site, 2);
+  assert.strictEqual(s.waSource.desconhecido, 2, 'd (null) + f (null)');
+  assert.strictEqual(s.waSource.maps, 1);
+  assert.strictEqual(s.waSource.instagram, 1);
+  assert.strictEqual(s.comEvidence, 2, 'a (wa_evidence_url) + e (wa_evidence DB)');
+  assert.strictEqual(s.evidencePct, 67, '2/3');
+  assert.strictEqual(s.descobertaPct, 50, '1 zap entre os 2 leads COM site (b/e são de lead sem site)');
+  assert.strictEqual(s.semSites.total, 3, 'b + d + e (f fechado fora)');
+  assert.strictEqual(s.semSites.tierA, 2, 'b: claimed, 4.8, 200; d: claimed, 4.9, 150');
+  assert.strictEqual(s.semSites.tierB, 0, 'e: rating 3.0 < 3.5 e reviews 5 < 20 — fora do A e sem sinais');
+});
+
+test('funnelSummary: base vazia e shape completo', () => {
+  const s = funnelSummary([]);
+  assert.strictEqual(s.total, 0);
+  assert.strictEqual(s.comZap, 0);
+  assert.strictEqual(s.descobertaPct, 0);
+  assert.strictEqual(s.evidencePct, 0);
+  assert.deepStrictEqual(s.semSites, { total: 0, tierA: 0, tierB: 0 });
+  assert.deepStrictEqual(Object.keys(s).sort(), ['comEvidence', 'comHint', 'comPhone', 'comSite', 'comZap', 'descobertaPct', 'evidencePct', 'semSites', 'total', 'waSource', 'waStatus', 'zapsUnicos']);
+});
