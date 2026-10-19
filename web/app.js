@@ -197,9 +197,10 @@
 
   /* ---------- helpers de render ---------- */
   function countUp(el, target) {
+    if (el._countTween) { el._countTween.kill(); el._countTween = null; } // tween antigo não sobrescreve render novo
     if (!hasGsap) { el.textContent = fmtInt(target); return; }
     var o = { v: 0 };
-    window.gsap.to(o, { v: target, duration: 0.9, ease: 'expo.out', onUpdate: function () { el.textContent = fmtInt(Math.round(o.v)); } });
+    el._countTween = window.gsap.to(o, { v: target, duration: 0.9, ease: 'expo.out', onUpdate: function () { el.textContent = fmtInt(Math.round(o.v)); } });
   }
 
   var CIRC = 2 * Math.PI * 15.5;
@@ -598,10 +599,19 @@
             head._featT = setTimeout(function () {
               head.style.opacity = '1'; // fade-in transicionado com a classe ainda viva
               head.textContent = txt;
-              var done = function () { head.classList.remove('is-swapping'); };
-              var te = function () { head.removeEventListener('transitionend', te); done(); };
+              var done = function () {
+                if (head._featIn) { clearTimeout(head._featIn); head._featIn = null; }
+                if (head._featTE) { head.removeEventListener('transitionend', head._featTE); head._featTE = null; }
+                head.classList.remove('is-swapping');
+              };
+              var te = function (e) {
+                if (e.propertyName !== 'opacity' || e.target !== head) return; // só o fade do próprio h2
+                if (head._featTE) { head.removeEventListener('transitionend', head._featTE); head._featTE = null; }
+                done();
+              };
+              if (head._featTE) head.removeEventListener('transitionend', head._featTE); // listener pendente morre antes do novo
+              head._featTE = te;
               head.addEventListener('transitionend', te);
-              clearTimeout(head._featIn);
               head._featIn = setTimeout(done, 170); // fallback sem transitionend
             }, 160);
           }
@@ -797,6 +807,7 @@
     /* motion: momento único de entrada */
     function finalStates() {
       document.querySelectorAll('[data-count]').forEach(function (el2) {
+        if (el2._countTween) { el2._countTween.kill(); el2._countTween = null; } // countUp pendente morre antes do texto final
         var m = { kTotal: S.total, kSite: S.comSite, kAlta: S.alta, kQual: S.qualif };
         el2.textContent = fmtInt(m[el2.id] || 0);
       });
@@ -949,7 +960,7 @@
 
   /* ---------- telas: Visão Geral x Base de Leads ---------- */
   /* entrada de troca: a .view é display:contents (anima-la é inerte) → a animation
-     vai nos FILHOS diretos, com stagger 30ms via --view-i. O void offsetWidth entre
+     vai nos FILHOS diretos, com stagger 24ms via --view-i. O void offsetWidth entre
      remover e re-adicionar a classe é o que força o restart da animation no mesmo frame */
   function animateViewIn(viewEl) {
     if (!viewEl) return;
