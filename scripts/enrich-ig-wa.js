@@ -7,6 +7,7 @@ const path = require('path');
 const { sbFetch } = require('../src/utils/sb');
 const { handleFrom } = require('../src/enrich/instagram');
 const { waFromBio } = require('../src/enrich/ig-bio');
+const { waWriteFields } = require('../src/utils/wa-audit');
 const { launchBrowser } = require('../src/scraper/mapsScraper');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -14,7 +15,7 @@ const statePath = path.join(__dirname, '..', 'auth', 'ig-state.json');
 
 async function main() {
   const limit = parseInt(process.argv[2] || '30', 10);
-  const rows = (await sbFetch(`leads?select=id,name,instagram&instagram=not.is.null&whatsapp=is.null&igw_checked_at=is.null&order=id&limit=${limit}`)) || [];
+  const rows = (await sbFetch(`leads?select=id,name,instagram,phone&instagram=not.is.null&whatsapp=is.null&igw_checked_at=is.null&order=id&limit=${limit}`)) || [];
   if (!rows.length) { console.log('[enrich:ig-wa] nada a checar (todos verificados ou sem instagram)'); return; }
   console.log(`[enrich:ig-wa] ${rows.length} perfis a checar`);
   if (!fs.existsSync(statePath)) { console.error('[enrich:ig-wa] sem auth/ig-state.json — rode npm run ig-login antes'); process.exit(1); }
@@ -43,9 +44,14 @@ async function main() {
           const html = await page.content();
           const got = waFromBio({ html, links: [], hrefsText }) || waFromBio({ html });
           if (got) {
-            patch.whatsapp = got.digits;
-            achados++;
-            console.log(`[enrich:ig-wa] ${r.name} — WA ${got.digits} (via ${got.via}, @${handle})`);
+            const wa = waWriteFields({ whatsapp: got.digits, phone: r.phone, hint: true, source: 'instagram', evidence: 'https://www.instagram.com/' + handle + '/' });
+            if (wa) {
+              Object.assign(patch, wa);
+              achados++;
+              console.log(`[enrich:ig-wa] ${r.name} — WA ${got.digits} (via ${got.via}, @${handle})`);
+            } else {
+              console.log(`[enrich:ig-wa] ${r.name} — WA ${got.digits} descartado (invalid pelo classificador)`);
+            }
           } else {
             console.log(`[enrich:ig-wa] ${r.name} — sem WA na bio (@${handle})`);
           }
@@ -57,8 +63,8 @@ async function main() {
         await sbFetch(`leads?id=eq.${encodeURIComponent(r.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: patch });
         ok++;
       } catch (e) {
-        if (/igw_checked_at/.test(e.message)) {
-          console.error('[enrich:ig-wa] coluna igw_checked_at ausente — aplique supabase/migrations/0008 no SQL Editor'); process.exit(1);
+        if (/igw_checked_at|wa_(source|status|evidence)/.test(e.message)) {
+          console.error('[enrich:ig-wa] colunas ausentes — aplique supabase/migrations/0008 + 0010 no SQL Editor'); process.exit(1);
         }
         console.error(`[enrich:ig-wa] erro ${r.id}: ${e.message}`);
       }
