@@ -69,7 +69,7 @@ function placeIdOrHash(l) {
 }
 
 function toRow(l) {
-  return {
+  const row = {
     id: placeIdOrHash(l),
     name: l.name || null,
     rating: num(l.rating),
@@ -95,6 +95,8 @@ function toRow(l) {
     facebook: l.facebook || null,
     whatsapp: String(l.whatsapp || '').replace(/\D/g, '') || null,
   };
+  if (row.whatsapp) row.wa_source = 'maps'; // origem do zap: página do place no Maps
+  return row;
 }
 
 /* Dedupe por id (nome+endereço normalizados): mantém a linha mais rica
@@ -173,13 +175,44 @@ async function fetchExisting(rows) {
   return [...out.values()];
 }
 
+// PATCH de lead com degrade de schema: colunas de wa_* ausentes (0010 pendente)
+// => tira as colunas wa_* e tenta de novo sem elas (não perde a captura).
+async function patchLead(id, set) {
+  try {
+    await sbFetch(`leads?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: set, headers: { Prefer: 'return=minimal' } });
+  } catch (e) {
+    if (!/wa_(source|status|evidence|checked_at)/.test(String(e.message || ''))) throw e;
+    const slim = Object.fromEntries(Object.entries(set).filter(([k]) => !k.startsWith('wa_')));
+    if (Object.keys(slim).length === Object.keys(set).length) throw e; // 400 sem relação com wa_*: cabe ao chamador
+    console.warn('[sync] colunas wa_* ausentes — aplique supabase/migrations/0010 no SQL Editor (salvando sem elas)');
+    await sbFetch(`leads?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: slim, headers: { Prefer: 'return=minimal' } });
+  }
+}
+
 async function upsertRows(rows) {
+  let waWarned = false;
   for (let i = 0; i < rows.length; i += CHUNK) {
-    await sbFetch('leads?on_conflict=id', {
-      method: 'POST',
-      body: rows.slice(i, i + CHUNK),
-      headers: { Prefer: 'resolution=merge-duplicates' },
-    });
+    const batch = rows.slice(i, i + CHUNK);
+    try {
+      await sbFetch('leads?on_conflict=id', {
+        method: 'POST',
+        body: batch,
+        headers: { Prefer: 'resolution=merge-duplicates' },
+      });
+    } catch (e) {
+      if (!/wa_/.test(String(e.message || ''))) throw e;
+      const slim = batch.map((row) => Object.fromEntries(Object.entries(row).filter(([k]) => !k.startsWith('wa_'))));
+      if (slim.every((r, idx) => Object.keys(r).length === Object.keys(batch[idx]).length)) throw e;
+      if (!waWarned) {
+        console.warn('[sync] colunas wa_* ausentes — aplique supabase/migrations/0010 no SQL Editor (salvando sem elas)');
+        waWarned = true;
+      }
+      await sbFetch('leads?on_conflict=id', {
+        method: 'POST',
+        body: slim,
+        headers: { Prefer: 'resolution=merge-duplicates' },
+      });
+    }
   }
 }
 
@@ -202,9 +235,7 @@ async function syncLeads({ dataDir, category = 'advogados', runBuild = true, cap
   const existing = await fetchExisting(rows);
   const plan = planUpsert(rows, existing);
   for (const p of plan.patches) {
-    await sbFetch(`leads?id=eq.${encodeURIComponent(p.id)}`, {
-      method: 'PATCH', body: p.set, headers: { Prefer: 'return=minimal' },
-    });
+    await patchLead(p.id, p.set);
   }
   for (const c of chunk(plan.deletes, 80)) {
     await sbFetch(`leads?id=in.(${inList(c)})`, { method: 'DELETE' });
@@ -324,4 +355,4 @@ if (require.main === module) {
     .catch((e) => { console.error('[sync]', e.message); process.exit(1); });
 }
 
-module.exports = { norm, leadId, placeIdOrHash, planUpsert, toRow, normPhone, cleanAddr, isLead, dedupeRows, upsertRows, syncLeads, captureRecord, legacyCaptureRecord, writeCapture };
+module.exports = { norm, leadId, placeIdOrHash, planUpsert, toRow, normPhone, cleanAddr, isLead, dedupeRows, upsertRows, patchLead, syncLeads, captureRecord, legacyCaptureRecord, writeCapture };

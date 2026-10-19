@@ -365,6 +365,32 @@ test('run partial pré-migration: legado estreia status como done (check constra
   assert.strictEqual(capCalls[1][0].status, 'done');  // legado remapeia partial → done
 });
 
+test('toRow marca wa_source maps só quando tem whatsapp', () => {
+  const { toRow } = require('../../scripts/sync-supabase');
+  const comWa = toRow({ name: 'A', whatsapp: '61999990000', address: 'B' });
+  assert.strictEqual(comWa.wa_source, 'maps');
+  assert.strictEqual(comWa.whatsapp, '61999990000');
+  const semWa = toRow({ name: 'B', address: 'B' });
+  assert.strictEqual('wa_source' in semWa, false);
+});
+
+test('patchLead degrada: 400 de coluna wa_ ausente => repete sem as colunas wa_*', async () => {
+  process.env.SUPABASE_URL = 'https://x.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = 'sb_secret_t';
+  const { patchLead } = require('../../scripts/sync-supabase');
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    if (calls.length === 1) return { ok: false, status: 400, text: async () => JSON.stringify({ message: "Could not find the 'wa_source' column of 'leads' in the schema cache" }) };
+    return { ok: true, status: 204, text: async () => '' };
+  };
+  await patchLead('x1', { whatsapp: '61999990000', wa_source: 'maps' });
+  assert.strictEqual(calls.length, 2);
+  const b2 = JSON.parse(calls[1].opts.body);
+  assert.strictEqual('wa_source' in b2, false);
+  assert.strictEqual(b2.whatsapp, '61999990000');
+});
+
 test('400 de captures com corpo SEM keyword de schema ainda cai no legado (400 raramente é de lógica)', async () => {
   fs.writeFileSync(path.join(TMP, 'leads-teste.v2.json'), JSON.stringify([{ name: 'Adv O', address: 'Rua O', source: 'q' }]));
   const { syncLeads } = require('../../scripts/sync-supabase');
