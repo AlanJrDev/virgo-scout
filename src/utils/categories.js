@@ -1,8 +1,8 @@
 const CATEGORIES = {
-  advogados: { tag: 'advogados', label: 'Advogado', script: 'capture-advogados-df.js', queriesModule: './queries', queriesExport: 'QUERIES', basename: null, terms: ['advogado', 'advocacia', 'escritório de advocacia'] },
-  arquitetura: { tag: 'arquitetura', label: 'Arquitetura', script: 'capture-arquitetura.js', queriesModule: './queries-arquitetura', queriesExport: 'QUERIES_ARQ', basename: 'arquitetura-df-max', terms: ['arquitetura', 'arquiteto'] },
-  tapecaria: { tag: 'tapecaria', label: 'Tapeçaria', script: 'capture-tapecaria.js', queriesModule: './queries-tapecaria', queriesExport: 'QUERIES_TAP', basename: 'tapecaria-df-max', terms: ['tapeçaria', 'tapiçaria', 'arroz de tapete'] },
-  estofado: { tag: 'estofado', label: 'Estofado', script: 'capture-estofado.js', queriesModule: './queries-estofado', queriesExport: 'QUERIES_EST', basename: 'estofado-df-max', terms: ['estofados', 'limpeza de estofados', 'tapetes'] },
+  advogados: { tag: 'advogados', label: 'Advogado', script: 'capture-advogados-df.js', queriesModule: './queries', queriesExport: 'QUERIES', basename: null, terms: ['advogado', 'advocacia', 'escritório de advocacia', 'advogado trabalhista', 'advogado imobiliário', 'advogado cível', 'advogado previdenciário'] },
+  arquitetura: { tag: 'arquitetura', label: 'Arquitetura', script: 'capture-arquitetura.js', queriesModule: './queries-arquitetura', queriesExport: 'QUERIES_ARQ', basename: 'arquitetura-df-max', terms: ['arquitetura', 'arquiteto', 'arquiteta', 'projeto arquitetônico'] },
+  tapecaria: { tag: 'tapecaria', label: 'Tapeçaria', script: 'capture-tapecaria.js', queriesModule: './queries-tapecaria', queriesExport: 'QUERIES_TAP', basename: 'tapecaria-df-max', terms: ['tapeçaria', 'tapiçaria', 'arroz de tapete', 'tapetes', 'cortinas', 'persianas', 'papel de parede'] },
+  estofado: { tag: 'estofado', label: 'Estofado', script: 'capture-estofado.js', queriesModule: './queries-estofado', queriesExport: 'QUERIES_EST', basename: 'estofado-df-max', terms: ['estofados', 'limpeza de estofados', 'tapetes', 'higienização de estofados', 'conserto de estofados', 'encapamento de estofados'] },
   topografia: { tag: 'topografia', label: 'Topografia', script: 'capture-topografia.js', queriesModule: './queries-topografia', queriesExport: 'QUERIES_TOP', basename: 'topografia-df-max', terms: ['topografia', 'topógrafo', 'levantamento topográfico', 'georreferenciamento'] },
 };
 const CAT_KEYS = Object.keys(CATEGORIES);

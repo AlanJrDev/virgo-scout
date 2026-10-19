@@ -67,3 +67,15 @@ test('termsOfCategory: termos do registro, fallback [cat]', () => {
   assert.deepStrictEqual(termsOfCategory('topografia'), ['topografia', 'topógrafo', 'levantamento topográfico', 'georreferenciamento']);
   assert.deepStrictEqual(termsOfCategory('desconhecida'), ['desconhecida']);
 });
+
+test('fase 2: termos novos por categoria (sem nicho novo, topografia intocada)', () => {
+  assert.ok(termsOfCategory('advogados').includes('advogado trabalhista'));
+  assert.ok(termsOfCategory('tapecaria').includes('persianas'));
+  assert.ok(termsOfCategory('estofado').includes('encapamento de estofados'));
+  assert.ok(termsOfCategory('arquitetura').includes('projeto arquitetônico'));
+  assert.deepStrictEqual(termsOfCategory('topografia'), ['topografia', 'topógrafo', 'levantamento topográfico', 'georreferenciamento'], 'nicho rico já tem raízes suficientes — não mexer');
+  for (const cat of ['advogados', 'arquitetura', 'tapecaria', 'estofado']) {
+    const termos = termsOfCategory(cat);
+    assert.strictEqual(new Set(termos).size, termos.length, `${cat}: sem duplicados`);
+  }
+});
