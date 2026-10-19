@@ -26,14 +26,15 @@ function extractSignals(html) {
 async function analyzeSite(rawUrl, { fetchImpl, timeoutMs = 6000 } = {}) {
   const f = fetchImpl || fetch;
   let url = String(rawUrl || '').trim();
-  if (!url) return { ok: false, status: 0, email: null, instagram: null, facebook: null, whatsapp: null, since_year: null, title: null };
+  if (!url) return { ok: false, status: 0, final_url: null, email: null, instagram: null, facebook: null, whatsapp: null, since_year: null, title: null };
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
   try {
     const res = await f(url, { redirect: 'follow', signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36', Accept: 'text/html' } });
-    if (!res.ok) return { ok: false, status: res.status, ...empty() };
+    const final_url = res.url || url;
+    if (!res.ok) return { ok: false, status: res.status, final_url, ...empty() };
     const html = await res.text();
-    return { ok: true, status: res.status, ...extractSignals(html) };
-  } catch { return { ok: false, status: 0, ...empty() }; }
+    return { ok: true, status: res.status, final_url, ...extractSignals(html) };
+  } catch { return { ok: false, status: 0, final_url: null, ...empty() }; }
 }
 function empty() { return { email: null, instagram: null, facebook: null, whatsapp: null, since_year: null, title: null }; }
 module.exports = { analyzeSite, extractSignals };

@@ -16,11 +16,13 @@ test('extrai email, instagram, whatsapp e ano de fundação', async () => {
   assert.strictEqual(s.whatsapp, '5561999990000');
   assert.strictEqual(s.since_year, 2013);
   assert.ok(s.title.includes('Trabalhista'));
+  assert.strictEqual(s.final_url, 'https://souzadv.com.br');
 });
 
 test('url sem esquema ganha https; erro de rede vira ok:false', async () => {
   const bad = await analyzeSite('souzadv.com.br', { fetchImpl: async () => { throw new TypeError('fetch failed'); } });
   assert.strictEqual(bad.ok, false); assert.strictEqual(bad.email, null);
+  assert.strictEqual(bad.final_url, null);
 });
 
 test('descarta emails falsos-positivos comuns', () => {
