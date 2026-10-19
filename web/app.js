@@ -200,7 +200,7 @@
     if (el._countTween) { el._countTween.kill(); el._countTween = null; } // tween antigo não sobrescreve render novo
     if (!hasGsap) { el.textContent = fmtInt(target); return; }
     var o = { v: 0 };
-    el._countTween = window.gsap.to(o, { v: target, duration: 0.9, ease: 'expo.out', onUpdate: function () { el.textContent = fmtInt(Math.round(o.v)); } });
+    el._countTween = window.gsap.to(o, { v: target, duration: 0.9, ease: 'expo.out', onUpdate: function () { el.textContent = fmtInt(Math.round(o.v)); }, onComplete: function () { el._countTween = null; } }); // ref não persiste além do tween
   }
 
   var CIRC = 2 * Math.PI * 15.5;
@@ -591,25 +591,29 @@
           clearTimeout(head._featT); // pendência antiga morre; alvo marcado já no agendamento
           var stale1 = head._featIn; // fallback do fade-in anterior, se houver
           if (stale1) clearTimeout(stale1);
+          if (head._featTE) { head.removeEventListener('transitionend', head._featTE); head._featTE = null; } // listener pendente morre antes do novo
           head._featTxt = txt;
+          head._featGen = (head._featGen || 0) + 1; // token de geração: artefatos do swap A não tocam o swap B
+          var gen = head._featGen;
           if (reduceMotion) { head.textContent = txt; head.classList.remove('is-swapping'); }
           else {
             head.classList.add('is-swapping'); // dona da transition de opacity (fade-out E fade-in animados)
             head.style.opacity = '0';
             head._featT = setTimeout(function () {
+              if (gen !== head._featGen) return; // swap B já venceu
               head.style.opacity = '1'; // fade-in transicionado com a classe ainda viva
               head.textContent = txt;
               var done = function () {
+                if (gen !== head._featGen) return; // só o swap corrente encerra
                 if (head._featIn) { clearTimeout(head._featIn); head._featIn = null; }
                 if (head._featTE) { head.removeEventListener('transitionend', head._featTE); head._featTE = null; }
                 head.classList.remove('is-swapping');
               };
               var te = function (e) {
+                if (gen !== head._featGen) return;
                 if (e.propertyName !== 'opacity' || e.target !== head) return; // só o fade do próprio h2
-                if (head._featTE) { head.removeEventListener('transitionend', head._featTE); head._featTE = null; }
                 done();
               };
-              if (head._featTE) head.removeEventListener('transitionend', head._featTE); // listener pendente morre antes do novo
               head._featTE = te;
               head.addEventListener('transitionend', te);
               head._featIn = setTimeout(done, 170); // fallback sem transitionend
