@@ -51,4 +51,16 @@ function classifyWaNumber({ whatsapp, phone, address } = {}) {
   return { status: suspect ? 'suspect' : 'declared', digits, ddd, mobile, reasons };
 }
 
-module.exports = { classifyWaNumber, isDfRegion, splitLocal, VALID_DDD };
+// Regra central de ESCRITA do whatsapp na base leads (enrich/enrich:wa/ig-wa).
+// Entra só com forma utilizável e DDD real; suspect entra marcado. Número sai normalizado (digits com 55).
+function waWriteFields({ whatsapp, phone, address, hint, source, evidence } = {}) {
+  if (!whatsapp) return null;
+  const c = classifyWaNumber({ whatsapp, phone, address });
+  if (c.status === 'invalid' || c.reasons.includes('invalid_ddd')) return null;
+  const out = { whatsapp: c.digits, wa_status: c.status, wa_source: source };
+  if (hint) out.whatsapp_hint = true;
+  if (evidence) out.wa_evidence = evidence;
+  return out;
+}
+
+module.exports = { classifyWaNumber, waWriteFields, isDfRegion, splitLocal, VALID_DDD };

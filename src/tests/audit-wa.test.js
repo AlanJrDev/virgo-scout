@@ -46,3 +46,32 @@ test('isDfRegion reconhece RA e sigla', () => {
   assert.strictEqual(isDfRegion('QS 1, Águas Claras - DF'), true);
   assert.strictEqual(isDfRegion('São Paulo SP'), false);
 });
+
+const { waWriteFields } = require('../utils/wa-audit');
+
+test('waWriteFields rejeita whatsapp invalid (sem forma utilizavel)', () => {
+  assert.strictEqual(waWriteFields({ whatsapp: '123', source: 'site' }), null);
+});
+
+test('waWriteFields rejeita invalid_ddd na escrita', () => {
+  assert.strictEqual(waWriteFields({ whatsapp: '5508999990000', source: 'site' }), null);
+});
+
+test('waWriteFields grava suspect com marcacao (ddd_off_region)', () => {
+  const out = waWriteFields({ whatsapp: '5555999793397', address: 'Águas Claras, DF', hint: true, source: 'site', evidence: 'https://x.com' });
+  assert.strictEqual(out.wa_status, 'suspect');
+  assert.strictEqual(out.whatsapp, '5555999793397');
+  assert.strictEqual(out.whatsapp_hint, true);
+  assert.strictEqual(out.wa_source, 'site');
+  assert.strictEqual(out.wa_evidence, 'https://x.com');
+});
+
+test('waWriteFields declared: differs_phone nao é motivo de exclusão', () => {
+  const out = waWriteFields({ whatsapp: '5561982638116', phone: '6132724904', address: 'Brasília DF', source: 'site' });
+  assert.strictEqual(out.wa_status, 'declared');
+});
+
+test('waWriteFields sem whatsapp => null (não marca nada de wa_*)', () => {
+  assert.strictEqual(waWriteFields({}), null);
+  assert.strictEqual(waWriteFields({ whatsapp: '', source: 'site' }), null);
+});
