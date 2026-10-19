@@ -5,6 +5,7 @@
   var hasGsap = typeof window.gsap !== 'undefined' && !reduceMotion;
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var charts = { bars: null, donut: null };
+  var bootTl = null; // timeline de entrada do boot — guardada p/ matar troca rápida (não acumula)
   var trendState = { visible: null };
   var TREND_COLORS = { total: '#38bdf8', comSite: '#34d399', semSite: '#fbbf24', comWa: '#2e7cf6', alta: '#f87171', icpSite: '#a78bfa', icpSistema: '#22d3ee' };
   var CHART_ANIM = reduceMotion ? { colors: true, x: false, y: false } : { duration: 650, easing: 'easeOutQuart', delay: function (c) { return (c.dataIndex || 0) * 45; } };
@@ -587,13 +588,21 @@
         var txt = 'Leads em Destaque (' + fmtInt(visible) + ')';
         if (head._featTxt !== txt) {
           clearTimeout(head._featT); // pendência antiga morre; alvo marcado já no agendamento
+          var stale1 = head._featIn; // fallback do fade-in anterior, se houver
+          if (stale1) clearTimeout(stale1);
           head._featTxt = txt;
           if (reduceMotion) { head.textContent = txt; head.classList.remove('is-swapping'); }
           else {
-            head.classList.add('is-swapping'); // dona da transition de opacity (sem :has)
+            head.classList.add('is-swapping'); // dona da transition de opacity (fade-out E fade-in animados)
             head.style.opacity = '0';
             head._featT = setTimeout(function () {
-              head.textContent = txt; head.style.opacity = '1'; head.classList.remove('is-swapping');
+              head.style.opacity = '1'; // fade-in transicionado com a classe ainda viva
+              head.textContent = txt;
+              var done = function () { head.classList.remove('is-swapping'); };
+              var te = function () { head.removeEventListener('transitionend', te); done(); };
+              head.addEventListener('transitionend', te);
+              clearTimeout(head._featIn);
+              head._featIn = setTimeout(done, 170); // fallback sem transitionend
             }, 160);
           }
         }
@@ -796,11 +805,24 @@
     }
     if (!hasGsap) { finalStates(); }
     else {
-      /* dono único da entrada do boot: cada tween termina limpando inline
-         transform/opacity/visibility (clearProps) — devolve os cards aos styles
-         (hover-lift .dash-lift e estados :active voltam a funcionar pós-boot) */
-      var tl = window.gsap.timeline({ defaults: { ease: 'expo.out', clearProps: 'transform,opacity,visibility' } });
-      tl.from('.sidebar', { x: -16, autoAlpha: 0, duration: 0.28 })
+      // partial boot de entrada apenas 1x por sessão (flag vs_dash_boot): trocas de tipo
+      // subsequentes atualizam em estado final, sem replay de entrada
+      var bootDone = null;
+      try { bootDone = sessionStorage.getItem('vs_dash_boot'); } catch (e) {}
+      if (bootDone) { finalStates(); }
+      else {
+        try { sessionStorage.setItem('vs_dash_boot', '1'); } catch (e) {}
+        /* dono único da entrada: cada tween termina limpando inline
+           transform/opacity/visibility (clearProps) — devolve os cards aos styles
+           (hover-lift .dash-lift e estados :active voltam a funcionar pós-boot).
+           is-booting silencia as transitions CSS dos cards ENQUANTO a timeline roda. */
+        if (bootTl) { bootTl.kill(); document.body.classList.remove('is-booting'); } // troca rápida não acumula timelines
+        document.body.classList.add('is-booting');
+        bootTl = window.gsap.timeline({
+          defaults: { ease: 'expo.out', clearProps: 'transform,opacity,visibility' },
+          onComplete: function () { document.body.classList.remove('is-booting'); }
+        });
+        bootTl.from('.sidebar', { x: -16, autoAlpha: 0, duration: 0.28 })
         .from('.topbar', { y: -12, autoAlpha: 0, duration: 0.26 }, 0.05)
         .from('.greet', { y: 10, autoAlpha: 0, duration: 0.26 }, 0.08)
         .from('.hero .card', { y: 12, autoAlpha: 0, duration: 0.28, stagger: 0.07 }, 0.12)
@@ -810,12 +832,13 @@
         .from('.row-2 .card, .row-3 .card', { y: 14, autoAlpha: 0, duration: 0.28, stagger: 0.07 }, 0.24)
         .from('.feat-list li, .recent-list li', { x: 10, autoAlpha: 0, duration: 0.24, stagger: 0.045 }, 0.4)
         .from('.map-bubble', { autoAlpha: 0, duration: 0.28, stagger: 0.03 }, 0.45);
-      countUp($('#kTotal'), S.total || 0); countUp($('#kSite'), S.comSite || 0);
-      countUp($('#kAlta'), S.alta || 0); countUp($('#kQual'), S.qualif || 0);
-      document.querySelectorAll('[data-w]').forEach(function (t) {
-        window.gsap.to(t, { width: t.getAttribute('data-w') + '%', duration: 0.7, ease: 'expo.out', delay: 0.4 });
-      });
-      drawRings(document);
+        countUp($('#kTotal'), S.total || 0); countUp($('#kSite'), S.comSite || 0);
+        countUp($('#kAlta'), S.alta || 0); countUp($('#kQual'), S.qualif || 0);
+        document.querySelectorAll('[data-w]').forEach(function (t) {
+          window.gsap.to(t, { width: t.getAttribute('data-w') + '%', duration: 0.7, ease: 'expo.out', delay: 0.4 });
+        });
+        drawRings(document);
+      }
     }
   }
 
