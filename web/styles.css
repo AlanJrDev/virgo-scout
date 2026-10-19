@@ -587,32 +587,30 @@ body.ia-open .ia-fab{opacity:0;visibility:hidden;pointer-events:none;transform:s
 .cap-cta-capture:active{transform:scale(.97)}
 
 /* ===== Fase B — camada de movimento (CURVA/DURAÇÃO herdam dos tokens: transform+opacity apenas) ===== */
-/* reveal dos cards: 1x por sessão (classe aplicada via JS ao 1º boot); fill backwards
-   p/ não prender o transform — hover lift volta a dominar após o fim da animation */
-.reveal-once{animation:cardReveal var(--d-med) var(--ease-out) backwards;animation-delay:calc(var(--reveal-i,0)*45ms)}
-@keyframes cardReveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* boot do dashboard: dono único = GSAP timeline (app.js) — com clearProps no fim p/ devolver
+   transform/opacity inline e o hover-lift (.dash-lift) voltar a dominar */
 .dash-lift{transition:transform 160ms var(--ease-out),box-shadow 160ms var(--ease-out)}
-/* troca de view: 200ms, fade + 4px rise, por troca (classe re-aplicada só no clique) */
-.view-enter{animation:viewIn 200ms var(--ease-out) backwards}
+/* troca de view: a .view é display:contents → anima os FILHOS diretos;
+   fade + 4px rise por filho, stagger 30ms (--view-i setado no JS da troca) */
+.view-enter > *{animation:viewIn 200ms var(--ease-out) backwards;animation-delay:calc(var(--view-i,0)*30ms)}
 @keyframes viewIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-/* título (N) do card de destaques: fade opacity-only na troca de recorte */
-.card:has(#areaFilter) .card-head h2{transition:opacity 160ms var(--ease-out)}
+/* título (N) do card de destaques: classe JS garante a transição sem depender de :has() */
+.card-head h2.is-swapping{transition:opacity 160ms var(--ease-out)}
 /* estados vazios: fade-in opacity-only (elemento novo por render — animation segura) */
 .feat-empty,.empty-box{animation:emptyIn 200ms var(--ease-out) backwards}
 @keyframes emptyIn{from{opacity:0}to{opacity:1}}
-/* FAB: pulse duplo sutil (2×[1→1.06→1] , 400ms) — budget de delight, 1x por sessão */
-.fab-pulse{animation:fabPulse 400ms var(--ease-out)}
+/* FAB: pulse duplo sutil (2×[1→1.06→1], 300ms) — budget de delight, 1x por sessão */
+.fab-pulse{animation:fabPulse 300ms var(--ease-out)}
 @keyframes fabPulse{0%,50%,100%{transform:scale(1)}25%,75%{transform:scale(1.06)}}
 @media(hover:hover) and (pointer:fine){.dash-lift:hover{transform:translateY(-2px);box-shadow:0 16px 36px rgba(2,6,16,.42),inset 0 1px 0 rgba(255,255,255,.02)}}
 @media(prefers-reduced-motion:reduce){
-  .reveal-once{animation:cardRevealRO var(--d-med) ease backwards;animation-delay:0}
-  .view-enter{animation:viewInRO 200ms ease backwards}
+  .view-enter > *{animation:viewInRO 200ms ease backwards;animation-delay:0}
   .feat-empty,.empty-box{animation:none}
   .fab-pulse{animation:none}
   .dash-lift{transition:none}
-  .card:has(#areaFilter) .card-head h2{transition:none}
+  .dash-lift:hover{transform:none}
+  .card-head h2.is-swapping{transition:none}
   .filter-row .chip{transition:none}
   .filter-row .chip:active{transform:none}
 }
-@keyframes cardRevealRO{from{opacity:0}to{opacity:1}}
 @keyframes viewInRO{from{opacity:0}to{opacity:1}}

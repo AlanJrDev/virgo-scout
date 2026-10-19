@@ -574,28 +574,31 @@
         counts[a] = (counts[a] || 0) + 1;
       }
       var labels = Object.keys(counts).sort(function (x, y) { return counts[y] - counts[x]; }).slice(0, 6);
-      // área ativa pode não existir no novo recorte: reset ANTES de qualquer early return
-      if (state.active && counts[state.active] == null) state.active = '';
+      // área ativa morre se sair do pool OU sair do top-6 (ficaria ativa e invisível); reset ANTES de qualquer early return
+      if (state.active && (counts[state.active] == null || labels.indexOf(state.active) === -1)) state.active = '';
       var fRow = $('#areaFilter');
       if (!fRow) return labels;
-      if (!labels.length) { fRow.innerHTML = ''; return labels; }
-      var head = fRow.closest('.card') ? fRow.closest('.card').querySelector('.card-head h2') : null;
       var visible = state.active ? counts[state.active] : pool.length;
-      // título: fade curto (opacity) quando a contagem muda — apropriado aqui,
-      // troca de recorte é pouco frequente e o (N) age como confirmação do dado
+      // título: fade curto (opacity) quando a contagem muda — troca de recorte é pouco
+      // frequente e o (N) age como confirmação do dado; roda ANTES do early return de
+      // labels vazio p/ o (N) corrigir mesmo recorte só-'Geral' e não deixar timer órfão
+      var head = fRow.closest('.card') ? fRow.closest('.card').querySelector('.card-head h2') : null;
       if (head) {
         var txt = 'Leads em Destaque (' + fmtInt(visible) + ')';
         if (head._featTxt !== txt) {
-          if (reduceMotion) { head.textContent = txt; head._featTxt = txt; }
+          clearTimeout(head._featT); // pendência antiga morre; alvo marcado já no agendamento
+          head._featTxt = txt;
+          if (reduceMotion) { head.textContent = txt; head.classList.remove('is-swapping'); }
           else {
-            clearTimeout(head._featT);
+            head.classList.add('is-swapping'); // dona da transition de opacity (sem :has)
             head.style.opacity = '0';
             head._featT = setTimeout(function () {
-              head.textContent = txt; head._featTxt = txt; head.style.opacity = '1';
+              head.textContent = txt; head.style.opacity = '1'; head.classList.remove('is-swapping');
             }, 160);
           }
         }
       }
+      if (!labels.length) { fRow.innerHTML = ''; return labels; }
       fRow.innerHTML = ['<button class="chip' + (state.active ? '' : ' active') + '" type="button" data-area="">Todas</button>']
         .concat(labels.map(function (a) {
           return '<button class="chip' + (state.active === a ? ' active' : '') + '" type="button" data-area="' + escapeHtml(a) + '">' + escapeHtml(a) + ' <b>' + counts[a] + '</b></button>';
@@ -793,7 +796,10 @@
     }
     if (!hasGsap) { finalStates(); }
     else {
-      var tl = window.gsap.timeline({ defaults: { ease: 'expo.out' } });
+      /* dono único da entrada do boot: cada tween termina limpando inline
+         transform/opacity/visibility (clearProps) — devolve os cards aos styles
+         (hover-lift .dash-lift e estados :active voltam a funcionar pós-boot) */
+      var tl = window.gsap.timeline({ defaults: { ease: 'expo.out', clearProps: 'transform,opacity,visibility' } });
       tl.from('.sidebar', { x: -16, autoAlpha: 0, duration: 0.28 })
         .from('.topbar', { y: -12, autoAlpha: 0, duration: 0.26 }, 0.05)
         .from('.greet', { y: 10, autoAlpha: 0, duration: 0.26 }, 0.08)
@@ -919,11 +925,14 @@
   }
 
   /* ---------- telas: Visão Geral x Base de Leads ---------- */
-  /* entrada de troca: classe CSS (animation roda 1x por troca; re-render não re-anima) */
+  /* entrada de troca: a .view é display:contents (anima-la é inerte) → a animation
+     vai nos FILHOS diretos, com stagger 30ms via --view-i. O void offsetWidth entre
+     remover e re-adicionar a classe é o que força o restart da animation no mesmo frame */
   function animateViewIn(viewEl) {
     if (!viewEl) return;
     viewEl.classList.remove('view-enter');
-    void viewEl.offsetWidth; // reinicia a animation na troca de volta
+    for (var i = 0; i < viewEl.children.length; i++) viewEl.children[i].style.setProperty('--view-i', i);
+    void viewEl.offsetWidth; // restaura o kick p/ a nova animation comecar do zero
     viewEl.classList.add('view-enter');
   }
   function showView(v) {
@@ -969,24 +978,20 @@
     showView(v === 'leads' ? 'leads' : 'dashboard');
   })();
 
-  /* ---------- Fase B: reveal dos cards (1x por sessão) + lift de hover + pulse único do FAB ---------- */
-  var DASH_FLAG = 'vs_dash_reveal';
+  /* ---------- Fase B: lift de hover nos cards + pulse único do FAB ---------- */
+  /* reveal dos cards: dono único é a timeline GSAP do boot (que ora limpa inline
+     transform/opacity ao final) — sem classe CSS de reveal, sem dono duplicado */
   (function rigDashCards() {
     var cards = document.querySelectorAll('#viewDashboard .card');
-    var first = false;
-    try { first = !sessionStorage.getItem(DASH_FLAG); if (first) sessionStorage.setItem(DASH_FLAG, '1'); } catch (e) {}
-    for (var i = 0; i < cards.length; i++) {
-      cards[i].classList.add('dash-lift');
-      if (first) { cards[i].classList.add('reveal-once'); cards[i].style.setProperty('--reveal-i', i); }
-    }
+    for (var i = 0; i < cards.length; i++) cards[i].classList.add('dash-lift');
   })();
   (function fabPulseOnce() {
     if (reduceMotion) return;
-    try { if (sessionStorage.getItem('vs_fab_intro')) return; sessionStorage.setItem('vs_fab_intro', '1'); } catch (e) { return; }
     var fab = document.querySelector('.ia-fab');
-    if (!fab) return;
+    if (!fab) { try { sessionStorage.setItem('vs_fab_intro', '1'); } catch (e) {} return; } // flag só com FAB confirmado
+    try { if (sessionStorage.getItem('vs_fab_intro')) return; sessionStorage.setItem('vs_fab_intro', '1'); } catch (e) { return; }
     fab.classList.add('fab-pulse');
-    setTimeout(function () { fab.classList.remove('fab-pulse'); }, 450);
+    setTimeout(function () { fab.classList.remove('fab-pulse'); }, 340);
   })();
 
   /* ---------- pipeline: marca "contatado" ao abrir o WhatsApp ---------- */
