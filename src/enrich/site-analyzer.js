@@ -1,26 +1,45 @@
 // Análise de sites de leads — fetch + regex, zero dependências.
 const BAD_EMAIL = /(sentry|example|wixpress|godaddy|@2x|\.png|\.jpg|\.webp|no-?reply|domain\.com)/i;
 
+// Link DECLARADO de WhatsApp: só o que está em atributo href (não vale texto corrido — vira hint).
+function findWaLink(html) {
+  const text = String(html || '').slice(0, 400000);
+  const hrefs = [];
+  for (const m of text.matchAll(/href\s*=\s*"([^"]*)"/gi)) hrefs.push(m[1]);
+  for (const m of text.matchAll(/href\s*=\s*'([^']*)'/gi)) hrefs.push(m[1]);
+  for (const raw of hrefs) {
+    const v = raw.replace(/&amp;/gi, '&'); // decode da entidade HTML (&amp;phone=X sem decode jamais casa [?&]phone=)
+    const m = v.match(/wa\.me\/\+?(\d{6,15})/) || v.match(/api\.whatsapp\.com[^"'\s]*[?&]phone=(\d{6,15})/);
+    if (m) return m[1];
+  }
+  return null;
+}
+// Presença de padrão wa em qualquer texto da página (sem exigir atributo) — sinal fraco, só hint.
+function waHint(html) {
+  const text = String(html || '').slice(0, 400000);
+  return /wa\.me\/\+?\d{6,15}/.test(text) || /api\.whatsapp\.com[^"'\s]*[?&]phone=\d{6,15}/.test(text);
+}
+
 function extractSignals(html) {
   const text = String(html || '').slice(0, 400000);
   let email = null;
   for (const m of text.matchAll(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi)) {
     if (!BAD_EMAIL.test(m[0])) { email = m[0].toLowerCase(); break; }
   }
-  let instagram = null, facebook = null, whatsapp = null;
+  let instagram = null, facebook = null;
   for (const m of text.matchAll(/instagram\.com\/([A-Za-z0-9_.]{2,40})/g)) {
     if (!/^(p|reel|reels|explore|stories|accounts)$/i.test(m[1])) { instagram = m[1]; break; }
   }
   for (const m of text.matchAll(/facebook\.com\/([A-Za-z0-9.-]{2,60})/g)) {
     if (!/^(sharer|share|tr|plugins|policies)(\.php)?$/i.test(m[1])) { facebook = m[1]; break; }
   }
-  const wa = text.match(/wa\.me\/(\+?\d{6,15})/) || text.match(/api\.whatsapp\.com[^"']*[?&]phone=(\d{6,15})/);
-  if (wa) whatsapp = wa[1].replace('+', '');
+  const whatsapp = findWaLink(html);
+  const whatsapp_hint = waHint(html);
   let since_year = null;
   const cy = text.match(/(?:©|&copy;|copyright)[^0-9<]{0,24}((?:19|20)\d{2})/i) || text.match(/desde\s+((?:19|20)\d{2})/i) || text.match(/fundad[ao]\s+em\s+((?:19|20)\d{2})/i);
   if (cy) since_year = parseInt(cy[1], 10);
   const title = (text.match(/<title[^>]*>([^<]{0,140})/i) || [])[1]?.trim() || null;
-  return { email, instagram, facebook, whatsapp, since_year, title };
+  return { email, instagram, facebook, whatsapp, whatsapp_hint, since_year, title };
 }
 
 async function analyzeSite(rawUrl, { fetchImpl, timeoutMs = 6000 } = {}) {

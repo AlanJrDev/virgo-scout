@@ -17,6 +17,7 @@ test('extrai email, instagram, whatsapp e ano de fundação', async () => {
   assert.strictEqual(s.since_year, 2013);
   assert.ok(s.title.includes('Trabalhista'));
   assert.strictEqual(s.final_url, 'https://souzadv.com.br');
+  assert.strictEqual(s.whatsapp_hint, true); // link declarado também é presença de padrão
 });
 
 test('url sem esquema ganha https; erro de rede vira ok:false', async () => {
@@ -45,4 +46,23 @@ test('segmentos reservados só contam com igualdade exata (handles com p/tr sobr
   );
   assert.strictEqual(r.instagram, null);
   assert.strictEqual(r.facebook, null);
+});
+
+test('wa declarado: atributo href wa.me e api.whatsapp com & e aspas simples', () => {
+  const dupla = `<a href="https://wa.me/5561999990000">z</a>`;
+  const api = `<a href="https://api.whatsapp.com/send?phone=5561987654321&text=oi">z</a>`;
+  const simples = `<a href='https://wa.me/61999990000'>z</a>`;
+  const r1 = extractSignals(dupla);
+  assert.strictEqual(r1.whatsapp, '5561999990000');
+  const r2 = extractSignals(api);
+  assert.strictEqual(r2.whatsapp, '5561987654321');
+  const r3 = extractSignals(simples);
+  assert.strictEqual(r3.whatsapp, '61999990000');
+  assert.strictEqual(r1.whatsapp_hint, true);
+});
+
+test('texto corrido com wa.me vira whatsapp_hint, NUNCA whatsapp', () => {
+  const s = extractSignals('<p>Fale com a gente no wa.me/5561999990000 ou ligue 61 3272-4904</p>');
+  assert.strictEqual(s.whatsapp, null);
+  assert.strictEqual(s.whatsapp_hint, true);
 });
