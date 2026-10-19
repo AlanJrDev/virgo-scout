@@ -66,3 +66,89 @@ test('texto corrido com wa.me vira whatsapp_hint, NUNCA whatsapp', () => {
   assert.strictEqual(s.whatsapp, null);
   assert.strictEqual(s.whatsapp_hint, true);
 });
+
+const HOME_SEM_ZAP = '<html><head><title>Escritorio Silva</title></head><body><a href="/contato">Fale conosco</a></body></html>';
+const CONTATO_ZAP = '<html><head><title>Contato</title></head><body><a href="https://wa.me/5561999888000">Zap</a></body></html>';
+
+// stub: home na 1ª chamada; páginas com 'contato' na URL recebem CONTATO_ZAP
+function stubV2(home, contatoHtml) {
+  return async (url) => ({
+    url,
+    ok: true,
+    status: 200,
+    text: async () => (String(url).includes('contato') ? (contatoHtml || CONTATO_ZAP) : home),
+  });
+}
+
+test('v2: home sem zap visita /contato e traz zap com wa_evidence_url da interna', async () => {
+  const s = await analyzeSite('https://silva.com', { fetchImpl: stubV2(HOME_SEM_ZAP) });
+  assert.strictEqual(s.ok, true);
+  assert.strictEqual(s.whatsapp, '5561999888000');
+  assert.strictEqual(s.wa_evidence_url, 'https://silva.com/contato');
+  assert.strictEqual(s.whatsapp_hint, true);
+  assert.strictEqual(s.pages_visited, 1);
+});
+
+test('v2: href relativo (contato.html) resolve contra a final_url da home', async () => {
+  const urls = [];
+  const s = await analyzeSite('https://silva.com/inicio', {
+    fetchImpl: async (url) => {
+      urls.push(String(url));
+      return { url, ok: true, status: 200, text: async () => (urls.length === 1 ? '<a href="contato.html">Contato</a>' : CONTATO_ZAP) };
+    },
+  });
+  assert.strictEqual(urls[1], 'https://silva.com/contato.html');
+  assert.strictEqual(s.whatsapp, '5561999888000');
+});
+
+test('v2: wa em texto corrido NUNCA vira whatsapp; só o declarado da interna grava', async () => {
+  const s = await analyzeSite('https://serra.com', {
+    fetchImpl: async (url) => (String(url).endsWith('/fale')
+      ? { url, ok: true, status: 200, text: async () => CONTATO_ZAP }
+      : { url, ok: true, status: 200, text: async () => '<p>Chame no wa.me/556177770000 agora mesmo</p><a href="/fale">Fale conosco</a>' }),
+  });
+  assert.strictEqual(s.whatsapp, '5561999888000');
+  assert.strictEqual(s.wa_evidence_url, 'https://serra.com/fale');
+  assert.strictEqual(s.whatsapp_hint, true);
+});
+
+test('v2: home com zap declarado não visita nada (pages_visited 0)', async () => {
+  const urls = [];
+  const s = await analyzeSite('https://souzadv.com.br', {
+    fetchImpl: async (url) => { urls.push(String(url)); return { url, ok: true, status: 200, text: async () => HTML }; },
+  });
+  assert.strictEqual(s.whatsapp, '5561999990000');
+  assert.strictEqual(s.pages_visited, 0);
+  assert.strictEqual(s.wa_evidence_url, null);
+  assert.strictEqual(urls.length, 1, 'só a homepage');
+});
+
+test('v2: budget curto com reserva de 2s reduz a zero as visitas internas', async () => {
+  const urls = [];
+  const s = await analyzeSite('https://silva.com', {
+    budgetMs: 300,
+    fetchImpl: async (url) => { urls.push(String(url)); return { url, ok: true, status: 200, text: async () => (urls.length === 1 ? HOME_SEM_ZAP : CONTATO_ZAP) }; },
+  });
+  assert.strictEqual(urls.length, 1);
+  assert.strictEqual(s.pages_visited, 0);
+  assert.strictEqual(s.whatsapp, null);
+  assert.strictEqual(s.ok, true);
+});
+
+test('v2: text() lança depois de res.ok => ok:false (amendment sem re-throw no caller)', async () => {
+  const s = await analyzeSite('https://quebrada.com', {
+    fetchImpl: async (url) => ({
+      url,
+      ok: true,
+      status: 200,
+      text: async () => { throw new TypeError('body stream errored'); },
+    }),
+  });
+  assert.strictEqual(s.ok, false);
+  assert.strictEqual(s.status, 200);
+  assert.strictEqual(s.final_url, 'https://quebrada.com');
+  assert.strictEqual(s.whatsapp, null);
+  assert.strictEqual(s.whatsapp_hint, false);
+  assert.strictEqual(s.wa_evidence_url, null);
+  assert.strictEqual(s.pages_visited, 0);
+});
