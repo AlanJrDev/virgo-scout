@@ -4,8 +4,8 @@ const assert = require('node:assert');
 const { waFits, waShortMessage, waLink, WA_URL_BUDGET } = require('../utils/wa');
 const quote = require('../../web/wa-quote');
 
-const T1 = (s) => '\u{1F4B8} Perdendo clientes para a concorr\u00eancia! Sou ' + s + ', da Virgo Tech. Posso te mostrar?';
-const T2 = '\u{1F4B8} Perdendo clientes para a concorr\u00eancia! Sou da Virgo Tech. Posso te mostrar?';
+const T1 = (s) => '\u{1F4B8} Perdendo clientes p/ concorr\u00eancia! Sou ' + s + ', da Virgo Tech. Posso te mostrar?';
+const T2 = '\u{1F4B8} Perdendo clientes p/ concorr\u00eancia! Sou da Virgo Tech. Posso te mostrar?';
 const T3 = '\u{1F4B8} Perdendo clientes p/ concorr\u00eancia! Posso te mostrar?';
 
 const enc = (s) => encodeURIComponent(String(s)).length;
