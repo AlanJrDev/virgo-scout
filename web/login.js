@@ -36,6 +36,7 @@
   if (hasGsap) {
     window.gsap.timeline({ defaults: { ease: 'expo.out' } })
       .from('.login-card', { y: 22, autoAlpha: 0, duration: 0.5 }, 0.1)
+      .from('.login-pill', { y: 8, autoAlpha: 0, duration: 0.3 }, 0.22)
       .from('.login-brand', { y: 10, autoAlpha: 0, duration: 0.35 }, 0.28)
       .from('.field', { y: 12, autoAlpha: 0, duration: 0.32, stagger: 0.07 }, 0.38)
       .from('.login-row', { autoAlpha: 0, duration: 0.3 }, 0.56)

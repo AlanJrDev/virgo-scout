@@ -16,7 +16,7 @@ function pickSrc() {
   const d = path.join(DATA, 'advogados-df-max.json');
   if (fs.existsSync(c)) return c;
   if (fs.existsSync(d)) return d;
-  const newest = fs.readdirSync(DATA).filter((f) => f.endsWith('.json') && f !== 'job.json' && !f.startsWith('capture-live'))
+  const newest = fs.readdirSync(DATA).filter((f) => f.endsWith('-max.json') || f.endsWith('-max.v2.json'))
     .map((f) => ({ f, t: fs.statSync(path.join(DATA, f)).mtimeMs })).sort((x, y) => y.t - x.t)[0];
   return newest ? path.join(DATA, newest.f) : null;
 }
@@ -34,7 +34,9 @@ function main() {
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, 'window.VIRGO_DATA = ' + JSON.stringify(payload) + ';\n', 'utf8');
-  console.log(`leads.js gerado de ${payload.source}: total=${payload.stats.total} top=${payload.top[0].name} (${payload.top[0].score}) areas=${payload.areas.length}`);
+  const topName = (payload.top && payload.top[0] && payload.top[0].name) || 'N/A';
+  const topScore = (payload.top && payload.top[0] && payload.top[0].score) || 0;
+  console.log(`leads.js gerado de ${payload.source}: total=${payload.stats.total} top=${topName} (${topScore}) areas=${payload.areas.length}`);
 }
 
 main();

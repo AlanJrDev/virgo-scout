@@ -50,7 +50,7 @@
     if (hasSite(l)) n++;
     if (l.instagram) n++;
     if (l.email) n++;
-    if (l.wa) n++;
+    if (isConfirmedWa(l)) n++;
     return n;
   }
   function capturedTs(l) { var t = Date.parse(l.captured_at); return isFinite(t) ? t : 0; }
@@ -79,6 +79,53 @@
     return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
   }
 
+  /* ---------- verificação de WhatsApp autêntico/confirmado ---------- */
+  function isConfirmedWa(l) {
+    if (!l) return false;
+    if (l.has_confirmed_wa === true) return true;
+    if (l.wa_confidence === 'suspect') return false;
+    if (l.wa_source === 'site' || l.wa_source === 'instagram' || l.wa_confidence === 'official_maps' || l.wa_confidence === 'official_site') return true;
+    if (l.wa && typeof l.wa === 'string') return true;
+    return false;
+  }
+
+  /* ---------- gancho dinâmico e mensagem de abordagem (loss of money hook) ---------- */
+  function segmentOfLead(l) {
+    var area = (l.area || '').toLowerCase();
+    var cat = (l.cat || l.category || '').toLowerCase();
+    var name = (l.name || '').toLowerCase();
+    var txt = area + ' ' + cat + ' ' + name;
+    if (/topograf|agrimens/.test(txt)) return 'topografia';
+    if (/arquit|urbanis/.test(txt)) return 'arquitetura e topografia';
+    if (/tapec|tapet|cortina/.test(txt)) return 'tapeçaria';
+    if (/estofad|sofa|colch/.test(txt)) return 'estofados';
+    return 'advocacia';
+  }
+
+  function waMessageClient(l) {
+    var quem = String(l.name || '').trim() || 'seu escritório';
+    var segmento = segmentOfLead(l);
+    var nota = (typeof l.rating === 'number' && isFinite(l.rating)) ? String(l.rating).replace('.', ',') : '';
+    
+    var intro = nota
+      ? 'Olá! Sou Alan, da Virgo Tech. Vi ' + quem + ' no Google Maps — nota ' + nota + '★, parabéns!'
+      : 'Olá! Sou Alan, da Virgo Tech. Encontrei ' + quem + ' no Google Maps.';
+
+    if (!hasSite(l)) {
+      return intro + ' Notei que vocês ainda não têm site próprio — hoje estão perdendo clientes e contratos todos os dias para outros de ' + segmento + ' no DF. Posso te mandar 2 referências rápidas de sites que trazem resultados?';
+    } else {
+      return intro + ' Analisei a presença de vocês em ' + segmento + ' no DF e notei pontos onde estão deixando dinheiro na mesa para a concorrência. Posso te mandar 2 ideias rápidas para dobrar seus contatos?';
+    }
+  }
+
+  function buildWaLink(l) {
+    var d = l.wa_digits || phoneDigits(l);
+    if (!d) return '';
+    var norm = normPhone(d);
+    var digits = norm.length <= 11 ? '55' + norm : norm;
+    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(waMessageClient(l));
+  }
+
   /* ---------- estado ---------- */
   var state = {
     rows: [], total: 0, updated: '',
@@ -92,6 +139,29 @@
   var firstRender = true;
   var els = {};
 
+  var selectedMap = {}; // key -> lead
+
+  function leadKey(l) {
+    return String(l.id || (l.name + '_' + phoneDigits(l)));
+  }
+
+  function getSelectedCount() {
+    return Object.keys(selectedMap).length;
+  }
+
+  function updateSelectPill() {
+    var count = getSelectedCount();
+    var counterEl = $('shareCounter');
+    var lblSel = $('lblCountSelected');
+    if (counterEl) {
+      counterEl.textContent = String(count);
+      counterEl.hidden = count === 0;
+    }
+    if (lblSel) {
+      lblSel.textContent = String(count);
+    }
+  }
+
   var TIPO_LABEL = { advogados: 'Advogado', arquitetura: 'Arquitetura', tapecaria: 'Tapeçaria', estofado: 'Estofado', topografia: 'Topografia' };
   var TIPO_ORDER = ['advogados', 'arquitetura', 'tapecaria', 'estofado', 'topografia'];
   function tipoLabel(t) {
@@ -101,13 +171,14 @@
   }
 
   var COLS = [
-    { key: 'name', label: 'Empresa', w: 22 },
-    { key: 'rating', label: 'Nota / Reviews', w: 11 },
+    { key: 'select', label: '', w: 3 },
+    { key: 'name', label: 'Empresa', w: 21 },
+    { key: 'rating', label: 'Nota / Reviews', w: 10 },
     { key: 'region', label: 'Cidade / Região', w: 13 },
     { key: 'area', label: 'Área', w: 12 },
     { key: 'tipo', label: 'Tipo', w: 10 },
-    { key: 'phone', label: 'Telefone', w: 16 },
-    { key: 'channels', label: 'Canais', w: 13 },
+    { key: 'phone', label: 'Telefone', w: 15 },
+    { key: 'channels', label: 'Canais', w: 12 },
     { key: 'since', label: 'Desde', w: 7, optional: true },
     { key: 'captured', label: 'Capturado em', w: 10, optional: true }
   ];
@@ -183,8 +254,10 @@
     site: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
     ig: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="12" cy="12" r="3.8"/><circle cx="16.8" cy="7.2" r="1.1" fill="currentColor" stroke="none"/></svg>',
     email: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7.5 8.5 5.5 8.5-5.5"/></svg>',
-    wa: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16.5v2.6a1.9 1.9 0 0 1-2.1 1.9 18.8 18.8 0 0 1-8.2-2.9 18.5 18.5 0 0 1-5.7-5.7A18.8 18.8 0 0 1 2.1 4.1 1.9 1.9 0 0 1 4 2h2.6a1.9 1.9 0 0 1 1.9 1.6c.1.9.3 1.8.7 2.7a1.9 1.9 0 0 1-.4 2L7.7 9.4a15 15 0 0 0 6.9 6.9l1.1-1.1a1.9 1.9 0 0 1 2-.4c.9.4 1.8.6 2.7.7a1.9 1.9 0 0 1 1.6 1.9z"/></svg>'
+    wa: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 1.67c4.55 0 8.24 3.7 8.24 8.24 0 2.2-.86 4.28-2.42 5.84a8.18 8.18 0 0 1-5.83 2.41c-1.46 0-2.88-.38-4.14-1.11l-.3-.17-3.12.82.83-3.04-.2-.31a8.18 8.18 0 0 1-1.26-4.44c0-4.55 3.7-8.25 8.25-8.25zm4.56 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.07-.39-2.03-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.38-.44.13-.14.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08s.89 2.41 1.01 2.58c.13.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.53.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.59.21-1.09.15-1.19-.07-.09-.23-.15-.48-.28z"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
   };
+
   function nameCell(l) {
     var badge = '';
     if (l.status && l.status !== 'novo') {
@@ -193,8 +266,10 @@
     } else if (l.badge) {
       badge = '<span class="badge ' + esc(l.badge) + '">' + esc(l.badge) + '</span>';
     }
-    return '<div class="nm-in"><span class="nm" title="' + esc(l.name) + '">' + esc(l.name) + '</span>' + badge + '</div>';
+    var noSiteTag = !hasSite(l) ? '<span class="tag-nosite" title="Oportunidade Forte: Empresa sem site próprio">Sem site</span>' : '';
+    return '<div class="nm-in"><span class="nm" title="' + esc(l.name) + '">' + esc(l.name) + '</span>' + noSiteTag + badge + '</div>';
   }
+
   function ratingCell(l) {
     var r = fmtRating(l.rating);
     if (!r) return '<span class="cell-none">—</span><span class="sr-only"> sem avaliação</span>';
@@ -203,25 +278,46 @@
       '<span class="rev"> · ' + (rev == null ? '—' : fmtInt(rev)) + '</span>' +
       '<span class="sr-only">' + (rev == null ? ' sem resenhas' : ' com ' + fmtInt(rev) + ' avaliações') + '</span>';
   }
+
+  function waBadge(l) {
+    var src = l.wa_source;
+    var conf = l.wa_confidence;
+    var ev = l.wa_evidence ? ' · Evidência: ' + l.wa_evidence : '';
+    if (conf === 'suspect') {
+      return '<span class="wa-badge wa-suspect" title="Atenção: Número suspeito ou compartilhado' + esc(ev) + '">⚠️ Compartilhado</span>';
+    }
+    if (src === 'maps' || conf === 'official_maps') {
+      return '<span class="wa-badge wa-maps" title="WhatsApp verificado direto do Google Maps' + esc(ev) + '"><i class="wa-dot"></i> Maps Oficial</span>';
+    }
+    if (src === 'site' || conf === 'official_site') {
+      return '<span class="wa-badge wa-site" title="WhatsApp declarado no site oficial' + esc(ev) + '"><i class="wa-dot"></i> Site Oficial</span>';
+    }
+    if (src === 'instagram' || conf === 'instagram') {
+      return '<span class="wa-badge wa-ig" title="WhatsApp extraído da bio do Instagram' + esc(ev) + '"><i class="wa-dot"></i> Instagram</span>';
+    }
+    if (isConfirmedWa(l)) {
+      return '<span class="wa-badge wa-cell" title="Celular direto compatível com WhatsApp' + esc(ev) + '"><i class="wa-dot"></i> Celular</span>';
+    }
+    return '';
+  }
+
   function phoneCell(l) {
     var d = phoneDigits(l);
     if (!d) return '<span class="cell-none">—</span><span class="sr-only"> sem telefone</span>';
-    if (l.wa) {
+    var badge = waBadge(l);
+    if (isConfirmedWa(l)) {
+      var waUrl = l.wa || buildWaLink(l);
       var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
-      return '<a class="cell-wa" href="' + esc(l.wa) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' + esc(fmtPhone(d)) + '</a>';
+      return '<div class="phone-wrap"><a class="cell-wa" href="' + esc(waUrl) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="WhatsApp Confirmado: Iniciar conversa" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' +
+        '<span class="cell-wa-ico" style="display:inline-flex;width:15px;height:15px;margin-right:5px;vertical-align:-2px;color:#25d366;">' + CH_SVG.wa + '</span>' +
+        '<span>' + esc(fmtPhone(d)) + '</span></a>' + badge + '</div>';
     }
-    if (l.phone_link) {
-      var isWa = /^https:\/\/wa\.me\//i.test(l.phone_link);
-      var tip = isWa ? 'Tentar WhatsApp' : 'Ligar';
-      var aria = isWa ? 'Tentar WhatsApp com ' + esc(l.name) : 'Ligar para ' + esc(l.name);
-      var blank = isWa ? ' target="_blank" rel="noopener noreferrer"' : '';
-      return '<a class="cell-link" href="' + esc(l.phone_link) + '" title="' + tip + '" aria-label="' + aria + '"' + blank + '>' + esc(fmtPhone(d)) + '</a>';
-    }
-    if (d.length >= 8) {
-      return '<a class="cell-tel" href="tel:+55' + esc(normPhone(d)) + '" title="Ligar" aria-label="Ligar para ' + esc(l.name) + '">' + esc(fmtPhone(d)) + '</a>';
-    }
-    return '<span class="cell-none">' + esc(fmtPhone(d)) + '</span>';
+    // Telefone comum do Google Maps — NÃO exibe link de WhatsApp nem ícone falso de zap
+    return '<div class="phone-wrap"><a class="cell-tel" href="tel:+55' + esc(normPhone(d)) + '" title="Telefone Google Maps (WhatsApp não confirmado)" aria-label="Ligar para ' + esc(l.name) + '">' +
+      '<span class="cell-phone-ico" style="display:inline-flex;width:14px;height:14px;margin-right:5px;vertical-align:-2px;color:#7d90ac;">' + CH_SVG.phone + '</span>' +
+      '<span>' + esc(fmtPhone(d)) + '</span></a>' + badge + '</div>';
   }
+
   function channelsCell(l) {
     var out = [];
     var url = siteUrl(l);
@@ -239,13 +335,16 @@
     if (l.email) {
       out.push('<a class="ch-ico" data-ch="email" href="mailto:' + esc(l.email) + '" title="' + esc(l.email) + '" aria-label="Enviar e-mail para ' + esc(l.name) + '">' + CH_SVG.email + '</a>');
     }
-    if (l.wa) {
+    // WhatsApp oficial/confirmado SOMENTE:
+    if (isConfirmedWa(l)) {
+      var waUrl = l.wa || buildWaLink(l);
       var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
-      out.push('<a class="ch-ico" data-ch="wa" href="' + esc(l.wa) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' + CH_SVG.wa + '</a>');
+      out.push('<a class="ch-ico is-wa-confirmed" data-ch="wa" href="' + esc(waUrl) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="WhatsApp Confirmado: Conversar no WhatsApp" aria-label="Abrir WhatsApp confirmado de ' + esc(l.name) + '">' + CH_SVG.wa + '</a>');
     }
     if (!out.length) return '<span class="cell-none">—</span><span class="sr-only"> sem canal</span>';
     return out.join('');
   }
+
   function sinceCell(l) {
     if (!l.since_year) return '<span class="cell-none">—</span><span class="sr-only"> sem ano</span>';
     return '<span title="Atuando desde ' + esc(l.since_year) + '">' + esc(String(l.since_year)) + '</span>';
@@ -255,7 +354,15 @@
     if (!ts) return '<span class="cell-none">—</span><span class="sr-only"> sem data</span>';
     return '<time datetime="' + esc(String(l.captured_at)) + '">' + fmtDate(ts) + '</time>';
   }
+
+  function selectCell(l) {
+    var k = leadKey(l);
+    var isSel = !!selectedMap[k];
+    return '<input type="checkbox" class="c-row-check" data-lead-key="' + esc(k) + '"' + (isSel ? ' checked' : '') + ' aria-label="Selecionar lead ' + esc(l.name) + '">';
+  }
+
   var CELLS = {
+    select: selectCell,
     name: nameCell, rating: ratingCell, region: function (l) {
       var r = regionOf(l);
       return r ? '<span title="' + esc(r) + '">' + esc(r) + '</span>' : '<span class="cell-none">—</span>';
@@ -277,6 +384,10 @@
     var cols = activeCols();
     var html = '<tr>';
     cols.forEach(function (c) {
+      if (c.key === 'select') {
+        html += '<th scope="col" class="c-select"><input type="checkbox" id="selectAllRows" title="Selecionar todos os leads visíveis" aria-label="Selecionar todas as linhas"></th>';
+        return;
+      }
       var sort = state.sortKey === c.key ? (state.sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
       html += '<th scope="col" class="c-' + c.key + '" aria-sort="' + sort + '">' +
         '<button type="button" class="th-sort" data-key="' + c.key + '">' + esc(c.label) +
@@ -285,6 +396,21 @@
     });
     els.head.innerHTML = html + '</tr>';
     els.cols.innerHTML = cols.map(function (c) { return '<col style="width:' + c.w + '%">'; }).join('');
+
+    var selAll = $('selectAllRows');
+    if (selAll) {
+      selAll.addEventListener('change', function () {
+        var visibleSlice = currentSlice();
+        var chk = selAll.checked;
+        visibleSlice.forEach(function (l) {
+          var k = leadKey(l);
+          if (chk) selectedMap[k] = l;
+          else delete selectedMap[k];
+        });
+        updateSelectPill();
+        renderRows(true);
+      });
+    }
   }
 
   function renderSummary() {
@@ -315,7 +441,13 @@
     els.empty.hidden = false;
   }
 
-  function renderRows() {
+  function currentSlice() {
+    var list = sortList(filtered());
+    var start = (state.page - 1) * state.pageSize;
+    return list.slice(start, start + state.pageSize);
+  }
+
+  function renderRows(skipGsap) {
     var list = sortList(filtered());
     var pages = Math.max(1, Math.ceil(list.length / state.pageSize));
     if (state.page > pages) state.page = pages;
@@ -340,8 +472,16 @@
         });
         return html + '</tr>';
       }).join('');
+
+      /* sync select all checkbox */
+      var selAll = $('selectAllRows');
+      if (selAll) {
+        var allChecked = slice.length > 0 && slice.every(function (l) { return !!selectedMap[leadKey(l)]; });
+        selAll.checked = allChecked;
+      }
+
       /* stagger só em re-render por interação (filtro/página/sort) — nunca no boot */
-      if (hasGsap && !firstRender) {
+      if (hasGsap && !firstRender && !skipGsap) {
         window.gsap.fromTo(els.body.children, { y: 12, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.18, stagger: 0.012, ease: 'expo.out', overwrite: true });
       }
     }
@@ -357,6 +497,170 @@
     els.prev.disabled = state.page <= 1;
     els.next.disabled = state.page >= pages;
     els.clear.hidden = !hasFilters();
+
+    updateSelectPill();
+  }
+
+  /* ---------- exportar para sócio via WhatsApp ---------- */
+  function generateShareText(leads, targetName) {
+    var lines = [];
+    var now = new Date();
+    var dateStr = pad2(now.getDate()) + '/' + pad2(now.getMonth() + 1) + '/' + now.getFullYear();
+    var currentCat = $('capCat') ? $('capCat').value : '';
+    var catLabel = tipoLabel(currentCat) || 'Prospecção DF';
+    
+    lines.push('*VIRGO TECH — LISTA DE LEADS PARA CONTACTAÇÃO*');
+    lines.push('📅 Data: ' + dateStr);
+    lines.push('🎯 Nicho: ' + catLabel);
+    lines.push('👥 Total: ' + leads.length + ' leads (' + targetName + ')');
+    lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    lines.push('');
+
+    leads.forEach(function (l, i) {
+      var num = i + 1;
+      var r = fmtRating(l.rating);
+      var rev = (typeof l.reviews === 'number' && isFinite(l.reviews)) ? l.reviews : 0;
+      var ratingStr = r ? r + '★ (' + rev + ' avaliações)' : 'Sem avaliação';
+      var reg = regionOf(l) || 'Brasília/DF';
+      var d = phoneDigits(l);
+      var foneStr = d ? fmtPhone(d) : 'Não informado';
+      var waUrl = buildWaLink(l);
+      var msg = waMessageClient(l);
+
+      lines.push('*[' + num + '] ' + (l.name || 'Empresa') + '*');
+      lines.push('⭐ Avaliação: ' + ratingStr);
+      lines.push('📍 Região: ' + reg);
+      lines.push('🌐 Site: ' + (hasSite(l) ? siteUrl(l) || 'Tem site' : '❌ SEM SITE (Oportunidade Forte)'));
+      lines.push('📱 WhatsApp: ' + foneStr + (isConfirmedWa(l) ? ' ✅ Confirmado' : ' ⚠️ Maps'));
+      if (waUrl) {
+        lines.push('🔗 Abrir Zap: ' + waUrl);
+      }
+      lines.push('💬 *Mensagem sugerida (Gancho Perda de Clientes)*:');
+      lines.push('"' + msg + '"');
+      lines.push('─────────────────────────────────');
+      lines.push('');
+    });
+
+    lines.push('🚀 *Recomendação*: Começar pelos leads com nota acima de 4,5 e sem site.');
+    lines.push('Virgo Tech Scout — Automação de Prospecção');
+    return lines.join('\n');
+  }
+
+  function updateSharePreview() {
+    var modal = $('shareModalBackdrop');
+    if (!modal || modal.hidden) return;
+
+    var optSelected = $('optSelected');
+    var optAlta = $('optAlta');
+    var optIdeal = $('optIdeal');
+    var shareOnlyWa = $('shareOnlyWa');
+    var preview = $('sharePreviewText');
+    var totalLbl = $('shareTotalItems');
+    var btnOpen = $('btnOpenWaDirect');
+
+    var targetName = 'Selecionados';
+    var candidateLeads = [];
+
+    if (optSelected && optSelected.checked) {
+      targetName = 'Selecionados manualmente';
+      candidateLeads = Object.keys(selectedMap).map(function (k) { return selectedMap[k]; });
+    } else if (optAlta && optAlta.checked) {
+      targetName = 'Alta Oportunidade';
+      candidateLeads = state.rows.filter(function (l) { return l.badge === 'Alta'; });
+    } else if (optIdeal && optIdeal.checked) {
+      targetName = 'Oportunidades Ideais (ICP)';
+      candidateLeads = state.rows.filter(function (l) { return (l.icp || []).length > 0; });
+    } else {
+      targetName = 'Todos da categoria';
+      candidateLeads = state.rows.slice();
+    }
+
+    if (shareOnlyWa && shareOnlyWa.checked) {
+      candidateLeads = candidateLeads.filter(function (l) { return isConfirmedWa(l); });
+    }
+
+    if (totalLbl) totalLbl.textContent = String(candidateLeads.length);
+
+    var text = candidateLeads.length
+      ? generateShareText(candidateLeads, targetName)
+      : 'Nenhum lead encontrado com os critérios escolhidos.';
+    
+    if (preview) preview.value = text;
+    if (btnOpen) {
+      btnOpen.href = 'https://wa.me/?text=' + encodeURIComponent(text);
+    }
+  }
+
+  function initShareModal() {
+    var shareBtn = $('tblShareBtn');
+    var modal = $('shareModalBackdrop');
+    var closeBtn = $('shareModalClose');
+    var cancelBtn = $('btnShareCancel');
+    var copyBtn = $('btnCopyWaText');
+    var copyLabel = $('btnCopyWaLabel');
+
+    if (!shareBtn || !modal) return;
+
+    shareBtn.addEventListener('click', function () {
+      var selCount = getSelectedCount();
+      var optSelected = $('optSelected');
+      var optAlta = $('optAlta');
+      var optAll = $('optAll');
+      var lblAll = $('lblCountAll');
+
+      if (lblAll) lblAll.textContent = String(state.rows.length);
+      updateSelectPill();
+
+      if (selCount > 0 && optSelected) {
+        optSelected.checked = true;
+      } else if (optAlta) {
+        optAlta.checked = true;
+      } else if (optAll) {
+        optAll.checked = true;
+      }
+
+      modal.hidden = false;
+      updateSharePreview();
+    });
+
+    var closeModal = function () {
+      modal.hidden = true;
+    };
+
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeModal();
+    });
+
+    ['optSelected', 'optAlta', 'optIdeal', 'optAll', 'shareOnlyWa'].forEach(function (id) {
+      var el = $(id);
+      if (el) el.addEventListener('change', updateSharePreview);
+    });
+
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var preview = $('sharePreviewText');
+        if (!preview) return;
+        var text = preview.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            if (copyLabel) copyLabel.textContent = '✓ Copiado!';
+            setTimeout(function () { if (copyLabel) copyLabel.textContent = 'Copiar Texto'; }, 2200);
+          }).catch(function () {
+            preview.select();
+            document.execCommand('copy');
+            if (copyLabel) copyLabel.textContent = '✓ Copiado!';
+            setTimeout(function () { if (copyLabel) copyLabel.textContent = 'Copiar Texto'; }, 2200);
+          });
+        } else {
+          preview.select();
+          document.execCommand('copy');
+          if (copyLabel) copyLabel.textContent = '✓ Copiado!';
+          setTimeout(function () { if (copyLabel) copyLabel.textContent = 'Copiar Texto'; }, 2200);
+        }
+      });
+    }
   }
 
   /* ---------- filtros ---------- */
@@ -415,6 +719,7 @@
   }
 
   function toggleSort(key) {
+    if (key === 'select') return;
     if (state.sortKey === key) {
       state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
     } else {
@@ -455,10 +760,30 @@
       var b = e.target && e.target.closest ? e.target.closest('.th-sort') : null;
       if (b) toggleSort(b.getAttribute('data-key'));
     });
+    els.body.addEventListener('change', function (e) {
+      var chk = e.target && e.target.closest ? e.target.closest('.c-row-check') : null;
+      if (chk) {
+        var key = chk.getAttribute('data-lead-key');
+        if (chk.checked) {
+          var found = state.rows.find(function (l) { return leadKey(l) === key; });
+          if (found) selectedMap[key] = found;
+        } else {
+          delete selectedMap[key];
+        }
+        updateSelectPill();
+        var selAll = $('selectAllRows');
+        if (selAll) {
+          var slice = currentSlice();
+          selAll.checked = slice.length > 0 && slice.every(function (l) { return !!selectedMap[leadKey(l)]; });
+        }
+      }
+    });
     document.addEventListener('click', function (e) {
       if (!e.target || !e.target.closest) return;
       if (e.target.closest('#tblClear') || e.target.closest('#tblEmptyClear')) clearFilters();
     });
+
+    initShareModal();
   }
 
   /* ---------- API pública ---------- */

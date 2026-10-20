@@ -196,6 +196,11 @@
               <option value="">Todos os status</option><option value="novo">Novos</option><option value="contatado">Contatados</option>
             </select>
             <button type="button" class="tbl-clear" id="tblClear" hidden>Limpar filtros</button>
+            <button type="button" class="tbl-btn-share" id="tblShareBtn" title="Exportar leads em formato de texto para enviar no WhatsApp">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+              <span>Enviar p/ Sócio</span>
+              <span class="share-counter" id="shareCounter" hidden>0</span>
+            </button>
           </div>
 
           <div class="tbl-scroll" id="tblScroll">
@@ -287,6 +292,61 @@
       <div class="cap-modal-foot">
         <button type="button" class="modal-ghost" id="capModalClose">Cancelar</button>
         <button type="button" class="capture-cta cap-cta-capture" id="capInterpret">Interpretar e capturar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============ MODAL EXPORTAR PARA SÓCIO (WHATSAPP) ============ -->
+  <div class="share-modal-back" id="shareModalBackdrop" hidden>
+    <div class="share-modal" role="dialog" aria-labelledby="shareModalTitle">
+      <div class="share-modal-head">
+        <div class="share-head-title">
+          <span class="share-head-ico">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"/><path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1"/></svg>
+          </span>
+          <div>
+            <h3 id="shareModalTitle">Exportar Leads p/ WhatsApp do Sócio</h3>
+            <p>Gera mensagem formatada para envio direto no WhatsApp</p>
+          </div>
+        </div>
+        <button class="share-close" id="shareModalClose" aria-label="Fechar modal">✕</button>
+      </div>
+      
+      <div class="share-modal-body">
+        <div class="share-filter-group">
+          <span class="share-label">Escolha quais leads deseja incluir:</span>
+          <div class="share-radios">
+            <label class="share-radio"><input type="radio" name="shareTarget" value="selected" id="optSelected" checked> <span>Selecionados manualmente (<b id="lblCountSelected">0</b>)</span></label>
+            <label class="share-radio"><input type="radio" name="shareTarget" value="alta" id="optAlta"> <span>Alta Oportunidade (Nota alta + sem site)</span></label>
+            <label class="share-radio"><input type="radio" name="shareTarget" value="ideal" id="optIdeal"> <span>Oportunidades Ideais (ICP Ouro)</span></label>
+            <label class="share-radio"><input type="radio" name="shareTarget" value="all" id="optAll"> <span>Todos da categoria atual (<b id="lblCountAll">0</b>)</span></label>
+          </div>
+        </div>
+
+        <div class="share-opt-row">
+          <label class="share-check"><input type="checkbox" id="shareOnlyWa" checked> <span>Apenas leads com WhatsApp confirmado</span></label>
+        </div>
+
+        <div class="share-preview-wrap">
+          <div class="share-preview-head">
+            <span>Pré-visualização do texto (<b id="shareTotalItems">0</b> leads incluídos)</span>
+            <span class="preview-tag">Texto pronto p/ WhatsApp</span>
+          </div>
+          <textarea id="sharePreviewText" readonly rows="9" spellcheck="false"></textarea>
+        </div>
+      </div>
+
+      <div class="share-modal-foot">
+        <button type="button" class="btn-cancel" id="btnShareCancel">Fechar</button>
+        <button type="button" class="btn-copy-wa" id="btnCopyWaText">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span id="btnCopyWaLabel">Copiar Texto</span>
+        </button>
+        <a class="btn-send-wa" id="btnOpenWaDirect" href="#" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"/><path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1"/></svg>
+          <span>Enviar no WhatsApp</span>
+        </a>
       </div>
     </div>
   </div>
