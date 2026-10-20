@@ -94,6 +94,7 @@ function toRow(l) {
     instagram: l.instagram || null,
     facebook: l.facebook || null,
     whatsapp: String(l.whatsapp || '').replace(/\D/g, '') || null,
+    wa_source: null, // preenchido abaixo quando há whatsapp (coluna SEMPRE presente p/ batch uniforme)
   };
   if (row.whatsapp) row.wa_source = 'maps'; // origem do zap: página do place no Maps
   return row;
@@ -189,10 +190,22 @@ async function patchLead(id, set) {
   }
 }
 
+/* União de keys de todas as rows: preenche faltantes com null. PostgREST exige
+   que TODAS as rows de um POST em lote tenham o MESMO conjunto de chaves. */
+function uniformKeys(rows) {
+  const keys = new Set();
+  for (const r of rows) for (const k of Object.keys(r)) keys.add(k);
+  return rows.map((r) => {
+    const out = {};
+    for (const k of keys) out[k] = k in r ? r[k] : null;
+    return out;
+  });
+}
+
 async function upsertRows(rows) {
   let waWarned = false;
   for (let i = 0; i < rows.length; i += CHUNK) {
-    const batch = rows.slice(i, i + CHUNK);
+    const batch = uniformKeys(rows.slice(i, i + CHUNK));
     try {
       await sbFetch('leads?on_conflict=id', {
         method: 'POST',
@@ -201,8 +214,9 @@ async function upsertRows(rows) {
       });
     } catch (e) {
       if (!/wa_/.test(String(e.message || ''))) throw e;
-      const slim = batch.map((row) => Object.fromEntries(Object.entries(row).filter(([k]) => !k.startsWith('wa_'))));
-      if (slim.every((r, idx) => Object.keys(r).length === Object.keys(batch[idx]).length)) throw e;
+      const slim0 = batch.map((row) => Object.fromEntries(Object.entries(row).filter(([k]) => !k.startsWith('wa_'))));
+      if (slim0.every((r, idx) => Object.keys(r).length === Object.keys(batch[idx]).length)) throw e;
+      const slim = uniformKeys(slim0);
       if (!waWarned) {
         console.warn('[sync] colunas wa_* ausentes — aplique supabase/migrations/0010 no SQL Editor (salvando sem elas)');
         waWarned = true;

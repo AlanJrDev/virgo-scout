@@ -365,13 +365,14 @@ test('run partial pré-migration: legado estreia status como done (check constra
   assert.strictEqual(capCalls[1][0].status, 'done');  // legado remapeia partial → done
 });
 
-test('toRow marca wa_source maps só quando tem whatsapp', () => {
+test('toRow sempre inclui wa_source (null sem whatsapp, maps com)', () => {
   const { toRow } = require('../../scripts/sync-supabase');
   const comWa = toRow({ name: 'A', whatsapp: '61999990000', address: 'B' });
   assert.strictEqual(comWa.wa_source, 'maps');
   assert.strictEqual(comWa.whatsapp, '61999990000');
   const semWa = toRow({ name: 'B', address: 'B' });
-  assert.strictEqual('wa_source' in semWa, false);
+  assert.strictEqual('wa_source' in semWa, true);
+  assert.strictEqual(semWa.wa_source, null);
 });
 
 test('patchLead degrada: 400 de coluna wa_ ausente => repete sem as colunas wa_*', async () => {
@@ -414,4 +415,26 @@ test('400 de captures com corpo SEM keyword de schema ainda cai no legado (400 r
   assert.strictEqual(capCalls[1][0].status, 'done');
   assert.strictEqual(capCalls[1][0].leads_count, r.synced);
   assert.ok(!('qs' in capCalls[1][0]));                // legado não tem colunas V2
+});
+
+test('upsertRows envia batch uniforme mesmo com rows divergentes', async () => {
+  const { upsertRows } = require('../../scripts/sync-supabase');
+  const calls = [];
+  global.fetch = async (url, opts) => { calls.push({ url, opts }); return { ok: true, status: 201, text: async () => '' }; };
+  await upsertRows([
+    { id: 'a', name: 'Com wa', whatsapp: '61999990000', wa_source: 'maps' },
+    { id: 'b', name: 'Sem wa', whatsapp: null },
+    { id: 'c', name: 'Extra', wa_source: 'maps', extra_prop: 1 },
+  ]);
+  const leadCall = calls.find((c) => String(c.url).includes('/rest/v1/leads') && c.opts.method === 'POST');
+  const body = JSON.parse(leadCall.opts.body);
+  const keysets = body.map((r) => Object.keys(r).sort().join(','));
+  assert.ok(keysets.every((k) => k === keysets[0]), `chaves divergentes no batch: ${[...new Set(keysets)].join(' | ')}`);
+  const rowA = body.find((r) => r.id === 'a');
+  assert.strictEqual(rowA.wa_source, 'maps');          // não perdeu wa_source
+  const rowB = body.find((r) => r.id === 'b');
+  assert.strictEqual(rowB.wa_source, null);            // preenchido com null pela união
+  const rowC = body.find((r) => r.id === 'c');
+  assert.strictEqual(rowC.extra_prop, 1);
+  assert.strictEqual(rowB.extra_prop, null);           // união propaga campo extra para as demais
 });
