@@ -502,6 +502,10 @@
       '📱 WhatsApp: ' + foneStr;
   }
 
+  /* ---------- compartilhar: estado do último preview ---------- */
+  var lastShareLeads = [];
+  var lastShareTarget = 'Selecionados';
+
   function generateShareText(leads, targetName, socio) {
     var lines = [];
     var now = new Date();
@@ -543,11 +547,6 @@
     return (el && el.value) ? el.value : 'Alan';
   }
 
-  function shareNichoValue() {
-    var el = document.querySelector('input[name="shareNicho"]:checked');
-    return (el && el.value) ? el.value : 'all';
-  }
-
   /* ---------- cópia + toast locais (app.js não expõe toast global) ---------- */
   function copyText(text, cb) {
     function fallback() {
@@ -583,17 +582,12 @@
     t.addEventListener('click', close);
   }
 
-  function updateSharePreview() {
-    var modal = $('shareModalBackdrop');
-    if (!modal || modal.hidden) return;
-
+  /* pool de candidatos do modal (alvo + filtro de WhatsApp confirmado) — SEM filtro de nicho,
+     usado tanto pelo preview quanto para o contador "Todos" do select de nicho */
+  function shareCandidatePool() {
     var optSelected = $('optSelected');
     var optAlta = $('optAlta');
     var optIdeal = $('optIdeal');
-    var shareOnlyWa = $('shareOnlyWa');
-    var preview = $('sharePreviewText');
-    var totalLbl = $('shareTotalItems');
-
     var targetName = 'Selecionados';
     var candidateLeads = (optSelected && optSelected.checked)
       ? Object.values(selectedMap)
@@ -611,15 +605,35 @@
       targetName = 'Todos da categoria';
     }
 
-    var nicho = shareNichoValue();
-    if (nicho !== 'all') {
-      candidateLeads = candidateLeads.filter(function (l) { return typesOf(l).includes(nicho); });
-    }
-
+    var shareOnlyWa = $('shareOnlyWa');
     if (shareOnlyWa && shareOnlyWa.checked) {
       candidateLeads = candidateLeads.filter(function (l) { return isConfirmedWa(l); });
     }
 
+    return { leads: candidateLeads, targetName: targetName };
+  }
+
+  function updateSharePreview() {
+    var modal = $('shareModalBackdrop');
+    if (!modal || modal.hidden) return;
+
+    var pool = shareCandidatePool();
+    var candidateLeads = pool.leads;
+    var targetName = pool.targetName;
+
+    var nichoSel = $('shareNichoSel');
+    var nicho = (nichoSel && nichoSel.value) ? nichoSel.value : 'all';
+    if (nichoSel) rebuildShareNichoSel(false);
+    nicho = (nichoSel && nichoSel.value) ? nichoSel.value : 'all';
+    if (nicho !== 'all') {
+      candidateLeads = candidateLeads.filter(function (l) { return typesOf(l).indexOf(nicho) !== -1; });
+    }
+
+    lastShareLeads = candidateLeads;
+    lastShareTarget = targetName;
+
+    var preview = $('sharePreviewText');
+    var totalLbl = $('shareTotalItems');
     if (totalLbl) totalLbl.textContent = String(candidateLeads.length);
 
     var text = candidateLeads.length
@@ -629,9 +643,9 @@
     if (preview) preview.value = text;
   }
 
-  function buildShareNichoChips(reset) {
-    var container = $('shareNichoChips');
-    if (!container) return;
+  function rebuildShareNichoSel(reset) {
+    var sel = $('shareNichoSel');
+    if (!sel) return;
 
     var nichos = {};
     state.rows.forEach(function (l) {
@@ -648,16 +662,16 @@
         return nichos[b.value] - nichos[a.value] || (a.value < b.value ? -1 : 1);
       });
 
-    var current = reset ? 'all' : shareNichoValue();
+    var current = reset ? 'all' : ((sel && sel.value) ? sel.value : 'all');
     if (current !== 'all' && !items.some(function (it) { return it.value === current; })) current = 'all';
 
-    var html = '<label class="share-radio"><input type="radio" name="shareNicho" value="all"' +
-      (current === 'all' ? ' checked' : '') + '> <span>Todos</span></label>';
+    var pool = shareCandidatePool(); // base pré-nicho para o contador do "Todos"
+    var html = '<option value="all">' + esc('Todos — ' + pool.leads.length + ' leads') + '</option>';
     items.forEach(function (it) {
-      html += '<label class="share-radio"><input type="radio" name="shareNicho" value="' + esc(it.value) + '"' +
-        (it.value === current ? ' checked' : '') + '> <span>' + esc(it.label) + '</span></label>';
+      html += '<option value="' + esc(it.value) + '">' + esc(it.label) + '</option>';
     });
-    container.innerHTML = html;
+    sel.innerHTML = html;
+    sel.value = current;
   }
 
   function initShareModal() {
@@ -667,7 +681,7 @@
     var cancelBtn = $('btnShareCancel');
     var copyBtn = $('btnCopyWaText');
     var copyLabel = $('btnCopyWaLabel');
-    var btnOpen = $('btnOpenWaDirect');
+    var btnDownload = $('btnDownloadDoc');
 
     if (!shareBtn || !modal) return;
 
@@ -688,7 +702,6 @@
         if (r.value === savedSocio) { r.checked = true; socioAchou = true; }
       });
       if (!socioAchou && socioRadios.length) socioRadios[0].checked = true;
-      buildShareNichoChips(true);
 
       if (selCount > 0 && optSelected) {
         optSelected.checked = true;
@@ -697,6 +710,7 @@
       } else if (optAll) {
         optAll.checked = true;
       }
+      rebuildShareNichoSel(true);
 
       modal.hidden = false;
       updateSharePreview();
@@ -723,21 +737,34 @@
         updateSharePreview();
       });
     });
-    var nichoBox = $('shareNichoChips');
-    if (nichoBox) nichoBox.addEventListener('change', updateSharePreview);
+    var nichoSel = $('shareNichoSel');
+    if (nichoSel) nichoSel.addEventListener('change', updateSharePreview);
 
-    if (btnOpen) {
-      btnOpen.addEventListener('click', function (e) {
+    if (btnDownload) {
+      btnDownload.addEventListener('click', function (e) {
         e.preventDefault();
-        var pv = $('sharePreviewText');
-        var full = pv ? pv.value : '';
-        if (navigator.share) {
-          navigator.share({ text: full }).catch(function (err) {
-            if (err && err.name === 'AbortError') return;
-            desktopFallback(full);
+        if (Array.isArray(lastShareLeads) && lastShareLeads.length) {
+          var socio = shareSocioValue();
+          var currentCat = $('capCat') ? $('capCat').value : '';
+          var catLabel = tipoLabel(currentCat) || 'Prospecção DF';
+          var nSel = $('shareNichoSel');
+          var nichoEscolhido = (nSel && nSel.value && nSel.value !== 'all') ? nSel.value : '';
+          var docLabel = nichoEscolhido ? (tipoLabel(nichoEscolhido) || nichoEscolhido) : catLabel;
+          var payload = lastShareLeads.map(function (l) {
+            return { name: l.name, msg: waMessageClient(l, socio), bloco: blocoDeDados(l), waUrl: buildWaLink(l, socio) };
           });
+          var html = window.SHARE_DOC.buildDocHtml(payload, lastShareTarget, socio, docLabel);
+          var blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = window.SHARE_DOC.buildDocFileName(nichoEscolhido || undefined);
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+          showToast('✓ Arquivo .doc baixado', 'ok');
         } else {
-          desktopFallback(full);
+          showToast('Nenhum lead para exportar', 'warn');
         }
       });
     }
@@ -752,13 +779,6 @@
         });
       });
     }
-  }
-
-  function desktopFallback(full) {
-    copyText(full, function () {
-      showToast('✓ Lista copiada — cole no chat do lead', 'ok');
-      window.open('https://web.whatsapp.com', '_blank', 'noopener');
-    });
   }
 
   function waFullMsg(l) {

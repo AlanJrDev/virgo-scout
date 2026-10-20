@@ -326,7 +326,7 @@
 
         <div class="share-filter-group">
           <span class="share-label">Nicho dos leads:</span>
-          <span class="share-chip-row" id="shareNichoChips"></span>
+          <select id="shareNichoSel" class="share-nicho-select tbl-select" aria-label="Nicho dos leads"></select>
         </div>
 
         <div class="share-filter-group">
@@ -358,10 +358,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           <span id="btnCopyWaLabel">Copiar Texto</span>
         </button>
-        <a class="btn-send-wa" id="btnOpenWaDirect" href="#">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"/><path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1"/></svg>
-          <span>Enviar no WhatsApp</span>
-        </a>
+        <button type="button" class="btn-download-doc" id="btnDownloadDoc" title="Baixa lista de leads como documento .doc (Word)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Baixar .doc</span>
+        </button>
       </div>
     </div>
   </div>
@@ -373,6 +373,7 @@
 <script src="vendor/chart.umd.js"></script>
 <script src="vendor/d3.min.js"></script>
 <script src="wa-quote.js"></script>
+<script src="share-doc.js"></script>
 <script src="table.js"></script>
 <script src="capture-state.js"></script>
 <script src="app.js"></script>
