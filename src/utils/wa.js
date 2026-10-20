@@ -27,7 +27,7 @@ function waDigits(phone) {
 function waLink(phone, message) {
   const d = waDigits(phone);
   if (!d) return null;
-  const text = message ? '?text=' + encodeURIComponent(message) : '';
+  const text = '?text=' + encodeURIComponent(message || waMessage());
   return `https://wa.me/${d}${text}`;
 }
 
@@ -37,33 +37,10 @@ function hasWa(lead) {
   return !!waLink(lead && lead.whatsapp);
 }
 
-function segmentOf(lead) {
-  const l = typeof lead === 'string' ? { name: lead } : lead || {};
-  if (['Arquitetura', 'Urbanismo', 'Topografia', 'Outros'].includes(l.area)) return 'arquitetura e topografia';
-  const txt = `${l.area || ''} ${l.category || ''} ${l.source || ''}`.toLowerCase();
-  if (/topograf|agrimens/.test(txt)) return 'topografia';
-  if (/arquit/.test(txt)) return 'arquitetura e topografia';
-  if (/tapec|tapet|cortina/.test(txt)) return 'tapeçaria';
-  if (/estofad|sofa|colch/.test(txt)) return 'estofados';
-  return 'advocacia';
+// Mensagem de primeira abordagem — gancho de perda de clientes + ideia da Virgo Tech
+function waMessage(lead, socio) {
+  const nome = String(socio || '').trim() || 'Alan';
+  return '💸 Sua empresa pode estar perdendo clientes e dinheiro todos os dias para a concorrência!\n\nOlá, tudo bem? Sou ' + nome + ', da Virgo Tech, e tenho uma ideia para ajudar vocês a atrair mais clientes. Posso te mostrar?';
 }
 
-// Mensagem de primeira abordagem — personalizada, curta e focada no gancho de perda de clientes/dinheiro
-function waMessage(lead) {
-  const l = typeof lead === 'string' ? { name: lead } : lead || {};
-  const quem = String(l.name || '').trim() || 'seu escritório';
-  const segmento = segmentOf(l);
-  const nota = typeof l.rating === 'number' && isFinite(l.rating) ? String(l.rating).replace('.', ',') : '';
-  
-  const intro = nota
-    ? `Olá! Sou Alan, da Virgo Tech. Vi ${quem} no Google Maps — nota ${nota}★, parabéns!`
-    : `Olá! Sou Alan, da Virgo Tech. Encontrei ${quem} no Google Maps.`;
-
-  if (!l.website) {
-    return `${intro} Notei que vocês ainda não têm site próprio — hoje estão perdendo clientes e contratos todos os dias para outros de ${segmento} no DF. Posso te mandar 2 referências rápidas de sites que trazem resultados?`;
-  } else {
-    return `${intro} Analisei a presença de vocês em ${segmento} no DF e notei pontos onde estão deixando dinheiro na mesa para a concorrência. Posso te mandar 2 ideias rápidas para dobrar seus contatos?`;
-  }
-}
-
-module.exports = { waDigits, waLink, waMessage, hasWa, segmentOf };
+module.exports = { waDigits, waLink, waMessage, hasWa };

@@ -90,40 +90,17 @@
   }
 
   /* ---------- gancho dinâmico e mensagem de abordagem (loss of money hook) ---------- */
-  function segmentOfLead(l) {
-    var area = (l.area || '').toLowerCase();
-    var cat = (l.cat || l.category || '').toLowerCase();
-    var name = (l.name || '').toLowerCase();
-    var txt = area + ' ' + cat + ' ' + name;
-    if (/topograf|agrimens/.test(txt)) return 'topografia';
-    if (/arquit|urbanis/.test(txt)) return 'arquitetura e topografia';
-    if (/tapec|tapet|cortina/.test(txt)) return 'tapeçaria';
-    if (/estofad|sofa|colch/.test(txt)) return 'estofados';
-    return 'advocacia';
+  function waMessageClient(l, socio) {
+    var nome = String(socio || '').trim() || 'Alan';
+    return '💸 Sua empresa pode estar perdendo clientes e dinheiro todos os dias para a concorrência!\n\nOlá, tudo bem? Sou ' + nome + ', da Virgo Tech, e tenho uma ideia para ajudar vocês a atrair mais clientes. Posso te mostrar?';
   }
 
-  function waMessageClient(l) {
-    var quem = String(l.name || '').trim() || 'seu escritório';
-    var segmento = segmentOfLead(l);
-    var nota = (typeof l.rating === 'number' && isFinite(l.rating)) ? String(l.rating).replace('.', ',') : '';
-    
-    var intro = nota
-      ? 'Olá! Sou Alan, da Virgo Tech. Vi ' + quem + ' no Google Maps — nota ' + nota + '★, parabéns!'
-      : 'Olá! Sou Alan, da Virgo Tech. Encontrei ' + quem + ' no Google Maps.';
-
-    if (!hasSite(l)) {
-      return intro + ' Notei que vocês ainda não têm site próprio — hoje estão perdendo clientes e contratos todos os dias para outros de ' + segmento + ' no DF. Posso te mandar 2 referências rápidas de sites que trazem resultados?';
-    } else {
-      return intro + ' Analisei a presença de vocês em ' + segmento + ' no DF e notei pontos onde estão deixando dinheiro na mesa para a concorrência. Posso te mandar 2 ideias rápidas para dobrar seus contatos?';
-    }
-  }
-
-  function buildWaLink(l) {
+  function buildWaLink(l, socio) {
     var d = l.wa_digits || phoneDigits(l);
     if (!d) return '';
     var norm = normPhone(d);
     var digits = norm.length <= 11 ? '55' + norm : norm;
-    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(waMessageClient(l));
+    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(waMessageClient(l, socio));
   }
 
   /* ---------- estado ---------- */
@@ -306,7 +283,7 @@
     if (!d) return '<span class="cell-none">—</span><span class="sr-only"> sem telefone</span>';
     var badge = waBadge(l);
     if (isConfirmedWa(l)) {
-      var waUrl = l.wa || buildWaLink(l);
+      var waUrl = buildWaLink(l);
       var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
       return '<div class="phone-wrap"><a class="cell-wa" href="' + esc(waUrl) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="WhatsApp Confirmado: Iniciar conversa" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' +
         '<span class="cell-wa-ico" style="display:inline-flex;width:15px;height:15px;margin-right:5px;vertical-align:-2px;color:#25d366;">' + CH_SVG.wa + '</span>' +
@@ -337,7 +314,7 @@
     }
     // WhatsApp oficial/confirmado SOMENTE:
     if (isConfirmedWa(l)) {
-      var waUrl = l.wa || buildWaLink(l);
+      var waUrl = buildWaLink(l);
       var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
       out.push('<a class="ch-ico is-wa-confirmed" data-ch="wa" href="' + esc(waUrl) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="WhatsApp Confirmado: Conversar no WhatsApp" aria-label="Abrir WhatsApp confirmado de ' + esc(l.name) + '">' + CH_SVG.wa + '</a>');
     }
@@ -502,13 +479,14 @@
   }
 
   /* ---------- exportar para sócio via WhatsApp ---------- */
-  function generateShareText(leads, targetName) {
+  function generateShareText(leads, targetName, socio) {
     var lines = [];
     var now = new Date();
     var dateStr = pad2(now.getDate()) + '/' + pad2(now.getMonth() + 1) + '/' + now.getFullYear();
     var currentCat = $('capCat') ? $('capCat').value : '';
     var catLabel = tipoLabel(currentCat) || 'Prospecção DF';
-    
+    var divider = '━━━━━━━━━━━━━━━━';
+
     lines.push('*VIRGO TECH — LISTA DE LEADS PARA CONTACTAÇÃO*');
     lines.push('📅 Data: ' + dateStr);
     lines.push('🎯 Nicho: ' + catLabel);
@@ -521,29 +499,42 @@
       var r = fmtRating(l.rating);
       var rev = (typeof l.reviews === 'number' && isFinite(l.reviews)) ? l.reviews : 0;
       var ratingStr = r ? r + '★ (' + rev + ' avaliações)' : 'Sem avaliação';
-      var reg = regionOf(l) || 'Brasília/DF';
-      var d = phoneDigits(l);
-      var foneStr = d ? fmtPhone(d) : 'Não informado';
-      var waUrl = buildWaLink(l);
-      var msg = waMessageClient(l);
+      var url = siteUrl(l);
+      var d = l.wa_digits || phoneDigits(l);
+      var foneStr = isConfirmedWa(l)
+        ? (d ? fmtPhone(d) + ' ✅ Confirmado' : '✅ Confirmado')
+        : (d ? fmtPhone(d) + ' · Não confirmado' : 'Não confirmado');
+      var ig = l.instagram ? '@' + String(l.instagram).trim().replace(/^@/, '') : 'Não informado';
+      var waUrl = buildWaLink(l, socio);
+      var msg = waMessageClient(l, socio);
 
       lines.push('*[' + num + '] ' + (l.name || 'Empresa') + '*');
-      lines.push('⭐ Avaliação: ' + ratingStr);
-      lines.push('📍 Região: ' + reg);
-      lines.push('🌐 Site: ' + (hasSite(l) ? siteUrl(l) || 'Tem site' : '❌ SEM SITE (Oportunidade Forte)'));
-      lines.push('📱 WhatsApp: ' + foneStr + (isConfirmedWa(l) ? ' ✅ Confirmado' : ' ⚠️ Maps'));
+      lines.push('"' + msg + '"');
+      lines.push(divider);
+      lines.push('⭐ Nota: ' + ratingStr);
+      lines.push('🌐 Site: ' + (url || (hasSite(l) ? 'Tem site' : '❌ SEM SITE (Oportunidade Forte)')));
+      lines.push('📸 Instagram: ' + ig);
+      lines.push('📱 WhatsApp: ' + foneStr);
       if (waUrl) {
         lines.push('🔗 Abrir Zap: ' + waUrl);
       }
-      lines.push('💬 *Mensagem sugerida (Gancho Perda de Clientes)*:');
-      lines.push('"' + msg + '"');
-      lines.push('─────────────────────────────────');
+      lines.push(divider);
       lines.push('');
     });
 
     lines.push('🚀 *Recomendação*: Começar pelos leads com nota acima de 4,5 e sem site.');
     lines.push('Virgo Tech Scout — Automação de Prospecção');
     return lines.join('\n');
+  }
+
+  function shareSocioValue() {
+    var el = document.querySelector('input[name="shareSocio"]:checked');
+    return (el && el.value) ? el.value : 'Alan';
+  }
+
+  function shareNichoValue() {
+    var el = document.querySelector('input[name="shareNicho"]:checked');
+    return (el && el.value) ? el.value : 'all';
   }
 
   function updateSharePreview() {
@@ -559,20 +550,25 @@
     var btnOpen = $('btnOpenWaDirect');
 
     var targetName = 'Selecionados';
-    var candidateLeads = [];
+    var candidateLeads = (optSelected && optSelected.checked)
+      ? Object.values(selectedMap)
+      : filtered();
 
     if (optSelected && optSelected.checked) {
       targetName = 'Selecionados manualmente';
-      candidateLeads = Object.keys(selectedMap).map(function (k) { return selectedMap[k]; });
     } else if (optAlta && optAlta.checked) {
       targetName = 'Alta Oportunidade';
-      candidateLeads = state.rows.filter(function (l) { return l.badge === 'Alta'; });
+      candidateLeads = candidateLeads.filter(function (l) { return l.badge === 'Alta'; });
     } else if (optIdeal && optIdeal.checked) {
       targetName = 'Oportunidades Ideais (ICP)';
-      candidateLeads = state.rows.filter(function (l) { return (l.icp || []).length > 0; });
+      candidateLeads = candidateLeads.filter(function (l) { return (l.icp || []).length > 0; });
     } else {
       targetName = 'Todos da categoria';
-      candidateLeads = state.rows.slice();
+    }
+
+    var nicho = shareNichoValue();
+    if (nicho !== 'all') {
+      candidateLeads = candidateLeads.filter(function (l) { return typesOf(l).includes(nicho); });
     }
 
     if (shareOnlyWa && shareOnlyWa.checked) {
@@ -582,13 +578,44 @@
     if (totalLbl) totalLbl.textContent = String(candidateLeads.length);
 
     var text = candidateLeads.length
-      ? generateShareText(candidateLeads, targetName)
+      ? generateShareText(candidateLeads, targetName, shareSocioValue())
       : 'Nenhum lead encontrado com os critérios escolhidos.';
-    
+
     if (preview) preview.value = text;
     if (btnOpen) {
       btnOpen.href = 'https://wa.me/?text=' + encodeURIComponent(text);
     }
+  }
+
+  function buildShareNichoChips(reset) {
+    var container = $('shareNichoChips');
+    if (!container) return;
+
+    var nichos = {};
+    state.rows.forEach(function (l) {
+      var tags = typesOf(l);
+      var seen = {};
+      tags.forEach(function (t) {
+        if (t && !seen[t]) { seen[t] = 1; nichos[t] = (nichos[t] || 0) + 1; }
+      });
+    });
+
+    var items = Object.keys(nichos)
+      .map(function (k) { return { value: k, label: tipoLabel(k) + ' · ' + nichos[k] }; })
+      .sort(function (a, b) {
+        return nichos[b.value] - nichos[a.value] || (a.value < b.value ? -1 : 1);
+      });
+
+    var current = reset ? 'all' : shareNichoValue();
+    if (current !== 'all' && !items.some(function (it) { return it.value === current; })) current = 'all';
+
+    var html = '<label class="share-radio"><input type="radio" name="shareNicho" value="all"' +
+      (current === 'all' ? ' checked' : '') + '> <span>Todos</span></label>';
+    items.forEach(function (it) {
+      html += '<label class="share-radio"><input type="radio" name="shareNicho" value="' + esc(it.value) + '"' +
+        (it.value === current ? ' checked' : '') + '> <span>' + esc(it.label) + '</span></label>';
+    });
+    container.innerHTML = html;
   }
 
   function initShareModal() {
@@ -607,9 +634,13 @@
       var optAlta = $('optAlta');
       var optAll = $('optAll');
       var lblAll = $('lblCountAll');
+      var socioAlan = document.querySelector('input[name="shareSocio"][value="Alan"]');
 
       if (lblAll) lblAll.textContent = String(state.rows.length);
       updateSelectPill();
+
+      if (socioAlan) socioAlan.checked = true;
+      buildShareNichoChips(true);
 
       if (selCount > 0 && optSelected) {
         optSelected.checked = true;
@@ -637,6 +668,12 @@
       var el = $(id);
       if (el) el.addEventListener('change', updateSharePreview);
     });
+
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="shareSocio"]'), function (el) {
+      el.addEventListener('change', updateSharePreview);
+    });
+    var nichoBox = $('shareNichoChips');
+    if (nichoBox) nichoBox.addEventListener('change', updateSharePreview);
 
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {

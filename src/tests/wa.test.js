@@ -50,19 +50,22 @@ test('waLink sem numero utilizavel retorna null', () => {
   assert.strictEqual(waLink('12'), null);
 });
 
-test('waMessage cita o nome do lead', () => {
-  assert.ok(waMessage('Silva Advogados').includes('Silva Advogados'));
-  assert.ok(waMessage('') .includes('seu escritório'));
+test('waMessage usa Alan por padrao e aceita socio explicito', () => {
+  assert.ok(waMessage({ name: 'Silva Advogados' }).includes('Sou Alan, da Virgo Tech'));
+  assert.ok(waMessage({ name: 'Silva Advogados' }, 'Dylan').includes('Sou Dylan, da Virgo Tech'));
+  assert.ok(waMessage({ name: 'X' }, '   ').includes('Sou Alan'));
 });
 
-test('waMessage personalizada usa o lead completo (objeto)', () => {
-  const sem = waMessage({ name: 'Silva Advogados', area: 'Criminal', rating: 4.8, reviews: 30, website: null });
-  assert.ok(sem.includes('Silva Advogados'));
-  assert.ok(sem.includes('Virgo Tech'));
-  assert.ok(sem.includes('4,8'));
-  assert.ok(sem.includes('não têm site'));
-  assert.ok(sem.includes('advocacia'));
-  const com = waMessage({ name: 'Studio X', area: 'Arquitetura', rating: 4.5, reviews: 2, website: 'https://x.com' });
-  assert.ok(!com.includes('não têm site'));
-  assert.ok(com.includes('arquitetura e topografia'));
+test('waMessage formato novo: gancho, abertura e fechamento', () => {
+  const msg = waMessage({ name: 'Silva Advogados' });
+  assert.ok(msg.includes('💸'));
+  assert.ok(msg.includes('Olá, tudo bem?'));
+  assert.ok(msg.includes('Posso te mostrar?'));
+  assert.ok(msg.startsWith('💸 Sua empresa pode estar perdendo clientes'));
+});
+
+test('waLink sem texto usa a mensagem padrao do socio', () => {
+  const link = waLink('(61) 99999-0000');
+  assert.ok(link.startsWith('https://wa.me/5561999990000?text='));
+  assert.ok(link.includes(encodeURIComponent(waMessage())));
 });
