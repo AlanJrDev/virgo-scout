@@ -12,10 +12,10 @@
   function waShortMessage(socio) {
     var nome = String(socio == null ? '' : socio).trim();
     var tiers = nome
-      ? ['💸 Sou ' + nome + ', da Virgo Tech. Posso te mostrar como dobrar seus clientes?',
-        '💸 Sou da Virgo Tech. Posso te mostrar como dobrar seus clientes?']
-      : ['💸 Sou da Virgo Tech. Posso te mostrar como dobrar seus clientes?'];
-    tiers.push('Olá! Posso te mostrar como dobrar seus clientes?'); // hard floor
+      ? ['💸 Perdendo clientes para a concorrência! Sou ' + nome + ', da Virgo Tech. Posso te mostrar?',
+        '💸 Perdendo clientes para a concorrência! Sou da Virgo Tech. Posso te mostrar?']
+      : ['💸 Perdendo clientes para a concorrência! Sou da Virgo Tech. Posso te mostrar?'];
+    tiers.push('💸 Perdendo clientes p/ concorrência! Posso te mostrar?'); // hard floor
     var i;
     for (i = 0; i < tiers.length; i++) {
       if (waFits(tiers[i])) return tiers[i];

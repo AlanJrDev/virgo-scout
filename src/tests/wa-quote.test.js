@@ -1,12 +1,12 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert');
 
 const { waFits, waShortMessage, waLink, WA_URL_BUDGET } = require('../utils/wa');
 const quote = require('../../web/wa-quote');
 
-const T1 = (s) => '💸 Sou ' + s + ', da Virgo Tech. Posso te mostrar como dobrar seus clientes?';
-const T2 = '💸 Sou da Virgo Tech. Posso te mostrar como dobrar seus clientes?';
-const T3 = 'Olá! Posso te mostrar como dobrar seus clientes?';
+const T1 = (s) => '\u{1F4B8} Perdendo clientes para a concorr\u00eancia! Sou ' + s + ', da Virgo Tech. Posso te mostrar?';
+const T2 = '\u{1F4B8} Perdendo clientes para a concorr\u00eancia! Sou da Virgo Tech. Posso te mostrar?';
+const T3 = '\u{1F4B8} Perdendo clientes p/ concorr\u00eancia! Posso te mostrar?';
 
 const enc = (s) => encodeURIComponent(String(s)).length;
 const textOf = (url) => decodeURIComponent(String(url).split('?text=')[1] || '');
@@ -34,10 +34,13 @@ test('waShortMessage: todo socio fica dentro do budget (<= 130 encoded)', () => 
 });
 
 test('waShortMessage: t1 com o nome do socio quando couber', () => {
-  ['Alan', 'Dylan', 'Luiz Augusto', 'Miguel'].forEach((socio) => {
+  ['Alan', 'Dylan', 'Miguel'].forEach((socio) => {
     assert.ok(enc(T1(socio)) <= 130);
     assert.strictEqual(waShortMessage(socio), T1(socio));
   });
+  // nome comprido demais para o t1 cai no t2 (sem nome)
+  assert.ok(enc(T1('Luiz Augusto')) > 130);
+  assert.strictEqual(waShortMessage('Luiz Augusto'), T2);
 });
 
 test('waShortMessage: sem socio e nome longo demais caem no t2', () => {
