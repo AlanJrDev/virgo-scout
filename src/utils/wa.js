@@ -37,25 +37,33 @@ function hasWa(lead) {
   return !!waLink(lead && lead.whatsapp);
 }
 
-// Mensagem de primeira abordagem — personalizada com o que a base já sabe
-// (nota, área e a ausência de site, que é a oportunidade do produto).
-// Aceita string (compat) ou o objeto do lead.
+function segmentOf(lead) {
+  const l = typeof lead === 'string' ? { name: lead } : lead || {};
+  if (['Arquitetura', 'Urbanismo', 'Topografia', 'Outros'].includes(l.area)) return 'arquitetura e topografia';
+  const txt = `${l.area || ''} ${l.category || ''} ${l.source || ''}`.toLowerCase();
+  if (/topograf|agrimens/.test(txt)) return 'topografia';
+  if (/arquit/.test(txt)) return 'arquitetura e topografia';
+  if (/tapec|tapet|cortina/.test(txt)) return 'tapeçaria';
+  if (/estofad|sofa|colch/.test(txt)) return 'estofados';
+  return 'advocacia';
+}
+
+// Mensagem de primeira abordagem — personalizada, curta e focada no gancho de perda de clientes/dinheiro
 function waMessage(lead) {
   const l = typeof lead === 'string' ? { name: lead } : lead || {};
   const quem = String(l.name || '').trim() || 'seu escritório';
-  const area = String(l.area || '');
-  const arq = ['Arquitetura', 'Urbanismo', 'Topografia', 'Outros'].includes(area);
-  const segmento = arq ? 'arquitetura e topografia' : 'advocacia';
+  const segmento = segmentOf(l);
   const nota = typeof l.rating === 'number' && isFinite(l.rating) ? String(l.rating).replace('.', ',') : '';
-  const parts = ['Olá! Sou Alan, da Virgo Tech.'];
-  if (nota) parts.push(`Vi ${quem} no Google Maps — nota ${nota}★, parabéns!`);
-  else parts.push(`Encontrei ${quem} no Google Maps.`);
+  
+  const intro = nota
+    ? `Olá! Sou Alan, da Virgo Tech. Vi ${quem} no Google Maps — nota ${nota}★, parabéns!`
+    : `Olá! Sou Alan, da Virgo Tech. Encontrei ${quem} no Google Maps.`;
+
   if (!l.website) {
-    parts.push(`Notei que vocês ainda não têm site próprio — isso costuma custar clientes. Posso te mandar 2 exemplos rápidos de sites para ${segmento}?`);
+    return `${intro} Notei que vocês ainda não têm site próprio — hoje estão perdendo clientes e contratos todos os dias para outros de ${segmento} no DF. Posso te mandar 2 referências rápidas de sites que trazem resultados?`;
   } else {
-    parts.push(`Trabalho com presença digital para ${segmento} no DF. Posso te mandar 2 exemplos rápidos?`);
+    return `${intro} Analisei a presença de vocês em ${segmento} no DF e notei pontos onde estão deixando dinheiro na mesa para a concorrência. Posso te mandar 2 ideias rápidas para dobrar seus contatos?`;
   }
-  return parts.join(' ');
 }
 
-module.exports = { waDigits, waLink, waMessage, hasWa };
+module.exports = { waDigits, waLink, waMessage, hasWa, segmentOf };

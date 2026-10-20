@@ -209,7 +209,20 @@ function buildTop(leads, n = 5) {
       site_url: (typeof l.website === 'string' && l.website) ? l.website : null,
       phone: /\d{8,}/.test(l.phone || ''),
       phone_raw: l.phone || '',
+      has_confirmed_wa: hasWa(l),
       wa: hasWa(l) ? waLink(l.whatsapp, waMessage(l)) : null,
+      wa_digits: hasWa(l) ? waDigits(l.whatsapp) : (l.phone ? waDigits(l.phone) : null),
+      wa_source: l.wa_source || (hasWa(l) ? (l.website ? 'site' : 'maps') : (phoneLink(l) && String(phoneLink(l)).includes('wa.me') ? 'maps' : null)),
+      wa_status: l.wa_status || (hasWa(l) ? 'declared' : null),
+      wa_evidence: l.wa_evidence || (l.wa_evidence_url || (l.website ? l.website : (l.source ? 'Google Maps: ' + l.source : null))),
+      wa_confidence: (function() {
+        if (!hasWa(l) && (!phoneLink(l) || !String(phoneLink(l)).includes('wa.me'))) return null;
+        if (l.wa_status === 'suspect') return 'suspect';
+        if (l.wa_source === 'maps' || (!l.website && hasWa(l))) return 'official_maps';
+        if (l.wa_source === 'site' || l.website) return 'official_site';
+        if (l.wa_source === 'instagram') return 'instagram';
+        return 'declared';
+      })(),
       phone_link: phoneLink(l),
       email: l.email || null,
       instagram: l.instagram || null,
