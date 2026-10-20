@@ -210,7 +210,7 @@ function buildTop(leads, n = 5) {
       phone: /\d{8,}/.test(l.phone || ''),
       phone_raw: l.phone || '',
       has_confirmed_wa: hasWa(l),
-      wa: hasWa(l) ? waLink(l.whatsapp, waMessage(l)) : null,
+      wa: hasWa(l) ? waLink(l.whatsapp) : null,
       wa_digits: hasWa(l) ? waDigits(l.whatsapp) : (l.phone ? waDigits(l.phone) : null),
       wa_source: l.wa_source || (hasWa(l) ? (l.website ? 'site' : 'maps') : (phoneLink(l) && String(phoneLink(l)).includes('wa.me') ? 'maps' : null)),
       wa_status: l.wa_status || (hasWa(l) ? 'declared' : null),

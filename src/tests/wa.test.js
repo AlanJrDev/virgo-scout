@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { waDigits, waLink, waMessage, hasWa } = require('../utils/wa');
+const { waDigits, waLink, waMessage, hasWa, waShortMessage } = require('../utils/wa');
 
 test('celular BR com DDD vira 55 + DDD + numero', () => {
   assert.strictEqual(waDigits('(61) 99999-0000'), '5561999990000');
@@ -67,5 +67,7 @@ test('waMessage formato novo: gancho, abertura e fechamento', () => {
 test('waLink sem texto usa a mensagem padrao do socio', () => {
   const link = waLink('(61) 99999-0000');
   assert.ok(link.startsWith('https://wa.me/5561999990000?text='));
-  assert.ok(link.includes(encodeURIComponent(waMessage())));
+  const decoded = decodeURIComponent(link.split('?text=')[1]);
+  assert.strictEqual(decoded, waShortMessage('Alan'));
+  assert.ok(encodeURIComponent(decoded).length <= 130);
 });

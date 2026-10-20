@@ -95,12 +95,19 @@
     return '💸 Sua empresa pode estar perdendo clientes e dinheiro todos os dias para a concorrência!\n\nOlá, tudo bem? Sou ' + nome + ', da Virgo Tech, e tenho uma ideia para ajudar vocês a atrair mais clientes. Posso te mostrar?';
   }
 
+  function socioMsg() {
+    var s = '';
+    try { s = localStorage.getItem('virgoLastSocio') || 'Alan'; } catch (e) { s = 'Alan'; }
+    return s;
+  }
+
   function buildWaLink(l, socio) {
     var d = l.wa_digits || phoneDigits(l);
     if (!d) return '';
     var norm = normPhone(d);
     var digits = norm.length <= 11 ? '55' + norm : norm;
-    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(waMessageClient(l, socio));
+    var msg = window.WA_QUOTE.waShortMessage(String(socio || '').trim() || socioMsg());
+    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(msg);
   }
 
   /* ---------- estado ---------- */
@@ -479,6 +486,22 @@
   }
 
   /* ---------- exportar para sócio via WhatsApp ---------- */
+  function blocoDeDados(l) {
+    var r = fmtRating(l.rating);
+    var rev = (typeof l.reviews === 'number' && isFinite(l.reviews)) ? l.reviews : 0;
+    var ratingStr = r ? r + '★ (' + rev + ' avaliações)' : 'Sem avaliação';
+    var url = siteUrl(l);
+    var d = l.wa_digits || phoneDigits(l);
+    var foneStr = isConfirmedWa(l)
+      ? (d ? fmtPhone(d) + ' ✅ Confirmado' : '✅ Confirmado')
+      : (d ? fmtPhone(d) + ' · Não confirmado' : 'Não confirmado');
+    var ig = l.instagram ? '@' + String(l.instagram).trim().replace(/^@/, '') : 'Não informado';
+    return '⭐ Nota: ' + ratingStr + '\n' +
+      '🌐 Site: ' + (url || (hasSite(l) ? 'Tem site' : '❌ SEM SITE (Oportunidade Forte)')) + '\n' +
+      '📸 Instagram: ' + ig + '\n' +
+      '📱 WhatsApp: ' + foneStr;
+  }
+
   function generateShareText(leads, targetName, socio) {
     var lines = [];
     var now = new Date();
@@ -496,25 +519,13 @@
 
     leads.forEach(function (l, i) {
       var num = i + 1;
-      var r = fmtRating(l.rating);
-      var rev = (typeof l.reviews === 'number' && isFinite(l.reviews)) ? l.reviews : 0;
-      var ratingStr = r ? r + '★ (' + rev + ' avaliações)' : 'Sem avaliação';
-      var url = siteUrl(l);
-      var d = l.wa_digits || phoneDigits(l);
-      var foneStr = isConfirmedWa(l)
-        ? (d ? fmtPhone(d) + ' ✅ Confirmado' : '✅ Confirmado')
-        : (d ? fmtPhone(d) + ' · Não confirmado' : 'Não confirmado');
-      var ig = l.instagram ? '@' + String(l.instagram).trim().replace(/^@/, '') : 'Não informado';
       var waUrl = buildWaLink(l, socio);
       var msg = waMessageClient(l, socio);
 
       lines.push('*[' + num + '] ' + (l.name || 'Empresa') + '*');
       lines.push('"' + msg + '"');
       lines.push(divider);
-      lines.push('⭐ Nota: ' + ratingStr);
-      lines.push('🌐 Site: ' + (url || (hasSite(l) ? 'Tem site' : '❌ SEM SITE (Oportunidade Forte)')));
-      lines.push('📸 Instagram: ' + ig);
-      lines.push('📱 WhatsApp: ' + foneStr);
+      lines.push(blocoDeDados(l));
       if (waUrl) {
         lines.push('🔗 Abrir Zap: ' + waUrl);
       }
@@ -537,6 +548,41 @@
     return (el && el.value) ? el.value : 'all';
   }
 
+  /* ---------- cópia + toast locais (app.js não expõe toast global) ---------- */
+  function copyText(text, cb) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      if (cb) cb();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { if (cb) cb(); }).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function showToast(msg, kind) {
+    var box = document.getElementById('toasts');
+    if (!box) return;
+    var t = document.createElement('div');
+    t.className = 'toast' + (kind ? ' ' + kind : '');
+    t.setAttribute('role', 'status');
+    t.innerHTML = '<i></i><span>' + esc(msg) + '</span>';
+    box.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add('in'); });
+    var timer = setTimeout(close, 2800);
+    function close() { clearTimeout(timer); if (!t.parentNode) return; t.classList.add('out'); setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 170); }
+    t.addEventListener('click', close);
+  }
+
   function updateSharePreview() {
     var modal = $('shareModalBackdrop');
     if (!modal || modal.hidden) return;
@@ -547,7 +593,6 @@
     var shareOnlyWa = $('shareOnlyWa');
     var preview = $('sharePreviewText');
     var totalLbl = $('shareTotalItems');
-    var btnOpen = $('btnOpenWaDirect');
 
     var targetName = 'Selecionados';
     var candidateLeads = (optSelected && optSelected.checked)
@@ -582,9 +627,6 @@
       : 'Nenhum lead encontrado com os critérios escolhidos.';
 
     if (preview) preview.value = text;
-    if (btnOpen) {
-      btnOpen.href = 'https://wa.me/?text=' + encodeURIComponent(text);
-    }
   }
 
   function buildShareNichoChips(reset) {
@@ -625,6 +667,7 @@
     var cancelBtn = $('btnShareCancel');
     var copyBtn = $('btnCopyWaText');
     var copyLabel = $('btnCopyWaLabel');
+    var btnOpen = $('btnOpenWaDirect');
 
     if (!shareBtn || !modal) return;
 
@@ -634,12 +677,17 @@
       var optAlta = $('optAlta');
       var optAll = $('optAll');
       var lblAll = $('lblCountAll');
-      var socioAlan = document.querySelector('input[name="shareSocio"][value="Alan"]');
+      var savedSocio = socioMsg();
+      var socioRadios = document.querySelectorAll('input[name="shareSocio"]');
+      var socioAchou = false;
 
       if (lblAll) lblAll.textContent = String(state.rows.length);
       updateSelectPill();
 
-      if (socioAlan) socioAlan.checked = true;
+      Array.prototype.forEach.call(socioRadios, function (r) {
+        if (r.value === savedSocio) { r.checked = true; socioAchou = true; }
+      });
+      if (!socioAchou && socioRadios.length) socioRadios[0].checked = true;
       buildShareNichoChips(true);
 
       if (selCount > 0 && optSelected) {
@@ -670,33 +718,100 @@
     });
 
     Array.prototype.forEach.call(document.querySelectorAll('input[name="shareSocio"]'), function (el) {
-      el.addEventListener('change', updateSharePreview);
+      el.addEventListener('change', function () {
+        try { localStorage.setItem('virgoLastSocio', shareSocioValue()); } catch (e) {}
+        updateSharePreview();
+      });
     });
     var nichoBox = $('shareNichoChips');
     if (nichoBox) nichoBox.addEventListener('change', updateSharePreview);
+
+    if (btnOpen) {
+      btnOpen.addEventListener('click', function (e) {
+        e.preventDefault();
+        var pv = $('sharePreviewText');
+        var full = pv ? pv.value : '';
+        if (navigator.share) {
+          navigator.share({ text: full }).catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+            desktopFallback(full);
+          });
+        } else {
+          desktopFallback(full);
+        }
+      });
+    }
 
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
         var preview = $('sharePreviewText');
         if (!preview) return;
-        var text = preview.value;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(function () {
-            if (copyLabel) copyLabel.textContent = '✓ Copiado!';
-            setTimeout(function () { if (copyLabel) copyLabel.textContent = 'Copiar Texto'; }, 2200);
-          }).catch(function () {
-            preview.select();
-            document.execCommand('copy');
-            if (copyLabel) copyLabel.textContent = '✓ Copiado!';
-            setTimeout(function () { if (copyLabel) copyLabel.textContent = 'Copiar Texto'; }, 2200);
-          });
-        } else {
-          preview.select();
-          document.execCommand('copy');
+        copyText(preview.value, function () {
           if (copyLabel) copyLabel.textContent = '✓ Copiado!';
           setTimeout(function () { if (copyLabel) copyLabel.textContent = 'Copiar Texto'; }, 2200);
-        }
+        });
       });
+    }
+  }
+
+  function desktopFallback(full) {
+    copyText(full, function () {
+      showToast('✓ Lista copiada — cole no chat do lead', 'ok');
+      window.open('https://web.whatsapp.com', '_blank', 'noopener');
+    });
+  }
+
+  function waFullMsg(l) {
+    return waMessageClient(l, socioMsg()) + '\n\n' + blocoDeDados(l);
+  }
+
+  function leadFromWaAnchor(a) {
+    var cid = a.getAttribute('data-contact-id');
+    var i;
+    if (cid) {
+      for (i = 0; i < state.rows.length; i++) {
+        if (String(state.rows[i].id) === cid) return state.rows[i];
+      }
+    }
+    var row = a.closest ? a.closest('tr') : null;
+    var chk = row ? row.querySelector('.c-row-check') : null;
+    var key = chk ? chk.getAttribute('data-lead-key') : '';
+    if (key) {
+      for (i = 0; i < state.rows.length; i++) {
+        if (leadKey(state.rows[i]) === key) return state.rows[i];
+      }
+    }
+    return null;
+  }
+
+  function onWaLinkClick(e) {
+    if (!e.target || !e.target.closest) return;
+    var a = e.target.closest('a[href]');
+    if (!a || !a.closest('#tblBody')) return;
+    if (!a.classList.contains('cell-wa') && !a.classList.contains('is-wa-confirmed')) return;
+    if (e.metaKey || e.ctrlKey) return;
+    var href = a.getAttribute('href') || '';
+    if (href.indexOf('https://wa.me') !== 0) return;
+    var l = leadFromWaAnchor(a);
+    if (!l) return;
+    e.preventDefault();
+    var msgFull = waFullMsg(l);
+    var waUrlCurto = buildWaLink(l);
+    function copiaEAbre() {
+      copyText(msgFull, function () {
+        window.open(waUrlCurto, '_blank', 'noopener');
+        showToast('✓ Mensagem completa copiada — cole no WhatsApp', 'ok');
+      });
+    }
+    if (navigator.share) {
+      navigator.share({ text: msgFull }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        copyText(msgFull, function () {
+          showToast('✓ Mensagem completa copiada — cole no chat do lead', 'ok');
+        });
+      });
+    } else {
+      copiaEAbre();
     }
   }
 
@@ -819,6 +934,7 @@
       if (!e.target || !e.target.closest) return;
       if (e.target.closest('#tblClear') || e.target.closest('#tblEmptyClear')) clearFilters();
     });
+    document.addEventListener('click', onWaLinkClick);
 
     initShareModal();
   }

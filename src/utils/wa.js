@@ -23,11 +23,33 @@ function waDigits(phone) {
   return d;
 }
 
+// Orçamento do ?text= do wa.me (URL truncada em ~140 chars encoded)
+const WA_URL_BUDGET = 130;
+
+function waFits(t) {
+  return encodeURIComponent(String(t == null ? '' : t)).length <= WA_URL_BUDGET;
+}
+
+// Saudação curta em tiers: o primeiro que couvir no orçamento vence.
+function waShortMessage(socio) {
+  const nome = String(socio == null ? '' : socio).trim();
+  const tiers = nome
+    ? ['💸 Sou ' + nome + ', da Virgo Tech. Posso te mostrar como dobrar seus clientes?',
+      '💸 Sou da Virgo Tech. Posso te mostrar como dobrar seus clientes?']
+    : ['💸 Sou da Virgo Tech. Posso te mostrar como dobrar seus clientes?'];
+  tiers.push('Olá! Posso te mostrar como dobrar seus clientes?'); // hard floor
+  for (let i = 0; i < tiers.length; i++) {
+    if (waFits(tiers[i])) return tiers[i];
+  }
+  return tiers[tiers.length - 1];
+}
+
 // null quando não há número utilizável
 function waLink(phone, message) {
   const d = waDigits(phone);
   if (!d) return null;
-  const text = '?text=' + encodeURIComponent(message || waMessage());
+  const texto = message && waFits(message) ? String(message) : waShortMessage('Alan');
+  const text = '?text=' + encodeURIComponent(texto);
   return `https://wa.me/${d}${text}`;
 }
 
@@ -43,4 +65,4 @@ function waMessage(lead, socio) {
   return '💸 Sua empresa pode estar perdendo clientes e dinheiro todos os dias para a concorrência!\n\nOlá, tudo bem? Sou ' + nome + ', da Virgo Tech, e tenho uma ideia para ajudar vocês a atrair mais clientes. Posso te mostrar?';
 }
 
-module.exports = { waDigits, waLink, waMessage, hasWa };
+module.exports = { waDigits, waLink, waMessage, hasWa, waFits, waShortMessage, WA_URL_BUDGET };
