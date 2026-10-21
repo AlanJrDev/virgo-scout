@@ -136,10 +136,84 @@ async function supabaseAddUser(email, role, pass, opts) {
   return { email: e, role };
 }
 
+/* ---------- adição com hash pré-existente (fluxo signup) ---------- */
+function validateNewUserBasic(email, role) {
+  const e = normEmail(email);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { const er = new Error(`e-mail inválido: ${email}`); er.code = 'invalid_email'; throw er; }
+  if (!ROLES.has(role)) { const er = new Error(`papel desconhecido: ${role} (válidos: founder, cofounder)`); er.code = 'invalid_role'; throw er; }
+  return e;
+}
+
+function taken(email) { const er = new Error(`e-mail já em uso: ${email}`); er.code = 'email_taken'; return er; }
+function notFound(email) { const er = new Error(`usuário não encontrado: ${email}`); er.code = 'not_found'; return er; }
+
+function localAddUserWithHash(email, role, cred, opts) {
+  const e = validateNewUserBasic(email, role);
+  const c = cred || {};
+  if (!c.salt || !c.hash) { const er = new Error('credenciais ausentes (salt/hash)'); er.code = 'invalid_credentials'; throw er; }
+  const store = localReadStore() || { version: 1, users: [] };
+  if (store.users.some((u) => normEmail(u.email) === e)) {
+    if (!(opts && opts.force)) { const er = new Error(`usuário já existe: ${e}`); er.code = 'user_exists'; throw er; }
+    store.users = store.users.filter((u) => normEmail(u.email) !== e);
+  }
+  store.users.push({ email: e, role, algo: c.algo || 'scrypt', salt: c.salt, hash: c.hash, created_at: new Date().toISOString() });
+  writeStore(store);
+  return { email: e, role };
+}
+
+async function supabaseAddUserWithHash(email, role, cred, opts) {
+  const e = validateNewUserBasic(email, role);
+  const c = cred || {};
+  if (!c.salt || !c.hash) { const er = new Error('credenciais ausentes (salt/hash)'); er.code = 'invalid_credentials'; throw er; }
+  const existente = await supabaseFindUser(e);
+  if (existente && !(opts && opts.force)) { const er = new Error(`usuário já existe: ${e}`); er.code = 'user_exists'; throw er; }
+  const row = { email: e, role, algo: c.algo || 'scrypt', salt: c.salt, hash: c.hash, created_at: new Date().toISOString() };
+  if (existente) {
+    await sbFetch('users?on_conflict=email', { method: 'POST', body: [row], headers: { Prefer: 'resolution=merge-duplicates' } });
+  } else {
+    await sbFetch('users', { method: 'POST', body: [row] });
+  }
+  return { email: e, role };
+}
+
+function localRenameEmail(from, to) {
+  const f = validateNewUserBasic(from, 'founder');
+  const t = validateNewUserBasic(to, 'founder');
+  const store = localReadStore();
+  if (!store) throw storeUnavailable();
+  const src = store.users.find((u) => normEmail(u.email) === f);
+  const dstOther = store.users.find((u) => normEmail(u.email) === t && normEmail(u.email) !== f);
+  if (!src && dstOther) return { from: f, to: t, changed: false, already: true };
+  if (!src) throw notFound(f);
+  if (dstOther) throw taken(t);
+  src.email = t;
+  writeStore(store);
+  return { from: f, to: t, changed: true };
+}
+
+async function supabaseRenameEmail(from, to) {
+  const f = validateNewUserBasic(from, 'founder');
+  const t = validateNewUserBasic(to, 'founder');
+  /* raw: busca SEM filtro de role — src com role inválido NÃO é "inexistente" */
+  const srcRows = await sbFetch(`users?email=eq.${encodeURIComponent(f)}&select=*`);
+  const srcRaw = srcRows && srcRows[0];
+  const dst = await supabaseFindUser(t);
+  if (!srcRaw && dst && normEmail(dst.email) !== f) return { from: f, to: t, changed: false, already: true };
+  if (!srcRaw || !ROLES.has(srcRaw.role)) throw notFound(f);
+  if (dst) throw taken(t);
+  await sbFetch(`users?email=eq.${encodeURIComponent(f)}`, { method: 'PATCH', body: { email: t } });
+  let sessions_cleared = true;
+  try { await sbFetch(`sessions?email=eq.${encodeURIComponent(f)}`, { method: 'DELETE' }); }
+  catch (e) { sessions_cleared = false; }
+  return { from: f, to: t, changed: true, sessions_cleared };
+}
+
 /* ---------- dispatcher ---------- */
 function readStore() { return sbEnabled() ? supabaseReadStore() : localReadStore(); }
 function findUser(email) { return sbEnabled() ? supabaseFindUser(email) : localFindUser(email); }
 function listUsers() { return sbEnabled() ? supabaseListUsers() : localListUsers(); }
 function addUser(email, role, pass, opts) { return sbEnabled() ? supabaseAddUser(email, role, pass, opts) : localAddUser(email, role, pass, opts); }
+function addUserWithHash(email, role, cred, opts) { return sbEnabled() ? supabaseAddUserWithHash(email, role, cred, opts) : localAddUserWithHash(email, role, cred, opts); }
+function renameEmail(from, to) { return sbEnabled() ? supabaseRenameEmail(from, to) : localRenameEmail(from, to); }
 
-module.exports = { ROLES, usersFile, normEmail, readStore, writeStore, hashPassword, verifyPassword, findUser, listUsers, addUser };
+module.exports = { ROLES, usersFile, normEmail, readStore, writeStore, hashPassword, verifyPassword, findUser, listUsers, addUser, addUserWithHash, renameEmail };

@@ -145,6 +145,14 @@ function buildStats(leads) {
   const comInstagram = leads.filter((l) => l.instagram).length;
   const comZapSite = leads.filter((l) => l.whatsapp_hint === true).length;
   const zapReal = leads.filter((l) => hasWa(l)).length;
+  const comZap = zapReal; // alias novo (= declared/contatável)
+  const comZapCelular = leads.filter((l) => !hasWa(l) && isMobilePhone(l.phone)).length;
+  const comZapTotal = comZap + comZapCelular;
+  const waSrcOf = (l) => l.wa_source || (l.website ? 'site' : 'maps');
+  const comZapMaps = leads.filter((l) => hasWa(l) && waSrcOf(l) === 'maps').length;
+  const comZapSiteOficial = leads.filter((l) => hasWa(l) && waSrcOf(l) === 'site').length;
+  const comZapIg = leads.filter((l) => hasWa(l) && l.wa_source === 'instagram').length;
+  const nichos = nichosOf(leads);
   const tierA = leads.filter((l) => tierOf(l) === 'a').length;
   const tierB = leads.filter((l) => tierOf(l) === 'b').length;
   const tierC = leads.filter((l) => tierOf(l) === 'c').length;
@@ -158,8 +166,9 @@ function buildStats(leads) {
   const avgFit = fits.length ? Math.round(fits.reduce((a, b) => a + b, 0) / fits.length) : 0;
   return {
     total, comSite, semSite: total - comSite, comPhone, alta, qualif,
-    comEmail, comInstagram, comZapSite, naoReclamados, desdeAntigo,
-    zapReal, tierA, tierB, tierC, tierD,
+    comEmail, comInstagram, comZapSite, comZapHint: comZapSite, naoReclamados, desdeAntigo,
+    zapReal, comZap, comZapCelular, comZapTotal, comZapMaps, comZapSiteOficial, comZapIg, nichos,
+    tierA, tierB, tierC, tierD,
     pctSite: pct(comSite), pctAlta: pct(alta), pctQualif: pct(qualif),
     icpSite, icpSistema, avgFit,
   };
@@ -179,6 +188,35 @@ function tierOf(l) {
   if (l.website) return 'b';
   if (l.instagram) return 'c';
   return 'd';
+}
+
+// Celular BR (13 dígitos: 55 + DDD + 9XXXXXXXX) — configuração do waDigits:
+// qualquer phone com esse shape tem WhatsApp provável, mesmo sem declaração no site.
+function isMobilePhone(phone) {
+  return /^55\d{2}9\d{8}$/.test(waDigits(phone));
+}
+
+// nichos conhecidos → label legível; demais slugs só capitalizam
+const NICHOS_LABEL = { advogados: 'Advogados', topografia: 'Topografia', tapecaria: 'Tapeçaria', estofado: 'Estofado', arquitetura: 'Arquitetura', outros: 'Outros' };
+function nichoLabel(t) {
+  return NICHOS_LABEL[t] || t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function nichosOf(leads) {
+  const nichos = {};
+  for (const l of leads) {
+    let raw;
+    if (Array.isArray(l.types)) raw = l.types;
+    else if (typeof l.types === 'string' && l.types) raw = l.types.split(',');
+    const seen = new Set();
+    for (const t of raw || []) {
+      const k = String(t).trim().toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      nichos[k] = (nichos[k] || 0) + 1;
+    }
+  }
+  return nichos;
 }
 
 function phoneLink(l) {
@@ -210,13 +248,14 @@ function buildTop(leads, n = 5) {
       phone: /\d{8,}/.test(l.phone || ''),
       phone_raw: l.phone || '',
       has_confirmed_wa: hasWa(l),
-      wa: hasWa(l) ? waLink(l.whatsapp) : null,
+      wa_mobile: !hasWa(l) && isMobilePhone(l.phone),
+      wa: hasWa(l) ? waLink(l.whatsapp) : (isMobilePhone(l.phone) ? waLink(l.phone) : null),
       wa_digits: hasWa(l) ? waDigits(l.whatsapp) : (l.phone ? waDigits(l.phone) : null),
-      wa_source: l.wa_source || (hasWa(l) ? (l.website ? 'site' : 'maps') : (phoneLink(l) && String(phoneLink(l)).includes('wa.me') ? 'maps' : null)),
+      wa_source: l.wa_source || (hasWa(l) ? (l.website ? 'site' : 'maps') : (isMobilePhone(l.phone) ? 'maps-celular' : null)),
       wa_status: l.wa_status || (hasWa(l) ? 'declared' : null),
       wa_evidence: l.wa_evidence || (l.wa_evidence_url || (l.website ? l.website : (l.source ? 'Google Maps: ' + l.source : null))),
       wa_confidence: (function() {
-        if (!hasWa(l) && (!phoneLink(l) || !String(phoneLink(l)).includes('wa.me'))) return null;
+        if (!hasWa(l)) return isMobilePhone(l.phone) ? 'mobile_phone' : null;
         if (l.wa_status === 'suspect') return 'suspect';
         if (l.wa_source === 'maps' || (!l.website && hasWa(l))) return 'official_maps';
         if (l.wa_source === 'site' || l.website) return 'official_site';
@@ -410,6 +449,9 @@ function buildPayload(leads, opts = {}) {
     stats,
     delta_pct: buildDelta(dataDir, category),
     areas: areaDistribution(poolLeads, category),
+    nichos: Object.entries(stats.nichos)
+      .map(([t, v]) => ({ label: nichoLabel(t), value: v }))
+      .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
     regions: regionAgg(poolLeads),
     ratingBuckets: ratingBuckets(poolLeads),
     top: buildTop(poolLeads),
@@ -426,4 +468,4 @@ function buildPayload(leads, opts = {}) {
   };
 }
 
-module.exports = { cleanName, scoreOf, badgeOf, prepare, buildStats, buildTop, buildSeries, buildRecent, buildPayload };
+module.exports = { cleanName, scoreOf, badgeOf, prepare, buildStats, buildTop, buildSeries, buildRecent, buildPayload, isMobilePhone, nichosOf, nichoLabel };

@@ -15,6 +15,7 @@ const { askGroq, formatContext, interpretCapture } = require('./groq');
 const { CATEGORIES, matchesType } = require('../src/utils/categories');
 const { findRA } = require('../src/utils/df-ra');
 const { parseCapturePrompt, planFor } = require('../src/utils/prompt-parse');
+const { createSignup, listSignups, reviewSignup } = require('../src/utils/signups');
 
 const ROOT = path.join(__dirname, '..', 'web');
 const DATA = path.join(__dirname, '..', 'data');
@@ -24,7 +25,42 @@ const JOB_ERR = path.join(DATA, 'capture-live.err.log');
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mp4': 'video/mp4' };
 
 // arquivos que a tela de login precisa sem sessão
-const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor/gsap.min.js', '/assets/LOGO.png', '/assets/black-hole.jpg', '/assets/videos/black-hole-first-pulse.mp4']);
+const PUBLIC_LOGIN = new Set(['/login.css', '/login.js', '/styles.css', '/vendor/gsap.min.js', '/assets/LOGO.png', '/assets/black-hole.jpg', '/assets/videos/black-hole-first-pulse.mp4', '/cadastro.css', '/cadastro.js', '/cadastro.html']);
+
+/* cadastro público: rate-limit 5/10min por IP (em memória) */
+const signupHits = new Map();
+function signupAllowed(ip) {
+  const now = Date.now();
+  for (const [k, v] of signupHits) if (now > v.resetAt) signupHits.delete(k); // poda expiradas (padrão serve-web-auth)
+  const a = signupHits.get(ip);
+  if (!a || now > a.resetAt) { signupHits.set(ip, { count: 1, resetAt: now + 600000 }); return true; }
+  if (a.count >= 5) return false;
+  a.count++;
+  return true;
+}
+
+function signupErrStatus(e) {
+  if (e instanceof SbError || (e && e.code === 'store_unavailable')) return { code: 503, body: { error: 'store_unavailable' } };
+  const c = e && e.code;
+  const st = c === 'duplicate' || c === 'user_exists' || c === 'already_reviewed' ? 409 : c === 'not_found' ? 404 : c === 'invalid_action' || c === 'too_large' || (c && c.startsWith('invalid_')) || c === 'weak_pass' ? 400 : null;
+  return st ? { code: st, body: { error: c } } : null;
+}
+
+/* body com cap: acumula chunks em Buffer, 413 + drenagem se passar do limite
+   (em vez de req.destroy()). Resolve null quando o cap estoura. */
+function readBody(req, cap) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0, tooLarge = false;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > cap) { tooLarge = true; chunks.length = 0; return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(tooLarge ? null : Buffer.concat(chunks).toString('utf8')));
+    req.on('error', () => resolve(null));
+  });
+}
 
 function catOf(params) {
   const c = params.get('category');
@@ -188,12 +224,60 @@ async function handler(req, res) {
     return;
   }
 
+  /* cadastro público (sem sessão, sem cookie) */
+  if (url === '/api/signup' && req.method === 'POST') {
+    if (!signupAllowed(ip)) { json(res, 429, { error: 'locked' }); return; }
+    const body = await readBody(req, 16384);
+    if (body === null) { json(res, 413, { error: 'payload_too_large' }); return; }
+    let j = {};
+    try { j = JSON.parse(body || '{}'); } catch {}
+    try {
+      await createSignup(j || {});
+      json(res, 201, { ok: true });
+    } catch (e) {
+      if (e instanceof SbError || (e && e.code === 'store_unavailable')) { json(res, 503, { error: 'store_unavailable' }); return; }
+      // anti-enumeração: duplicidade responde igual ao sucesso, sem criar nada
+      if (e && e.code === 'duplicate') { json(res, 201, { ok: true }); return; }
+      const m = signupErrStatus(e);
+      if (m) { json(res, m.code, m.body); return; }
+      console.error('[serve-web] signup', e);
+      json(res, 500, { error: 'internal' });
+    }
+    return;
+  }
+
   /* API exige sessão */
   if (url.startsWith('/api')) {
     if (!authed) { json(res, 401, { error: 'unauthorized' }); return; }
     const qs = new URLSearchParams(req.url.split('?')[1] || '');
     const category = catOf(qs);
     if (url === '/api/me') { json(res, 200, { user: sess.email, role: sess.role }); return; }
+    if (url === '/api/signups' && req.method === 'GET') {
+      if (sess.role !== 'founder') { json(res, 403, { error: 'forbidden' }); return; }
+      try { json(res, 200, await listSignups()); }
+      catch (e) {
+        if (e instanceof SbError || (e && e.code === 'store_unavailable')) { json(res, 503, { error: 'store_unavailable' }); return; }
+        const m = signupErrStatus(e);
+        if (m) json(res, m.code, m.body);
+        else { console.error('[serve-web] signups', e); json(res, 500, { error: 'internal' }); }
+      }
+      return;
+    }
+    if (url === '/api/signup-review' && req.method === 'POST') {
+      if (sess.role !== 'founder') { json(res, 403, { error: 'forbidden' }); return; }
+      const body = await readBody(req, 4096);
+      if (body === null) { json(res, 413, { error: 'payload_too_large' }); return; }
+      let id = '', action = '';
+      try { const j = JSON.parse(body || '{}'); id = String(j.id || ''); action = j.action; } catch {}
+      try { json(res, 200, await reviewSignup({ id, action, reviewer: sess.email })); }
+      catch (e) {
+        const m = signupErrStatus(e);
+        if (m) { json(res, m.code, m.body); return; }
+        console.error('[serve-web] signup-review', e);
+        json(res, 500, { error: 'internal' });
+      }
+      return;
+    }
     if (url === '/api/insight' && req.method === 'POST') {
       let body = '';
       req.on('data', (c) => { body += c; if (body.length > 8192) req.destroy(); });
@@ -329,8 +413,9 @@ async function handler(req, res) {
     return;
   }
 
-  /* tela de login */
+  /* telas de login e cadastro */
   if (url === '/login' || url === '/login.html') { serveFile(path.join(ROOT, 'login.html')); return; }
+  if (url === '/cadastro' || url === '/cadastro.html') { serveFile(path.join(ROOT, 'cadastro.html')); return; }
 
   /* sem sessão: bloqueia o app e redireciona */
   if (!authed) {
@@ -339,6 +424,9 @@ async function handler(req, res) {
     res.end();
     return;
   }
+
+  /* painel de cadastros (autenticado; o JS guarda founder via API) */
+  if (url === '/cadastros' || url === '/cadastros.html') { serveFile(path.join(ROOT, 'cadastros.html')); return; }
 
   const file = path.join(ROOT, url === '/' ? 'index.html' : url);
   if (!file.startsWith(ROOT)) {

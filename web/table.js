@@ -80,13 +80,30 @@
   }
 
   /* ---------- verificação de WhatsApp autêntico/confirmado ---------- */
+  function isMobilePhoneClient(l) {
+    var d = phoneDigits(l);
+    if (!d) return false;
+    if (d.length > 11 && d.slice(0, 2) === '55') return /^55\d{2}9\d{8}$/.test(d);
+    if (d.length === 10 || d.length === 11) return /^55\d{2}9\d{8}$/.test('55' + d);
+    return false;
+  }
   function isConfirmedWa(l) {
     if (!l) return false;
     if (l.has_confirmed_wa === true) return true;
+    if (l.wa_mobile === true) return true;
+    if (l.wa_confidence === 'mobile_phone') return true;
     if (l.wa_confidence === 'suspect') return false;
     if (l.wa_source === 'site' || l.wa_source === 'instagram' || l.wa_confidence === 'official_maps' || l.wa_confidence === 'official_site') return true;
     if (l.wa && typeof l.wa === 'string') return true;
+    if (!l.whatsapp && isMobilePhoneClient(l)) return true;
     return false;
+  }
+  /* declarado (site/maps/ig) ≠ fallback celular — usado nos rótulos do bloco de dados */
+  function isDeclaredWa(l) {
+    if (!l) return false;
+    if (l.wa_mobile === true || l.wa_confidence === 'mobile_phone') return false;
+    if (l.has_confirmed_wa !== true && !l.whatsapp && isMobilePhoneClient(l)) return false;
+    return isConfirmedWa(l);
   }
 
   /* ---------- gancho dinâmico e mensagem de abordagem (loss of money hook) ---------- */
@@ -292,7 +309,8 @@
     if (isConfirmedWa(l)) {
       var waUrl = buildWaLink(l);
       var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
-      return '<div class="phone-wrap"><a class="cell-wa" href="' + esc(waUrl) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="WhatsApp Confirmado: Iniciar conversa" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' +
+      var waTitle = isDeclaredWa(l) ? 'WhatsApp Confirmado: Iniciar conversa' : 'WhatsApp provável (celular do Maps): Iniciar conversa';
+      return '<div class="phone-wrap"><a class="cell-wa" href="' + esc(waUrl) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="' + waTitle + '" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' +
         '<span class="cell-wa-ico" style="display:inline-flex;width:15px;height:15px;margin-right:5px;vertical-align:-2px;color:#25d366;">' + CH_SVG.wa + '</span>' +
         '<span>' + esc(fmtPhone(d)) + '</span></a>' + badge + '</div>';
     }
@@ -323,7 +341,7 @@
     if (isConfirmedWa(l)) {
       var waUrl = buildWaLink(l);
       var cid = l.id ? ' data-contact-id="' + esc(l.id) + '"' : '';
-      out.push('<a class="ch-ico is-wa-confirmed" data-ch="wa" href="' + esc(waUrl) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="WhatsApp Confirmado: Conversar no WhatsApp" aria-label="Abrir WhatsApp confirmado de ' + esc(l.name) + '">' + CH_SVG.wa + '</a>');
+      out.push('<a class="ch-ico is-wa-confirmed" data-ch="wa" href="' + esc(waUrl) + '"' + cid + ' target="_blank" rel="noopener noreferrer" title="' + (isDeclaredWa(l) ? 'WhatsApp Confirmado: Conversar no WhatsApp' : 'WhatsApp provável (celular): Conversar no WhatsApp') + '" aria-label="Abrir WhatsApp de ' + esc(l.name) + '">' + CH_SVG.wa + '</a>');
     }
     if (!out.length) return '<span class="cell-none">—</span><span class="sr-only"> sem canal</span>';
     return out.join('');
@@ -492,9 +510,9 @@
     var ratingStr = r ? r + '★ (' + rev + ' avaliações)' : 'Sem avaliação';
     var url = siteUrl(l);
     var d = l.wa_digits || phoneDigits(l);
-    var foneStr = isConfirmedWa(l)
-      ? (d ? fmtPhone(d) + ' ✅ Confirmado' : '✅ Confirmado')
-      : (d ? fmtPhone(d) + ' · Não confirmado' : 'Não confirmado');
+    var celOnly = !isDeclaredWa(l) && isConfirmedWa(l); // WhatsApp provável (celular do Maps), não declarado
+    var confirmado = isConfirmedWa(l) ? (celOnly ? ' · Celular' : ' ✅ Confirmado') : ' · Não confirmado';
+    var foneStr = d ? fmtPhone(d) + confirmado : (celOnly ? '· Celular' : isConfirmedWa(l) ? '✅ Confirmado' : 'Não confirmado');
     var ig = l.instagram ? '@' + String(l.instagram).trim().replace(/^@/, '') : 'Não informado';
     return '⭐ Nota: ' + ratingStr + '\n' +
       '🌐 Site: ' + (url || (hasSite(l) ? 'Tem site' : '❌ SEM SITE (Oportunidade Forte)')) + '\n' +

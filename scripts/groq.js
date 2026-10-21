@@ -9,18 +9,28 @@ const SYSTEM = [
   'Responda em português do Brasil, em no máximo 3 frases, direto ao ponto e com os números exatos dos dados fornecidos, em texto puro (sem markdown, asteriscos nem HTML).',
   'Só use os dados do painel; se a resposta não estiver neles, diga que não encontrou na base atual.',
   'Não invente empresas, telefones ou estatísticas.',
+  'Use SOMENTE os números e listas presentes em "Dados atuais do painel". Se a informação pedida não estiver no contexto, responda que não está disponível — nunca estime, some ou invente números.',
 ].join(' ');
 
 function formatContext(p) {
   const s = (p && p.stats) || {};
+  const comZap = s.comZap != null ? s.comZap : (s.zapReal || 0);
+  const nichosSrc = (p && p.nichos && p.nichos.length ? p.nichos : (p && p.areas) || []);
+  const nichos = nichosSrc.map((a) => `${a.label}=${a.value}`).join(', ') || '-';
   const areas = ((p && p.areas) || []).map((a) => `${a.label}=${a.value}`).join(', ') || '—';
   const top = ((p && p.top) || []).slice(0, 5).map((l) => `${l.name} (${l.score})`).join(' · ') || '—';
+  const zapMaps = s.comZapMaps || 0;
+  const zapSite = s.comZapSiteOficial || 0;
+  const zapIg = s.comZapIg || 0;
+  const zapOutros = comZap - zapMaps - zapSite - zapIg;
+  const zapFontes = zapOutros === 0 ? ` (maps: ${zapMaps} · site: ${zapSite} · ig: ${zapIg})` : '';
   return [
-    `Total: ${s.total || 0} empresas | com site: ${s.comSite || 0} | sem site: ${s.semSite || 0} | com telefone: ${s.comPhone || 0}`,
-    `Alta oportunidade: ${s.alta || 0} | qualificados: ${s.qualif || 0}`,
-    `E-mail direto: ${s.comEmail || 0} · Instagram: ${s.comInstagram || 0} · WhatsApp no site: ${s.comZapSite || 0}`,
+    `Total: ${s.total || 0} empresas · com site: ${s.comSite || 0} · sem site: ${s.semSite || 0} · com telefone: ${s.comPhone || 0}`,
+    `WhatsApp: ${comZap} com zap declarado${zapFontes} · ${s.comZapCelular || 0} por celular · ${s.comZapTotal || comZap} contatáveis no total`,
+    `Alta oportunidade: ${s.alta || 0} | qualificados: ${s.qualif || 0} · E-mail direto: ${s.comEmail || 0} · Instagram: ${s.comInstagram || 0} · hint no site: ${s.comZapSite || 0}`,
+    `Nichos: ${nichos}`,
+    `Áreas de atuação: ${areas}`,
     `Perfis não reclamados (Maps): ${s.naoReclamados || 0} · Negócios de 5+ anos: ${s.desdeAntigo || 0}`,
-    `Áreas: ${areas}`,
     `Top leads: ${top}`,
   ].join('\n');
 }

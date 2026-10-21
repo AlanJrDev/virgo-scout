@@ -1,0 +1,15 @@
+/* cadastro — só o que login.css não cobre */
+.cad-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cad-grid .field{margin-bottom:16px}
+.cad-consent{margin:2px 0 14px}
+.cad-ok{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.3);border-radius:12px;padding:22px 18px;text-align:center;margin-bottom:16px}
+.cad-ok-ico{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--cyan);color:#05263a;margin-bottom:10px}
+.cad-ok-ico svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.cad-ok strong{display:block;font-size:15px;margin-bottom:4px}
+.cad-ok p{font-size:12.5px;color:var(--muted)}
+.login-foot{margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.cad-back{font-size:12px;color:var(--muted)}
+@media(hover:hover){.cad-back:hover{color:var(--text)}}
+@media (max-width:480px){
+  .cad-grid{grid-template-columns:1fr}
+}

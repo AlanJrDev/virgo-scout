@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { buildPayload, scoreOf, buildTop, buildStats, buildSeries } = require('../utils/metrics');
+const { buildPayload, scoreOf, buildTop, buildStats, buildSeries, isMobilePhone } = require('../utils/metrics');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-metrics-'));
 fs.writeFileSync(path.join(TMP, 'advogados-df-max.json'), JSON.stringify([
@@ -228,14 +228,23 @@ test('tier A: sem site + celular (sem zap declarado) é principal; fixo não é'
   assert.strictEqual(byId['3'].tier, 'b');
 });
 
-test('wa: botão só com zap declarado (phone do Maps não gera mais wa)', () => {
+test('wa: zap declarado manda no wa; celular do Maps vira fallback; fixo não vira', () => {
   const out = buildTop([
     { id: '1', name: 'X', phone: '61999998888', whatsapp: '5561999998888' },
     { id: '2', name: 'Y', phone: '61999998888' },
-  ], 2);
+    { id: '3', name: 'F', phone: '(61) 3222-1234' },
+  ], 3);
   const byId = Object.fromEntries(out.map((l) => [l.id, l]));
   assert.ok(byId['1'].wa.includes('wa.me/5561999998888'));
-  assert.strictEqual(byId['2'].wa, null);
+  assert.ok(byId['2'].wa.includes('wa.me/5561999998888'));
+  assert.strictEqual(byId['2'].wa_mobile, true);
+  assert.strictEqual(byId['2'].wa_source, 'maps-celular');
+  assert.strictEqual(byId['2'].wa_confidence, 'mobile_phone');
+  assert.strictEqual(byId['2'].has_confirmed_wa, false);
+  assert.strictEqual(byId['1'].wa_mobile, false);
+  assert.strictEqual(byId['3'].wa, null);
+  assert.strictEqual(byId['3'].wa_mobile, false);
+  assert.strictEqual(byId['3'].phone_link, 'tel:+556132221234');
 });
 
 test('phone_link: fixo vira tel:, celular vira wa.me, zap real vira null', () => {
@@ -373,4 +382,54 @@ test('funnelSummary: base vazia e shape completo', () => {
   assert.strictEqual(s.evidencePct, 0);
   assert.deepStrictEqual(s.semSites, { total: 0, tierA: 0, tierB: 0 });
   assert.deepStrictEqual(Object.keys(s).sort(), ['comEvidence', 'comHint', 'comPhone', 'comSite', 'comZap', 'descobertaPct', 'evidencePct', 'semSites', 'total', 'waSource', 'waStatus', 'zapsUnicos']);
+});
+
+test('isMobilePhone: celular BR (13 díg) true; fixo, 0800 e vazio false', () => {
+  assert.strictEqual(isMobilePhone('5561992509853'), true); // Sandra Estofados
+  assert.strictEqual(isMobilePhone('61992509853'), true); // local 11 dígitos vira 13
+  assert.strictEqual(isMobilePhone('(61) 99250-9853'), true); // com máscara
+  assert.strictEqual(isMobilePhone('6132724904'), false); // fixo
+  assert.strictEqual(isMobilePhone('556132724904'), false); // fixo com 55
+  assert.strictEqual(isMobilePhone('0800 000 1000'), false);
+  assert.strictEqual(isMobilePhone(''), false);
+});
+
+test('buildTop: celular sem zap declarado (Sandra) vira WhatsApp fallback', () => {
+  const out = buildTop([{ id: 'sandra', name: 'Sandra Estofados', phone: '61992509853' }], 1);
+  const l = out[0];
+  assert.ok(l.wa && l.wa.includes('wa.me/5561992509853'), `wa=${l.wa}`);
+  assert.strictEqual(l.wa_mobile, true);
+  assert.strictEqual(l.has_confirmed_wa, false);
+  assert.strictEqual(l.wa_source, 'maps-celular');
+  assert.strictEqual(l.wa_confidence, 'mobile_phone');
+  assert.strictEqual(l.wa_digits, '5561992509853');
+});
+
+test('buildStats: comZapCelular/comZapTotal e fontes do zap declarado', () => {
+  const stats = buildStats([
+    { phone: '61999998888', whatsapp: '5561999998888', wa_source: 'maps' },
+    { phone: '61999997777', whatsapp: '5561999997777', wa_source: 'site' },
+    { phone: '61999996666', whatsapp: '5561999996666', wa_source: 'instagram' },
+    { phone: '61999995555' }, // celular sem zap declarado → fallback
+    { phone: '(61) 3272-4904' }, // fixo → nada
+  ]);
+  assert.strictEqual(stats.comZap, 3);
+  assert.strictEqual(stats.zapReal, 3);
+  assert.strictEqual(stats.comZapCelular, 1);
+  assert.strictEqual(stats.comZapTotal, 4);
+  assert.strictEqual(stats.comZapMaps, 1);
+  assert.strictEqual(stats.comZapSiteOficial, 1);
+  assert.strictEqual(stats.comZapIg, 1);
+  assert.strictEqual(stats.comZapSite, 0);
+  assert.strictEqual(stats.comZapHint, 0);
+});
+
+test('buildPayload expõe nichos agrupando types (string multi, único por lead, desc)', () => {
+  const p = buildPayload([
+    { id: '1', name: 'Multi A', address: 'Gama', types: 'advogados,topografia' },
+    { id: '2', name: 'Multi B', address: 'Gama', types: 'topografia,estofado' },
+    { id: '3', name: 'Dup C', address: 'Gama', types: 'estofado,estofado' },
+  ], { dataDir: TMP, category: 'all' });
+  assert.deepStrictEqual(p.nichos.map((n) => n.label), ['Estofado', 'Topografia', 'Advogados']);
+  assert.deepStrictEqual(p.nichos.map((n) => n.value), [2, 2, 1]);
 });

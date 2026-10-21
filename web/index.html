@@ -45,6 +45,7 @@
       <div class="search-results" id="searchResults" role="listbox" hidden></div>
     </label>
     <div class="top-user">
+      <a class="icon-btn" id="navSignups" href="/cadastros" hidden title="Cadastros" aria-label="Cadastros (fundador)"><svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2"/><path d="M19 8v6"/><path d="m22 11h-6"/></svg></a>
       <button class="icon-btn bell" aria-label="Notificações"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></button>
       <div class="avatar" id="uAvatar" aria-hidden="true">VS</div>
       <div class="uinfo"><strong id="uName">—</strong><span id="uRole">…</span></div>
@@ -340,7 +341,7 @@
         </div>
 
         <div class="share-opt-row">
-          <label class="share-check"><input type="checkbox" id="shareOnlyWa" checked> <span>Apenas leads com WhatsApp confirmado</span></label>
+          <label class="share-check"><input type="checkbox" id="shareOnlyWa" checked> <span title="Filtra leads com WhatsApp declarado (site/Maps/Instagram) ou celular qualificado do Maps">Apenas leads com WhatsApp (confirmado ou celular)</span></label>
         </div>
 
         <div class="share-preview-wrap">

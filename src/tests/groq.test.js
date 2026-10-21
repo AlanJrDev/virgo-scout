@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { buildMessages, formatContext, askGroq, interpretCapture, GROQ_URL, MODEL } = require('../../scripts/groq');
+const { buildMessages, formatContext, askGroq, interpretCapture, GROQ_URL, MODEL, SYSTEM } = require('../../scripts/groq');
 
 const PAYLOAD = {
   stats: { total: 1345, comSite: 192, semSite: 1153, comPhone: 240, alta: 578, qualif: 168 },
@@ -20,12 +20,61 @@ test('formatContext resume stats, áreas e top leads', () => {
 });
 
 test('formatContext inclui os novos sinais quando existem na base', () => {
-  const c = formatContext({ stats: { total: 10, comEmail: 7, comInstagram: 4, comZapSite: 2, naoReclamados: 5, desdeAntigo: 3 } });
+  const c = formatContext({ stats: { total: 10, comEmail: 7, comInstagram: 4, comZapSite: 2, comZapHint: 2, naoReclamados: 5, desdeAntigo: 3 } });
   assert.match(c, /E-mail direto: 7/);
   assert.match(c, /Instagram: 4/);
-  assert.match(c, /WhatsApp no site: 2/);
+  assert.match(c, /hint no site: 2/);
+  assert.doesNotMatch(c, /WhatsApp no site:/);
   assert.match(c, /Perfis não reclamados \(Maps\): 5/);
   assert.match(c, /Negócios de 5\+ anos: 3/);
+});
+
+test('formatContext separa WhatsApp por fonte / celular / contatáveis', () => {
+  const c = formatContext({ stats: { total: 10, comZap: 3, zapReal: 3, comZapMaps: 2, comZapSiteOficial: 1, comZapIg: 0, comZapCelular: 4, comZapTotal: 7 } });
+  assert.match(c, /WhatsApp: 3 com zap declarado \(maps: 2 · site: 1 · ig: 0\)/);
+  assert.match(c, /4 por celular · 7 contatáveis no total/);
+});
+
+test('formatContext separa Nichos de Áreas de atuação (hack antigo não volta)', () => {
+  const p = {
+    nichos: [{ label: 'Estofado', value: 5 }, { label: 'Advogados', value: 3 }],
+    areas: [{ label: 'Civil', value: 4 }],
+    stats: { total: 10 },
+  };
+  const c = formatContext(p);
+  assert.match(c, /Nichos: Estofado=5, Advogados=3/);
+  assert.match(c, /Áreas de atuação: Civil=4/);
+  assert.ok(!/^.Áreas:/m.test(c), 'linha antiga "Áreas:" não volta');
+});
+
+test('formatContext deriva nichos de p.areas quando p.nichos ausente', () => {
+  const c = formatContext({ areas: [{ label: 'Trabalhista', value: 81 }], stats: {} });
+  assert.match(c, /Nichos: Trabalhista=81/);
+  assert.match(c, /Áreas de atuação: Trabalhista=81/);
+});
+
+test('formatContext: nichos vazio cai em p.areas; ambos vazios → "-"', () => {
+  const c = formatContext({ nichos: [], areas: [{ label: 'Criminal', value: 7 }], stats: {} });
+  assert.match(c, /Nichos: Criminal=7/);
+  const vazio = formatContext({ nichos: [], stats: {} });
+  assert.match(vazio, /Nichos: -/);
+});
+
+test('formatContext: breakdown de zap incoerente → sem parêntese de fontes', () => {
+  const coerente = formatContext({ stats: { total: 10, comZap: 3, comZapMaps: 2, comZapSiteOficial: 1, comZapIg: 0 } });
+  assert.match(coerente, /WhatsApp: 3 com zap declarado \(maps: 2 · site: 1 · ig: 0\)/);
+  const somadoAlem = formatContext({ stats: { total: 10, comZap: 3, comZapMaps: 2, comZapSiteOficial: 1, comZapIg: 1 } });
+  assert.match(somadoAlem, /WhatsApp: 3 com zap declarado ·/);
+  assert.doesNotMatch(somadoAlem, /maps: 2/);
+  const negativo = formatContext({ stats: { total: 10, comZap: 1, comZapMaps: 2, comZapSiteOficial: 0, comZapIg: 0 } });
+  assert.match(negativo, /WhatsApp: 1 com zap declarado ·/);
+  assert.doesNotMatch(negativo, /\(maps:/);
+});
+
+test('SYSTEM veda estimação/invenção de números', () => {
+  assert.match(SYSTEM, /nunca estime, some ou invente números/);
+  const msgs = buildMessages({ question: 'quantos temos?', context: 'c' });
+  assert.match(msgs[0].content, /nunca estime, some ou invente números/);
 });
 
 test('buildMessages monta system + contexto + histórico + pergunta', () => {

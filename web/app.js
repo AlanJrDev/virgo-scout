@@ -506,12 +506,30 @@
 
     /* destaques + filtro por área — chips derivam do recorte ativo (tipo no topbar), não do payload global */
     var pool = D.pool && D.pool.length ? D.pool : (D.top || []);
+    function waPhoneDigits(str) {
+      var d = String(str || '').replace(/\D/g, '');
+      if (!d) return '';
+      if (d.length > 11 && d.slice(0, 2) === '55') return d;
+      if (d.length === 10 || d.length === 11) d = '55' + d;
+      if (/^55\d{2}9\d{8}$/.test(d)) return d; // celular → WhatsApp provável
+      return /^55\d{2}9\d{8}$|^55\d{2}\d{8}$/.test(d) ? d : '';
+    }
     function waBtn(l) {
       if (l.wa) {
         var cid = l.id ? ' data-contact-id="' + escapeHtml(l.id) + '"' : '';
         return '<a class="wa-btn" href="' + escapeHtml(l.wa) + '"' + cid + ' target="_blank" rel="noopener noreferrer" aria-label="Conversar no WhatsApp com ' + escapeHtml(l.name) + '" title="Abrir WhatsApp">' + WA_SVG + '</a>';
       }
-      var semZap = l.phone ? 'Sem WhatsApp declarado no site' : 'Sem telefone na base';
+      var digits = l.wa_digits || waPhoneDigits(l.phone_raw);
+      var celular = (l.wa_mobile === true || /^55\d{2}9\d{8}$/.test(String(digits || ''))) && digits;
+      if (celular) {
+        var cidCel = l.id ? ' data-contact-id="' + escapeHtml(l.id) + '"' : '';
+        var href = 'https://wa.me/' + String(digits).replace(/\D/g, '');
+        if (window.WA_QUOTE && typeof window.WA_QUOTE.waShortMessage === 'function') {
+          href += '?text=' + encodeURIComponent(window.WA_QUOTE.waShortMessage('Alan'));
+        }
+        return '<a class="wa-btn" href="' + escapeHtml(href) + '"' + cidCel + ' target="_blank" rel="noopener noreferrer" aria-label="Conversar no WhatsApp com ' + escapeHtml(l.name) + '" title="Abrir WhatsApp (celular)">' + WA_SVG + '</a>';
+      }
+      var semZap = (l.phone_raw || l.phone) ? 'Telefone fixo — WhatsApp não confirmado' : 'Sem WhatsApp na base';
       return '<span class="wa-btn disabled" role="img" aria-label="' + semZap + '" title="' + semZap + '">' + WA_SVG + '</span>';
     }
     function featRows(area) {
@@ -1234,6 +1252,8 @@
         if (g) g.textContent = g.textContent.replace(',', ', ' + String(me.user || '').split('@')[0].split(/[._-]/)[0] + '!');
         if (role) role.textContent = me.role === 'founder' ? 'Fundador' : 'Cofounder';
         if (av) av.textContent = emailInitials(me.user);
+        var ns = document.getElementById('navSignups');
+        if (ns) ns.hidden = me.role !== 'founder';
       })
       .catch(function () {});
   }

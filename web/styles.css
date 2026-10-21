@@ -390,6 +390,7 @@ body.ia-open .ia-fab{opacity:0;visibility:hidden;pointer-events:none;transform:s
 .toast i{width:8px;height:8px;border-radius:50%;background:var(--cyan);flex:none}
 .toast.ok i{background:#34d399}
 .toast.warn i{background:#fbbf24}
+.toast.err i{background:#ef4444}
 
 .msg.assistant{align-self:flex-start;max-width:96%;background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--muted)}
 .msg.assistant strong{color:var(--text)}
@@ -788,3 +789,34 @@ body.is-booting .filter-row .chip{transition:none}
 }
 .btn-download-doc svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
 .btn-download-doc:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 6px 18px rgba(37,211,102,.5)}
+
+/* ===== CADASTROS (founder) ===== */
+.icon-btn[hidden]{display:none}
+.cad-wrap{max-width:860px;margin:0 auto;padding:40px 20px 60px}
+.cad-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:28px;flex-wrap:wrap}
+.cad-brand{display:flex;align-items:center;gap:14px}
+.cad-brand .brand-logo{height:38px;width:auto}
+.cad-brand h1{font-size:20px;font-weight:700}
+.cad-brand p{font-size:12.5px;color:var(--muted)}
+.cad-panel-link{font-size:12.5px;color:var(--muted);border:1px solid var(--border);border-radius:9px;padding:8px 12px;background:var(--surface)}
+@media(hover:hover){.cad-panel-link:hover{color:var(--text);border-color:var(--border-strong)}}
+.cad-sec-title{font-size:13px;font-weight:600;color:var(--muted);margin:22px 0 10px;text-transform:uppercase;letter-spacing:.04em}
+.cad-list{display:grid;gap:10px}
+.cad-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+.cad-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.cad-card-name{font-size:14px;display:inline-flex;align-items:center;gap:8px}
+.cad-card-date{font-size:11.5px;color:var(--faint)}
+.cad-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;margin-bottom:10px}
+.cad-info dt{font-size:11px;color:var(--faint)}
+.cad-info dd{font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis}
+.cad-badge{font-size:10.5px;font-weight:600;border-radius:99px;padding:2px 9px;border:1px solid}
+.cad-pending{color:var(--amber);background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.3)}
+.cad-approved{color:var(--green);background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3)}
+.cad-rejected{color:var(--red);background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.3)}
+.cad-acts{display:flex;gap:8px;justify-content:flex-end}
+.cad-act{font-size:12.5px;font-weight:600;border-radius:9px;padding:7px 14px;border:1px solid;transition:filter 160ms var(--ease-out)}
+.cad-act-ok{color:#05263a;background:var(--cyan);border-color:var(--cyan)}
+.cad-act-no{color:var(--red);background:transparent;border-color:rgba(248,113,113,.4)}
+.cad-act:disabled{opacity:.5;cursor:default}
+@media(hover:hover){.cad-act-ok:hover{filter:brightness(1.08)}.cad-act-no:hover{background:rgba(248,113,113,.1)}}
+.cad-empty{font-size:12.5px;color:var(--faint);background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--r-md);padding:14px;text-align:center}

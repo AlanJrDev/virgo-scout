@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Virgo Scout — Cadastros</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="cad-wrap">
+  <header class="cad-head">
+    <div class="cad-brand">
+      <img src="assets/LOGO.png" alt="Virgo Tech" class="brand-logo">
+      <div>
+        <h1>Cadastros</h1>
+        <p>Solicitações de criação de conta pendentes e histórico de revisões.</p>
+      </div>
+    </div>
+    <a class="cad-panel-link" href="/">← Voltar ao painel</a>
+  </header>
+
+  <section aria-labelledby="pendTitle">
+    <h2 class="cad-sec-title" id="pendTitle">Pendentes <span id="cadPendCount"></span></h2>
+    <div id="cadPendList" class="cad-list"></div>
+  </section>
+
+  <section aria-labelledby="histTitle">
+    <h2 class="cad-sec-title" id="histTitle">Histórico</h2>
+    <div id="cadHistList" class="cad-list"></div>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script src="cadastros.js"></script>
+</body>
+</html>
